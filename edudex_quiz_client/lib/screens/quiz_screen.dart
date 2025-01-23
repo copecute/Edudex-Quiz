@@ -4,6 +4,10 @@ import 'dart:async';
 import 'result_screen.dart';
 import 'package:window_manager/window_manager.dart';
 import 'dart:io' show Platform;
+import 'package:provider/provider.dart';
+import '../theme.dart';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -13,204 +17,39 @@ class QuizScreen extends StatefulWidget {
 }
 
 class _QuizScreenState extends State<QuizScreen> with WindowListener {
+  // biến lưu câu hỏi hiện tại
   int _currentQuestionIndex = 0;
+
+  // đáp án được chọn cho câu hỏi hiện tại
   int? _selectedAnswerIndex;
+
+  // biến đếm thời gian làm bài
   Timer? _timer;
-  int _remainingSeconds = 30 * 60; // 30 phút
+
+  int _remainingSeconds = 1 * 60; // 1 phút
+
+  // biến trạng thái đang nộp bài
   bool _isSubmitting = false;
 
-  final List<Map<String, dynamic>> _questions = [
-    {
-      'question':
-          'Ngôn ngữ lập trình nào được sử dụng để phát triển ứng dụng Android?',
-      'answers': [
-        'Swift',
-        'Kotlin',
-        'Objective-C',
-        'Ruby',
-      ],
-    },
-    {
-      'question': 'Đâu là kiểu dữ liệu nguyên thủy trong Java?',
-      'answers': [
-        'String',
-        'Array',
-        'int',
-        'Object',
-      ],
-    },
-    {
-      'question':
-          'Thuật toán sắp xếp nào có độ phức tạp trung bình là O(n log n)?',
-      'answers': [
-        'Bubble Sort',
-        'Quick Sort',
-        'Selection Sort',
-        'Insertion Sort',
-      ],
-    },
-    {
-      'question': 'Cấu trúc dữ liệu nào hoạt động theo nguyên tắc LIFO?',
-      'answers': [
-        'Queue',
-        'Stack',
-        'Tree',
-        'Graph',
-      ],
-    },
-    {
-      'question': 'HTML là viết tắt của?',
-      'answers': [
-        'Hyper Text Markup Language',
-        'High Tech Modern Language',
-        'Hyper Transfer Markup Language',
-        'High Text Machine Language',
-      ],
-    },
-    {
-      'question': 'Đâu không phải là một framework JavaScript?',
-      'answers': [
-        'React',
-        'Angular',
-        'Django',
-        'Vue',
-      ],
-    },
-    {
-      'question':
-          'Phương pháp nào được sử dụng để tìm kiếm trong mảng đã sắp xếp?',
-      'answers': [
-        'Linear Search',
-        'Binary Search',
-        'Hash Search',
-        'Bubble Search',
-      ],
-    },
-    {
-      'question': 'Git là gì?',
-      'answers': [
-        'Ngôn ngữ lập trình',
-        'Hệ quản trị cơ sở dữ liệu',
-        'Hệ thống quản lý phiên bản',
-        'Framework web',
-      ],
-    },
-    {
-      'question': 'RAM là viết tắt của?',
-      'answers': [
-        'Random Access Memory',
-        'Read Access Memory',
-        'Random Available Memory',
-        'Read Available Memory',
-      ],
-    },
-    {
-      'question': 'Đâu là một trình duyệt web?',
-      'answers': [
-        'Windows',
-        'Linux',
-        'Chrome',
-        'Python',
-      ],
-    },
-    {
-      'question': 'CPU là viết tắt của?',
-      'answers': [
-        'Central Processing Unit',
-        'Central Program Utility',
-        'Computer Personal Unit',
-        'Control Processing Unit',
-      ],
-    },
-    {
-      'question': 'Đâu là một hệ điều hành di động?',
-      'answers': [
-        'Windows',
-        'iOS',
-        'Linux',
-        'Firefox',
-      ],
-    },
-    {
-      'question': 'SQL là viết tắt của?',
-      'answers': [
-        'Strong Question Language',
-        'Structured Query Language',
-        'System Query Language',
-        'Simple Question Language',
-      ],
-    },
-    {
-      'question': 'Đâu là một ngôn ngữ lập trình hướng đối tượng?',
-      'answers': [
-        'HTML',
-        'CSS',
-        'Java',
-        'SQL',
-      ],
-    },
-    {
-      'question': 'Thuật toán tìm kiếm nào có độ phức tạp O(1)?',
-      'answers': [
-        'Linear Search',
-        'Binary Search',
-        'Hash Search',
-        'Bubble Search',
-      ],
-    },
-    {
-      'question': 'Đâu là một protocol truyền tải web?',
-      'answers': [
-        'HTML',
-        'CSS',
-        'HTTP',
-        'SQL',
-      ],
-    },
-    {
-      'question': 'Phần mềm nào được sử dụng để quản lý cơ sở dữ liệu?',
-      'answers': [
-        'Chrome',
-        'MySQL',
-        'Python',
-        'Linux',
-      ],
-    },
-    {
-      'question': 'API là viết tắt của?',
-      'answers': [
-        'Application Programming Interface',
-        'Advanced Programming Interface',
-        'Application Process Integration',
-        'Advanced Process Interface',
-      ],
-    },
-    {
-      'question': 'Đâu là một công cụ phát triển web?',
-      'answers': [
-        'Word',
-        'Excel',
-        'VSCode',
-        'Paint',
-      ],
-    },
-    {
-      'question': 'Đâu là một cấu trúc dữ liệu phi tuyến tính?',
-      'answers': [
-        'Array',
-        'Stack',
-        'Tree',
-        'Queue',
-      ],
-    },
-  ];
+  // cỡ chữ hiện tại
+  double _fontSize = 16.0;
 
+  // biến lưu danh sách câu hỏi từ file json
+  List<Map<String, dynamic>> _questions = [];
+
+  // trạng thái đang tải câu hỏi
+  bool _isLoading = true;
+
+  // biến lưu đáp án của người dùng (số thứ tự câu hỏi -> đáp án đã chọn)
   Map<int, int?> _userAnswers = {};
 
+  // biến controller cuộn màn hình
   final ScrollController _scrollController = ScrollController();
-  final double _questionHeight =
-      250; // Ước tính chiều cao trung bình của mỗi câu hỏi
 
+  // biến chiều cao ước tính cho mỗi câu hỏi
+  final double _questionHeight = 250;
+
+  // hàm cuộn đến câu hỏi được chọn
   void _scrollToQuestion(int index) {
     final double offset = index * _questionHeight;
     _scrollController.animateTo(
@@ -223,21 +62,95 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
+    // tải câu hỏi khi khởi tạo
+    _loadQuestions();
+    // toàn màn hình
     _setupFullScreen();
+    // bắt đầu đếm thời gian
     _startTimer();
+    // thêm listener cho window
     windowManager.addListener(this);
+    // khởi tạo cửa sổ
     _initializeWindow();
+    // Thêm listener cho keyboard
+    RawKeyboard.instance.addListener(_handleKeyEvent);
+  }
+
+  Future<void> _loadQuestions() async {
+    try {
+      // đọc file JSON từ assets
+      final String response = await DefaultAssetBundle.of(context)
+          .loadString('assets/questions.json');
+      final data = await json.decode(response);
+
+      setState(() {
+        _questions = List<Map<String, dynamic>>.from(data['questions']);
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Lỗi khi tải câu hỏi: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _setupFullScreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: []);
-    // Prevent Alt+Tab
+    // Ngăn chặn Alt+Tab
     RawKeyboard.instance.addListener(_handleKeyEvent);
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
-    if (event.isAltPressed || event.isControlPressed) {
-      // Block Alt+Tab by doing nothing
+    // Chặn các phím Windows/Super
+    if (event.isMetaPressed) {
+      return;
+    }
+
+    // Chặn Alt+Tab, Windows+Tab
+    if (event.isAltPressed || event.isMetaPressed) {
+      if (event.logicalKey == LogicalKeyboardKey.tab) {
+        return;
+      }
+    }
+
+    // Chặn Windows+D (Show desktop)
+    if (event.isMetaPressed && event.logicalKey == LogicalKeyboardKey.keyD) {
+      return;
+    }
+
+    // Chặn Ctrl+Alt+Delete
+    if (event.isControlPressed && event.isAltPressed) {
+      if (event.logicalKey == LogicalKeyboardKey.delete) {
+        return;
+      }
+    }
+
+    // Chặn Alt+F4
+    if (event.isAltPressed && event.logicalKey == LogicalKeyboardKey.f4) {
+      return;
+    }
+
+    // Chặn Ctrl+W
+    if (event.isControlPressed && event.logicalKey == LogicalKeyboardKey.keyW) {
+      return;
+    }
+
+    // Chặn các phím chức năng F1-F12
+    if (event.logicalKey.keyLabel.startsWith('F') &&
+        event.logicalKey.keyLabel.length <= 3) {
+      return;
+    }
+
+    // Chặn Ctrl+Shift+Esc (Task Manager)
+    if (event.isControlPressed &&
+        event.isShiftPressed &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      return;
+    }
+
+    // Chặn Alt+Esc
+    if (event.isAltPressed && event.logicalKey == LogicalKeyboardKey.escape) {
       return;
     }
   }
@@ -248,7 +161,26 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         if (_remainingSeconds > 0) {
           _remainingSeconds--;
         } else {
-          _submitQuiz();
+          _timer?.cancel();
+          // hiện modal hết giờ
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => ContentDialog(
+              title: const Text('Hết giờ làm bài'),
+              content: const Text(
+                  'Đã hết thời gian làm bài, hệ thống sẽ tự động nộp bài.'),
+              actions: [
+                FilledButton(
+                  child: const Text('OK'),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _submitQuiz(isTimeUp: true);
+                  },
+                ),
+              ],
+            ),
+          );
         }
       });
     });
@@ -260,32 +192,35 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  Future<void> _submitQuiz() async {
+  void _submitQuiz({bool isTimeUp = false}) async {
     if (_isSubmitting) return;
 
     setState(() {
       _isSubmitting = true;
     });
 
-    bool shouldSubmit = await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => ContentDialog(
-            title: const Text('Nộp bài'),
-            content: const Text('Bạn có chắc chắn muốn nộp bài?'),
-            actions: [
-              Button(
-                child: const Text('Không'),
-                onPressed: () => Navigator.pop(context, false),
+    // nếu không phải hết giờ thì hiện dialog xác nhận
+    bool shouldSubmit = isTimeUp
+        ? true
+        : await showDialog<bool>(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) => ContentDialog(
+                title: const Text('Nộp bài'),
+                content: const Text('Bạn có chắc chắn muốn nộp bài?'),
+                actions: [
+                  Button(
+                    child: const Text('Không'),
+                    onPressed: () => Navigator.pop(context, false),
+                  ),
+                  FilledButton(
+                    child: const Text('Có'),
+                    onPressed: () => Navigator.pop(context, true),
+                  ),
+                ],
               ),
-              FilledButton(
-                child: const Text('Có'),
-                onPressed: () => Navigator.pop(context, true),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+            ) ??
+            false;
 
     if (shouldSubmit) {
       _timer?.cancel();
@@ -293,29 +228,38 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
           overlays: SystemUiOverlay.values);
       RawKeyboard.instance.removeListener(_handleKeyEvent);
 
+      // Tắt full screen và always on top
+      try {
+        if (const bool.fromEnvironment('dart.library.io')) {
+          await windowManager.setFullScreen(false);
+          await windowManager.setAlwaysOnTop(false);
+        }
+      } catch (e) {
+        // Bỏ qua lỗi khi chạy trên web
+      }
+
       // Tính điểm
       int correctAnswers = 0;
-      // TODO: Thay thế logic tính điểm thực tế ở đây
       _userAnswers.forEach((key, value) {
         if (value == 1) {
-          // Giả sử đáp án 1 (B) là đáp án đúng
           correctAnswers++;
         }
       });
 
       double score = (correctAnswers * 10) / _questions.length;
 
-      // Chuyển sang màn hình kết quả
-      Navigator.pushReplacement(
-        context,
-        FluentPageRoute(
-          builder: (context) => ResultScreen(
-            totalQuestions: _questions.length,
-            correctAnswers: correctAnswers,
-            score: score,
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(
+            builder: (context) => ResultScreen(
+              totalQuestions: _questions.length,
+              correctAnswers: correctAnswers,
+              score: score,
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else {
       setState(() {
         _isSubmitting = false;
@@ -332,7 +276,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         await windowManager.focus();
       }
     } catch (e) {
-      // Bỏ qua lỗi khi chạy trên web
+      // Bỏ qua lỗi khi debug web
     }
   }
 
@@ -388,10 +332,70 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.watch<AppTheme>();
+
+    if (_isLoading) {
+      return const Center(child: ProgressRing());
+    }
+
     return NavigationView(
-      appBar: const NavigationAppBar(
-        title: Text('Bài kiểm tra'),
+      appBar: NavigationAppBar(
         automaticallyImplyLeading: false,
+        // title: const Text('Làm bài'),
+        actions: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            // Nút điều chỉnh cỡ chữ
+            Row(
+              children: [
+                IconButton(
+                  icon: const Icon(FluentIcons.font_decrease),
+                  onPressed: () {
+                    setState(() {
+                      if (_fontSize > 12) {
+                        _fontSize -= 2;
+                      }
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(FluentIcons.font_size),
+                  onPressed: () {
+                    setState(() {
+                      _fontSize = 16.0; // Reset về mặc định
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(FluentIcons.font_increase),
+                  onPressed: () {
+                    setState(() {
+                      if (_fontSize < 24) {
+                        _fontSize += 2;
+                      }
+                    });
+                  },
+                ),
+                const SizedBox(width: 16),
+              ],
+            ),
+            // Nút chuyển đổi theme
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ToggleSwitch(
+                content: const Text('Chế độ tối'),
+                checked: FluentTheme.of(context).brightness.isDark,
+                onChanged: (v) {
+                  if (v) {
+                    appTheme.mode = ThemeMode.dark;
+                  } else {
+                    appTheme.mode = ThemeMode.light;
+                  }
+                },
+              ),
+            ),
+          ],
+        ),
       ),
       content: ScaffoldPage(
         padding: EdgeInsets.zero,
@@ -479,7 +483,8 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                Text(_questions[questionIndex]['question']),
+                                Text(_questions[questionIndex]['question'],
+                                    style: TextStyle(fontSize: _fontSize)),
                                 const SizedBox(height: 24),
                                 ...List.generate(
                                   _questions[questionIndex]['answers'].length,
@@ -502,6 +507,8 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                                       },
                                       content: Text(
                                         '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]}',
+                                        style:
+                                            TextStyle(fontSize: _fontSize - 2),
                                       ),
                                     ),
                                   ),

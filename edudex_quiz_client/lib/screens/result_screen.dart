@@ -1,5 +1,8 @@
 import 'package:fluent_ui/fluent_ui.dart';
-import 'dashboard_screen.dart';
+import 'package:window_manager/window_manager.dart';
+import 'package:provider/provider.dart';
+import '../theme.dart';
+import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 
 class ResultScreen extends StatelessWidget {
   final int totalQuestions;
@@ -15,12 +18,43 @@ class ResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.watch<AppTheme>();
     final bool isPassed = score >= 5.0;
 
     return NavigationView(
-      appBar: const NavigationAppBar(
-        title: Text('Kết quả bài thi'),
+      appBar: NavigationAppBar(
         automaticallyImplyLeading: false,
+        title: () {
+          return const DragToMoveArea(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('Kết quả bài làm'),
+            ),
+          );
+        }(),
+        actions: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8.0),
+                child: ToggleSwitch(
+                  content: const Text('Chế độ tối'),
+                  checked: FluentTheme.of(context).brightness.isDark,
+                  onChanged: (v) {
+                    if (v) {
+                      appTheme.mode = ThemeMode.dark;
+                    } else {
+                      appTheme.mode = ThemeMode.light;
+                    }
+                  },
+                ),
+              ),
+            ),
+            const WindowButtons(),
+          ],
+        ),
       ),
       content: ScaffoldPage(
         padding: EdgeInsets.zero,

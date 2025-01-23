@@ -1,0 +1,204 @@
+{
+  "questions": [
+    {
+      "question": "Ngôn ngữ lập trình nào được sử dụng để phát triển ứng dụng Android?",
+      "answers": [
+        "Swift",
+        "Kotlin",
+        "Objective-C",
+        "Ruby"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "Đâu là kiểu dữ liệu nguyên thủy trong Java?",
+      "answers": [
+        "String",
+        "Array",
+        "int",
+        "Object"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Thuật toán sắp xếp nào có độ phức tạp trung bình là O(n log n)?",
+      "answers": [
+        "Bubble Sort",
+        "Quick Sort",
+        "Selection Sort",
+        "Insertion Sort"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "Cấu trúc dữ liệu nào hoạt động theo nguyên tắc LIFO?",
+      "answers": [
+        "Queue",
+        "Stack",
+        "Tree",
+        "Graph"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "HTML là viết tắt của?",
+      "answers": [
+        "Hyper Text Markup Language",
+        "High Tech Modern Language",
+        "Hyper Transfer Markup Language",
+        "High Text Machine Language"
+      ],
+      "correctAnswer": 0
+    },
+    {
+      "question": "Đâu không phải là một framework JavaScript?",
+      "answers": [
+        "React",
+        "Angular",
+        "Django",
+        "Vue"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Phương pháp nào được sử dụng để tìm kiếm trong mảng đã sắp xếp?",
+      "answers": [
+        "Linear Search",
+        "Binary Search",
+        "Hash Search",
+        "Bubble Search"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "Git là gì?",
+      "answers": [
+        "Ngôn ngữ lập trình",
+        "Hệ quản trị cơ sở dữ liệu",
+        "Hệ thống quản lý phiên bản",
+        "Framework web"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "RAM là viết tắt của?",
+      "answers": [
+        "Random Access Memory",
+        "Read Access Memory",
+        "Random Available Memory",
+        "Read Available Memory"
+      ],
+      "correctAnswer": 0
+    },
+    {
+      "question": "Đâu là một trình duyệt web?",
+      "answers": [
+        "Windows",
+        "Linux",
+        "Chrome",
+        "Python"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "CPU là viết tắt của?",
+      "answers": [
+        "Central Processing Unit",
+        "Central Program Utility",
+        "Computer Personal Unit",
+        "Control Processing Unit"
+      ],
+      "correctAnswer": 0
+    },
+    {
+      "question": "Đâu là một hệ điều hành di động?",
+      "answers": [
+        "Windows",
+        "iOS",
+        "Linux",
+        "Firefox"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "SQL là viết tắt của?",
+      "answers": [
+        "Strong Question Language",
+        "Structured Query Language",
+        "System Query Language",
+        "Simple Question Language"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "Đâu là một ngôn ngữ lập trình hướng đối tượng?",
+      "answers": [
+        "HTML",
+        "CSS",
+        "Java",
+        "SQL"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Thuật toán tìm kiếm nào có độ phức tạp O(1)?",
+      "answers": [
+        "Linear Search",
+        "Binary Search",
+        "Hash Search",
+        "Bubble Search"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Đâu là một protocol truyền tải web?",
+      "answers": [
+        "HTML",
+        "CSS",
+        "HTTP",
+        "SQL"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Phần mềm nào được sử dụng để quản lý cơ sở dữ liệu?",
+      "answers": [
+        "Chrome",
+        "MySQL",
+        "Python",
+        "Linux"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "question": "API là viết tắt của?",
+      "answers": [
+        "Application Programming Interface",
+        "Advanced Programming Interface",
+        "Application Process Integration",
+        "Advanced Process Interface"
+      ],
+      "correctAnswer": 0
+    },
+    {
+      "question": "Đâu là một công cụ phát triển web?",
+      "answers": [
+        "Word",
+        "Excel",
+        "VSCode",
+        "Paint"
+      ],
+      "correctAnswer": 2
+    },
+    {
+      "question": "Đâu là một cấu trúc dữ liệu phi tuyến tính?",
+      "answers": [
+        "Array",
+        "Stack",
+        "Tree",
+        "Queue"
+      ],
+      "correctAnswer": 2
+    }
+  ]
+}
