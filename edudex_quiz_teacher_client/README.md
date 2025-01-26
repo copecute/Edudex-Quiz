@@ -1,4 +1,4 @@
-# edudex_quiz_client
+# edudex_quiz_teacher_client
 
 A new Flutter project.
 
