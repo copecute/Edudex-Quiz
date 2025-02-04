@@ -1,0 +1,62 @@
+<mxfile host="Electron" modified="2025-02-04T03:48:10.801Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="x8kswr_rIsujgrZFezZQ" version="22.1.16" type="device">
+  <diagram name="Page-1" id="qIYn6nQawjhsTXp5d-BZ">
+    <mxGraphModel dx="1050" dy="621" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="NPBW1c6neppc75bLWa00-40" value="" style="ellipse;html=1;shape=startState;fillColor=#000000;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="50" y="210" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-41" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;" edge="1" parent="1" source="NPBW1c6neppc75bLWa00-40">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="200" y="225" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-42" value="Màn hình xem kết quả" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="200" y="210" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-43" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;" edge="1" parent="1" source="NPBW1c6neppc75bLWa00-42">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="260" y="310" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-44" value="Khởi tạo" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" vertex="1" parent="1">
+          <mxGeometry x="95" y="198" width="70" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-45" value="Chọn in" style="rhombus;whiteSpace=wrap;html=1;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="209.5" y="310" width="101" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-46" value="yes" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;" edge="1" parent="1" source="NPBW1c6neppc75bLWa00-45">
+          <mxGeometry x="-1" relative="1" as="geometry">
+            <mxPoint x="410" y="340" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="401" y="340" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-47" value="no" style="edgeStyle=orthogonalEdgeStyle;html=1;align=left;verticalAlign=top;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="NPBW1c6neppc75bLWa00-45" target="NPBW1c6neppc75bLWa00-67">
+          <mxGeometry x="-1" relative="1" as="geometry">
+            <mxPoint x="260" y="410" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="260" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-58" value="in bài thi" style="rounded=1;whiteSpace=wrap;html=1;arcSize=40;fontColor=#000000;fillColor=#ffffc0;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="410" y="320" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-59" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;verticalAlign=bottom;endArrow=open;endSize=8;strokeColor=#ff0000;rounded=0;entryX=1;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="NPBW1c6neppc75bLWa00-58" target="NPBW1c6neppc75bLWa00-67">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="340" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="470" y="455" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="NPBW1c6neppc75bLWa00-67" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#ff0000;" vertex="1" parent="1">
+          <mxGeometry x="350" y="440" width="30" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
