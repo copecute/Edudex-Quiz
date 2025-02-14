@@ -21,9 +21,24 @@
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //            amen đà phật, không bao giờ BUG
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-namespace App\Http\Controllers;
+namespace App\Http\Middleware;
 
-abstract class Controller
+use Closure;
+use Illuminate\Http\Request;
+
+class CheckRole
 {
-    //
-}
+    public function handle(Request $request, Closure $next, ...$roles)
+    {
+        if (!auth()->check()) {
+            return redirect('login');
+        }
+
+        $user = auth()->user();
+        if (in_array($user->role, $roles)) {
+            return $next($request);
+        }
+
+        return redirect()->back()->with('error', 'Bạn không có quyền truy cập trang này');
+    }
+} 

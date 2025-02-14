@@ -21,9 +21,24 @@
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //            amen đà phật, không bao giờ BUG
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-namespace App\Http\Controllers;
+namespace App\Models;
 
-abstract class Controller
+use Illuminate\Database\Eloquent\Model;
+
+class UserInfo extends Model
 {
-    //
-}
+    protected $fillable = [
+        'user_id',
+        'fullName',
+        'birthday',
+        'avatar',
+        'gender',
+        'phoneNumber',
+        'address',
+    ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+} 
