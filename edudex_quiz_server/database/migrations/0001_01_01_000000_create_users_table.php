@@ -7,17 +7,28 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration
 {
     /**
-     * Run the migrations.
+     * chạy migration
      */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
+            $table->string('username')->unique();
             $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->rememberToken();
+            $table->tinyInteger('role')->default(0); // 0: quản trị viên, 1: giáo viên, 2: nhân viên
+            $table->timestamps();
+        });
+
+        Schema::create('user_infos', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('user_id')->constrained('users');
+            $table->string('fullName');
+            $table->date('birthday')->nullable();
+            $table->string('avatar')->nullable();
+            $table->boolean('gender'); // true: nam, false: nữ
+            $table->string('phoneNumber');
+            $table->string('address');
             $table->timestamps();
         });
 
@@ -38,11 +49,12 @@ return new class extends Migration
     }
 
     /**
-     * Reverse the migrations.
+     * hoàn tác migration
      */
     public function down(): void
     {
         Schema::dropIfExists('users');
+        Schema::dropIfExists('user_infos');
         Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
     }
