@@ -4,6 +4,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import 'package:edudex_quiz_teacher_client/screens/dashboard/dashboard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +24,12 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   final _loginFocusNode = FocusNode();
   String? _errorMessage;
   bool _rememberMe = false;
+  static const String TOKEN_KEY = 'user_token';
+  static const String USER_ID_KEY = 'user_id';
+  static const String USERNAME_KEY = 'username';
+  static const String EMAIL_KEY = 'email';
+  static const String ROLE_KEY = 'user_role';
+  static const String SERVER_URL_KEY = 'server_url';
 
   @override
   void initState() {
@@ -45,20 +54,80 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
     super.dispose();
   }
 
-  void _login() {
-    if (_soBaoDanhController.text == '123' &&
-        _maSinhVienController.text == '123') {
-      _soBaoDanhFocusNode.unfocus();
-      _maSinhVienFocusNode.unfocus();
-      _loginFocusNode.unfocus();
+  Future<void> _login() async {
+    if (_soBaoDanhController.text.isEmpty ||
+        _maSinhVienController.text.isEmpty) {
+      print('❌ Username hoặc password trống');
+      return;
+    }
 
-      Navigator.pushReplacement(
-        context,
-        FluentPageRoute(builder: (context) => const DashboardScreen()),
+    setState(() {
+      _errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString(SERVER_URL_KEY);
+      print('🌐 Server URL: $serverUrl');
+
+      if (serverUrl == null) {
+        print('❌ Không tìm thấy địa chỉ máy chủ');
+        setState(() {
+          _errorMessage = 'Không tìm thấy địa chỉ máy chủ';
+        });
+        return;
+      }
+
+      final loginUrl = '$serverUrl/api/login';
+      print('🚀 Login URL: $loginUrl');
+      print('👤 Username: ${_soBaoDanhController.text}');
+
+      final response = await http.post(
+        Uri.parse(loginUrl).replace(queryParameters: {
+          'username': _soBaoDanhController.text,
+          'password': _maSinhVienController.text,
+        }),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
       );
-    } else {
+
+      print('📥 Status code: ${response.statusCode}');
+      print('📦 Headers: ${response.headers}');
+      print('📦 Response body: ${response.body}');
+
+      final data = json.decode(response.body);
+      print('✅ Parsed data: $data');
+
+      if (data['type'] == 'success') {
+        print('✨ Đăng nhập thành công');
+        print('🔑 Token: ${data['token']}');
+        print('👤 User info: ${data['user']}');
+
+        await prefs.setString(TOKEN_KEY, data['token']);
+        await prefs.setInt(USER_ID_KEY, data['user']['id']);
+        await prefs.setString(USERNAME_KEY, data['user']['username']);
+        await prefs.setString(EMAIL_KEY, data['user']['email']);
+        await prefs.setInt(ROLE_KEY, data['user']['role']);
+        print('💾 Đã lưu thông tin người dùng');
+
+        // ignore: use_build_context_synchronously
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(builder: (context) => const DashboardScreen()),
+        );
+      } else {
+        print('❌ Đăng nhập thất bại: ${data['message']}');
+        setState(() {
+          _errorMessage = data['message'];
+        });
+      }
+    } catch (e, stackTrace) {
+      print('🔥 Lỗi đăng nhập: $e');
+      print('📚 Stack trace: $stackTrace');
       setState(() {
-        _errorMessage = 'Thông tin không đúng!';
+        _errorMessage = 'Đã có lỗi xảy ra khi đăng nhập';
       });
     }
   }

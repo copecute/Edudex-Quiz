@@ -1,8 +1,35 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:edudex_quiz_teacher_client/screens/quiz_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  String _username = '';
+  String _email = '';
+  int _role = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserInfo();
+  }
+
+  Future<void> _loadUserInfo() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('username') ?? 'Không xác định';
+      _email = prefs.getString('email') ?? 'Không xác định';
+      _role = prefs.getInt('user_role') ?? 0;
+    });
+    print(
+        '👤 Loaded user info - Username: $_username, Email: $_email, Role: $_role');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +48,17 @@ class HomePage extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Chào mừng, Minh Giang!',
+                        'Chào mừng, $_username!',
                         style: FluentTheme.of(context).typography.titleLarge,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Bạn có một bài kiểm tra đang chờ',
+                        _email,
+                        style: FluentTheme.of(context).typography.body,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Vai trò: ${_getRoleName(_role)}',
                         style: FluentTheme.of(context).typography.body,
                       ),
                     ],
@@ -200,5 +232,18 @@ class HomePage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  String _getRoleName(int role) {
+    switch (role) {
+      case 0:
+        return 'Quản trị viên';
+      case 1:
+        return 'Giáo viên';
+      case 2:
+        return 'Cán bộ coi thi';
+      default:
+        return 'Cán bộ coi thi';
+    }
   }
 }

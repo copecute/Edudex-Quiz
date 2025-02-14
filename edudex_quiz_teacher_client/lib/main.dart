@@ -4,6 +4,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
@@ -21,6 +22,9 @@ bool get isDesktop {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Khởi tạo shared preferences
+  await SharedPreferences.getInstance();
 
   if (!kIsWeb &&
       [TargetPlatform.windows, TargetPlatform.android]

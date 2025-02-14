@@ -1,10 +1,12 @@
 // ignore_for_file: constant_identifier_names
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart';
 import 'package:provider/provider.dart';
+import '../screens/splash_screen.dart';
 
 import '../theme.dart';
 import '../widgets/page.dart';
@@ -85,6 +87,25 @@ class Settings extends StatefulWidget {
 }
 
 class _SettingsState extends State<Settings> with PageMixin {
+  Future<void> _disconnectServer() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('server_url');
+    await prefs.remove('user_token');
+    await prefs.remove('user_id');
+    await prefs.remove('username');
+    await prefs.remove('email');
+    await prefs.remove('user_role');
+    print('🔌 Đã ngắt kết nối và xóa thông tin server/người dùng');
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      FluentPageRoute(builder: (context) => const SplashScreen()),
+      (route) => false,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasMediaQuery(context));
@@ -284,6 +305,51 @@ class _SettingsState extends State<Settings> with PageMixin {
                 ),
               );
             },
+          ),
+        ),
+        biggerSpacer,
+        Text('Kết nối máy chủ',
+            style: FluentTheme.of(context).typography.subtitle),
+        spacer,
+        FilledButton(
+          style: ButtonStyle(
+            backgroundColor: ButtonState.resolveWith((states) {
+              if (states.isPressed) {
+                return Colors.errorPrimaryColor;
+              }
+              return Colors.errorSecondaryColor;
+            }),
+          ),
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => ContentDialog(
+                title: const Text('Xác nhận ngắt kết nối'),
+                content: const Text(
+                    'Bạn có chắc chắn muốn ngắt kết nối khỏi máy chủ? Ứng dụng sẽ quay về màn hình kết nối.'),
+                actions: [
+                  FilledButton(
+                    child: const Text('Có'),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _disconnectServer();
+                    },
+                  ),
+                  Button(
+                    child: const Text('Không'),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            );
+          },
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(FluentIcons.plug_disconnected),
+              SizedBox(width: 8),
+              Text('Ngắt kết nối máy chủ'),
+            ],
           ),
         ),
       ],
