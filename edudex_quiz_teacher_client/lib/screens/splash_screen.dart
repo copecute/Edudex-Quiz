@@ -153,8 +153,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
           context: context,
           builder: (context) => ContentDialog(
             title: const Text('Lỗi'),
-            content:
-                const Text('Không thể kết nối đến máy chủ qua HTTPS hoặc HTTP'),
+            content: const Text('Không thể kết nối đến máy chủ'),
             actions: [
               Button(
                 child: const Text('Đóng'),
@@ -195,7 +194,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     final data = json.decode(response.body);
     print('✅ Parsed data: $data');
 
-    if (data['message'] == 'copecute is beautiful') {
+    if (data['messages'] == 'copecute is beautiful') {
       print('✨ Xác thực server thành công');
       await _saveServerUrl(baseUrl);
       print('💾 Đã lưu địa chỉ server: $baseUrl');
@@ -206,7 +205,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
         );
       }
     } else {
-      print('❌ Message không hợp lệ: ${data['message']}');
+      print('❌ Message không hợp lệ: ${data['messages']}');
       if (mounted) {
         showDialog(
           context: context,

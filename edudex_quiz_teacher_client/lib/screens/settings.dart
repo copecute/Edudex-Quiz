@@ -24,60 +24,13 @@ const List<String> accentColorNames = [
 ];
 
 bool get kIsWindowEffectsSupported {
-  return !kIsWeb &&
-      [
-        TargetPlatform.windows,
-        TargetPlatform.linux,
-        TargetPlatform.macOS,
-      ].contains(defaultTargetPlatform);
+  return false;
 }
 
-const _LinuxWindowEffects = [
-  WindowEffect.disabled,
-  WindowEffect.transparent,
+const List<Locale> supportedLocales = [
+  Locale('vi', 'VN'), // Đặt tiếng Việt lên đầu
+  Locale('en', 'US'),
 ];
-
-const _WindowsWindowEffects = [
-  WindowEffect.disabled,
-  WindowEffect.solid,
-  WindowEffect.transparent,
-  WindowEffect.aero,
-  WindowEffect.acrylic,
-  WindowEffect.mica,
-  WindowEffect.tabbed,
-];
-
-const _MacosWindowEffects = [
-  WindowEffect.disabled,
-  WindowEffect.titlebar,
-  WindowEffect.selection,
-  WindowEffect.menu,
-  WindowEffect.popover,
-  WindowEffect.sidebar,
-  WindowEffect.headerView,
-  WindowEffect.sheet,
-  WindowEffect.windowBackground,
-  WindowEffect.hudWindow,
-  WindowEffect.fullScreenUI,
-  WindowEffect.toolTip,
-  WindowEffect.contentBackground,
-  WindowEffect.underWindowBackground,
-  WindowEffect.underPageBackground,
-];
-
-List<WindowEffect> get currentWindowEffects {
-  if (kIsWeb) return [];
-
-  if (defaultTargetPlatform == TargetPlatform.windows) {
-    return _WindowsWindowEffects;
-  } else if (defaultTargetPlatform == TargetPlatform.linux) {
-    return _LinuxWindowEffects;
-  } else if (defaultTargetPlatform == TargetPlatform.macOS) {
-    return _MacosWindowEffects;
-  }
-
-  return [];
-}
 
 class Settings extends StatefulWidget {
   const Settings({super.key});
@@ -113,15 +66,16 @@ class _SettingsState extends State<Settings> with PageMixin {
     const spacer = SizedBox(height: 10.0);
     const biggerSpacer = SizedBox(height: 40.0);
 
-    const supportedLocales = FluentLocalizations.supportedLocales;
-    final currentLocale =
-        appTheme.locale ?? Localizations.maybeLocaleOf(context);
-
     return ScaffoldPage.scrollable(
       header: const PageHeader(title: Text('Cài đặt')),
       children: [
         Text('Chế độ giao diện',
             style: FluentTheme.of(context).typography.subtitle),
+        description(
+          content: const Text(
+            'Thay đổi giao diện sáng/tối của ứng dụng. Chọn "Hệ thống" để theo cài đặt của Windows.',
+          ),
+        ),
         spacer,
         ...List.generate(ThemeMode.values.length, (index) {
           final mode = ThemeMode.values[index];
@@ -132,9 +86,6 @@ class _SettingsState extends State<Settings> with PageMixin {
               onChanged: (value) {
                 if (value) {
                   appTheme.mode = mode;
-                  if (kIsWindowEffectsSupported) {
-                    appTheme.setEffect(appTheme.windowEffect, context);
-                  }
                 }
               },
               content: Text(
@@ -148,56 +99,12 @@ class _SettingsState extends State<Settings> with PageMixin {
           );
         }),
         biggerSpacer,
-        Text('Kiểu hiển thị thanh điều hướng',
-            style: FluentTheme.of(context).typography.subtitle),
-        spacer,
-        ...List.generate(PaneDisplayMode.values.length, (index) {
-          final mode = PaneDisplayMode.values[index];
-          return Padding(
-            padding: const EdgeInsetsDirectional.only(bottom: 8.0),
-            child: RadioButton(
-              checked: appTheme.displayMode == mode,
-              onChanged: (value) {
-                if (value) appTheme.displayMode = mode;
-              },
-              content: Text(
-                mode
-                    .toString()
-                    .replaceAll('PaneDisplayMode.', '')
-                    .replaceAll('top', 'Trên cùng')
-                    .replaceAll('open', 'Mở rộng')
-                    .replaceAll('compact', 'Thu gọn')
-                    .replaceAll('minimal', 'Tối giản'),
-              ),
-            ),
-          );
-        }),
-        biggerSpacer,
-        Text('Chỉ báo điều hướng',
-            style: FluentTheme.of(context).typography.subtitle),
-        spacer,
-        ...List.generate(NavigationIndicators.values.length, (index) {
-          final mode = NavigationIndicators.values[index];
-          return Padding(
-            padding: const EdgeInsetsDirectional.only(bottom: 8.0),
-            child: RadioButton(
-              checked: appTheme.indicator == mode,
-              onChanged: (value) {
-                if (value) appTheme.indicator = mode;
-              },
-              content: Text(
-                mode
-                    .toString()
-                    .replaceAll('NavigationIndicators.', '')
-                    .replaceAll('sticky', 'Cố định')
-                    .replaceAll('end', 'Cuối')
-                    .replaceAll('start', 'Đầu'),
-              ),
-            ),
-          );
-        }),
-        biggerSpacer,
         Text('Màu chủ đề', style: FluentTheme.of(context).typography.subtitle),
+        description(
+          content: const Text(
+            'Màu sắc chủ đạo được sử dụng trong toàn bộ ứng dụng. Chọn "Hệ thống" để theo màu accent của Windows.',
+          ),
+        ),
         spacer,
         Wrap(children: [
           Tooltip(
@@ -220,47 +127,14 @@ class _SettingsState extends State<Settings> with PageMixin {
             );
           }),
         ]),
-        if (kIsWindowEffectsSupported) ...[
-          biggerSpacer,
-          Text('Hiệu ứng cửa sổ',
-              style: FluentTheme.of(context).typography.subtitle),
-          description(
-            content: Text(
-              'Đang chạy trên ${defaultTargetPlatform.toString().replaceAll('TargetPlatform.', '')}',
-            ),
-          ),
-          spacer,
-          ...List.generate(currentWindowEffects.length, (index) {
-            final mode = currentWindowEffects[index];
-            return Padding(
-              padding: const EdgeInsetsDirectional.only(bottom: 8.0),
-              child: RadioButton(
-                checked: appTheme.windowEffect == mode,
-                onChanged: (value) {
-                  if (value) {
-                    appTheme.windowEffect = mode;
-                    appTheme.setEffect(mode, context);
-                  }
-                },
-                content: Text(
-                  mode
-                      .toString()
-                      .replaceAll('WindowEffect.', '')
-                      .replaceAll('disabled', 'Tắt')
-                      .replaceAll('solid', 'Đặc')
-                      .replaceAll('transparent', 'Trong suốt')
-                      .replaceAll('aero', 'Aero')
-                      .replaceAll('acrylic', 'Acrylic')
-                      .replaceAll('mica', 'Mica')
-                      .replaceAll('tabbed', 'Tab'),
-                ),
-              ),
-            );
-          }),
-        ],
         biggerSpacer,
         Text('Hướng văn bản',
             style: FluentTheme.of(context).typography.subtitle),
+        description(
+          content: const Text(
+            'Thay đổi hướng hiển thị văn bản từ trái sang phải hoặc ngược lại.',
+          ),
+        ),
         spacer,
         ...List.generate(TextDirection.values.length, (index) {
           final direction = TextDirection.values[index];
@@ -280,44 +154,21 @@ class _SettingsState extends State<Settings> with PageMixin {
           );
         }).reversed,
         biggerSpacer,
-        Text('Ngôn ngữ', style: FluentTheme.of(context).typography.subtitle),
-        description(
-          content: const Text(
-            'Ngôn ngữ được sử dụng cho các widget như TimePicker và DatePicker.',
-          ),
-        ),
-        spacer,
-        Wrap(
-          spacing: 15.0,
-          runSpacing: 10.0,
-          children: List.generate(
-            supportedLocales.length,
-            (index) {
-              final locale = supportedLocales[index];
-              return Padding(
-                padding: const EdgeInsetsDirectional.only(bottom: 8.0),
-                child: RadioButton(
-                  checked: currentLocale == locale,
-                  onChanged: (value) {
-                    if (value) appTheme.locale = locale;
-                  },
-                  content: Text('$locale'),
-                ),
-              );
-            },
-          ),
-        ),
-        biggerSpacer,
         Text('Kết nối máy chủ',
             style: FluentTheme.of(context).typography.subtitle),
+        description(
+          content: const Text(
+            'Ngắt kết nối với máy chủ nhằm cập nhật địa chỉ máy chủ. Bạn sẽ cần đăng nhập lại.',
+          ),
+        ),
         spacer,
         FilledButton(
           style: ButtonStyle(
             backgroundColor: ButtonState.resolveWith((states) {
               if (states.isPressed) {
-                return Colors.errorPrimaryColor;
+                return Colors.red;
               }
-              return Colors.errorSecondaryColor;
+              return Colors.red;
             }),
           ),
           onPressed: () {

@@ -1,5 +1,5 @@
 name: edudex_quiz_teacher_client
-description: "A new Flutter project."
+description: "edudex_quiz_teacher_client"
 
 publish_to: 'none' 
 
@@ -39,7 +39,6 @@ flutter:
 
   assets:
     - assets/
-    - assets/login_illustration.svg
+    - assets/login_illustration.png
     - assets/logo.png
-    - assets/questions.json
 

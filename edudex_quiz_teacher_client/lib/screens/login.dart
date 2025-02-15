@@ -30,6 +30,8 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   static const String EMAIL_KEY = 'email';
   static const String ROLE_KEY = 'user_role';
   static const String SERVER_URL_KEY = 'server_url';
+  bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -55,14 +57,28 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   }
 
   Future<void> _login() async {
-    if (_soBaoDanhController.text.isEmpty ||
-        _maSinhVienController.text.isEmpty) {
-      print('❌ Username hoặc password trống');
+    setState(() {
+      _errorMessage = null;
+    });
+
+    // Kiểm tra username trống
+    if (_soBaoDanhController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng nhập tên tài khoản';
+      });
+      return;
+    }
+
+    // Kiểm tra password trống
+    if (_maSinhVienController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng nhập mật khẩu';
+      });
       return;
     }
 
     setState(() {
-      _errorMessage = null;
+      _isLoading = true;
     });
 
     try {
@@ -129,6 +145,10 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       setState(() {
         _errorMessage = 'Đã có lỗi xảy ra khi đăng nhập';
       });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -164,22 +184,36 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
               ),
               const SizedBox(height: 32),
               InfoLabel(
-                label: 'Số báo danh',
+                label: 'Tên tài khoản',
                 child: TextBox(
                   controller: _soBaoDanhController,
-                  placeholder: 'Nhập số báo danh',
+                  placeholder: 'Nhập tên tài khoản',
                   focusNode: _soBaoDanhFocusNode,
                   onSubmitted: (_) => _maSinhVienFocusNode.requestFocus(),
                 ),
               ),
               const SizedBox(height: 16),
               InfoLabel(
-                label: 'Mã sinh viên',
+                label: 'Mật khẩu',
                 child: TextBox(
                   controller: _maSinhVienController,
-                  placeholder: 'Nhập mã sinh viên',
+                  placeholder: 'Nhập mật khẩu',
                   focusNode: _maSinhVienFocusNode,
                   onSubmitted: (_) => _login(),
+                  obscureText: _obscurePassword,
+                  suffix: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? FluentIcons.hide3
+                          : FluentIcons.red_eye,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
               ),
               if (_errorMessage != null) ...[
@@ -194,10 +228,23 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
                 width: double.infinity,
                 child: FilledButton(
                   focusNode: _loginFocusNode,
-                  onPressed: _login,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text('Kiểm tra thông tin'),
+                  onPressed: _isLoading ? null : _login,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: ProgressRing(),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Đang đăng nhập...'),
+                            ],
+                          )
+                        : const Text('Đăng nhập'),
                   ),
                 ),
               ),
@@ -213,8 +260,8 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       return Container(
         constraints: const BoxConstraints(maxWidth: 600),
         child: Center(
-          child: SvgPicture.asset(
-            'assets/login_illustration.svg',
+          child: Image.asset(
+            'assets/login_illustration.png',
             width: 500,
           ),
         ),
