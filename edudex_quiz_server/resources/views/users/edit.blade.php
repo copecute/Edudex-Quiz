@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Chỉnh sửa tài khoản - Edudex Quiz')
+
 @section('content')
 <div class="container">
     <div class="row justify-content-center">
@@ -57,7 +59,7 @@
                                         Giáo viên
                                     </option>
                                     <option value="2" {{ old('role', $user->role) === 2 ? 'selected' : '' }}>
-                                        Nhân viên
+                                        Cán bộ coi thi
                                     </option>
                                 </select>
                                 @error('role')

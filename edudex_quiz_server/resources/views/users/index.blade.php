@@ -1,5 +1,7 @@
 @extends('layouts.app')
 
+@section('title', 'Quản lý tài khoản - Edudex Quiz')
+
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -20,7 +22,7 @@
                         <option value="">Tất cả vai trò</option>
                         <option value="0" {{ request('role') === '0' ? 'selected' : '' }}>Quản trị viên</option>
                         <option value="1" {{ request('role') === '1' ? 'selected' : '' }}>Giáo viên</option>
-                        <option value="2" {{ request('role') === '2' ? 'selected' : '' }}>Nhân viên</option>
+                        <option value="2" {{ request('role') === '2' ? 'selected' : '' }}>Cán bộ coi thi</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -55,11 +57,11 @@
                                 <td>{{ $user->email }}</td>
                                 <td>
                                     @if ($user->role === 0)
-                                        <span class="badge bg-primary">Quản trị viên</span>
+                                        <span class="badge bg-danger">Quản trị viên</span>
                                     @elseif ($user->role === 1)
                                         <span class="badge bg-success">Giáo viên</span>
                                     @else
-                                        <span class="badge bg-secondary">Nhân viên</span>
+                                        <span class="badge bg-secondary">Cán bộ coi thi</span>
                                     @endif
                                 </td>
                                 <td>

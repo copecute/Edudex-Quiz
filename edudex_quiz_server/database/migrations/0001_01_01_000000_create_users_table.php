@@ -16,7 +16,7 @@ return new class extends Migration
             $table->string('username')->unique();
             $table->string('email')->unique();
             $table->string('password');
-            $table->tinyInteger('role')->default(0); // 0: quản trị viên, 1: giáo viên, 2: nhân viên
+            $table->tinyInteger('role')->default(0); // 0: quản trị viên, 1: giáo viên, 2: cán bộ coi thi
             $table->timestamps();
         });
 

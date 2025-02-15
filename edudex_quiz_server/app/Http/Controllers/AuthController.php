@@ -105,7 +105,7 @@ class AuthController extends Controller
                 'username' => $request->username,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
-                'role' => 2, // mặc định là nhân viên
+                'role' => 2, // mặc định là cán bộ coi thi
             ]);
 
             UserInfo::create([
