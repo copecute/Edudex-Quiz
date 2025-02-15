@@ -2,12 +2,17 @@ import 'package:fluent_ui/fluent_ui.dart' hide Page;
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 import '../../theme.dart';
 import 'home_page.dart';
-import 'quiz_page.dart';
-import 'history_page.dart';
 import '../settings.dart';
+import '../splash_screen.dart';
+import '../login.dart';
+import 'quiz_management.dart';
+import 'student_management.dart';
+import 'statistics.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -23,8 +28,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
 
   final List<Widget> _pages = const [
     HomePage(),
-    QuizMenuPage(),
-    HistoryPage(),
+    QuizManagementPage(),
+    StudentManagementPage(),
+    StatisticsPage(),
     Settings(),
   ];
 
@@ -38,6 +44,67 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  Future<void> _handleLogout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString('server_url');
+      final token = prefs.getString('user_token');
+
+      if (serverUrl == null || token == null) {
+        print('❌ Không tìm thấy thông tin server hoặc token');
+        return;
+      }
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/logout'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'copecute $token',
+        },
+      );
+
+      print('📥 Status code: ${response.statusCode}');
+      print('📦 Response body: ${response.body}');
+
+      // Xóa thông tin người dùng (giữ lại server_url)
+      await prefs.remove('user_token');
+      await prefs.remove('user_id');
+      await prefs.remove('username');
+      await prefs.remove('email');
+      await prefs.remove('user_role');
+      print('🗑️ Đã xóa thông tin người dùng');
+
+      if (!mounted) return;
+
+      // Chuyển về màn hình login thay vì splash screen
+      Navigator.pushAndRemoveUntil(
+        context,
+        FluentPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
+    } catch (e, stackTrace) {
+      print('🔥 Lỗi đăng xuất: $e');
+      print('📚 Stack trace: $stackTrace');
+
+      if (!mounted) return;
+
+      showDialog(
+        context: context,
+        builder: (context) => ContentDialog(
+          title: const Text('Lỗi'),
+          content: const Text('Đã có lỗi xảy ra khi đăng xuất'),
+          actions: [
+            Button(
+              child: const Text('Đóng'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override
@@ -88,14 +155,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             body: _pages[0],
           ),
           PaneItem(
-            icon: const Icon(FluentIcons.account_activity),
-            title: const Text('Bài kiểm tra'),
+            icon: const Icon(FluentIcons.page_list),
+            title: const Text('Quản lý đề thi'),
             body: _pages[1],
           ),
           PaneItem(
-            icon: const Icon(FluentIcons.history),
-            title: const Text('Lịch sử'),
+            icon: const Icon(FluentIcons.people),
+            title: const Text('Quản lý thí sinh'),
             body: _pages[2],
+          ),
+          PaneItem(
+            icon: const Icon(FluentIcons.b_i_dashboard),
+            title: const Text('Thống kê'),
+            body: _pages[3],
           ),
         ],
         footerItems: [
@@ -103,7 +175,40 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
           PaneItem(
             icon: const Icon(FluentIcons.settings),
             title: const Text('Cài đặt'),
-            body: _pages[3],
+            body: _pages[4],
+          ),
+          PaneItem(
+            icon: const Icon(FluentIcons.sign_out),
+            title: const Text('Đăng xuất'),
+            body: _pages[0],
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => ContentDialog(
+                  title: const Text('Xác nhận đăng xuất'),
+                  content: const Text(
+                      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
+                  actions: [
+                    FilledButton(
+                      child: const Text('Có'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _handleLogout();
+                      },
+                    ),
+                    Button(
+                      child: const Text('Không'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        setState(() {
+                          _selectedIndex = 0;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),

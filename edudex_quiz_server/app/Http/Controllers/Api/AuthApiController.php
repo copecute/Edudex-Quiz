@@ -41,8 +41,8 @@ class AuthApiController extends Controller
                 'username' => 'required',
                 'password' => 'required',
             ], [
-                'username.required' => 'username không được để trống',
-                'password.required' => 'mật khẩu không được để trống',
+                'username.required' => 'Username không được để trống',
+                'password.required' => 'Mật khẩu không được để trống',
             ]);
 
             $user = User::where('username', $request->username)->first();
@@ -50,7 +50,7 @@ class AuthApiController extends Controller
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'type' => 'error',
-                    'message' => 'thông tin đăng nhập không chính xác'
+                    'message' => 'Thông tin đăng nhập không chính xác'
                 ], 401);
             }
 
@@ -58,7 +58,7 @@ class AuthApiController extends Controller
 
             return response()->json([
                 'type' => 'success',
-                'message' => 'đăng nhập thành công',
+                'message' => 'Đăng nhập thành công',
                 'user' => $user,
                 'token' => $token
             ]);
@@ -71,7 +71,7 @@ class AuthApiController extends Controller
         } catch (\Exception $e) {
             return response()->json([
                 'type' => 'error',
-                'message' => 'có lỗi xảy ra, vui lòng thử lại'
+                'message' => 'Có lỗi xảy ra, vui lòng thử lại'
             ], 500);
         }
     }
@@ -89,12 +89,12 @@ class AuthApiController extends Controller
 
             return response()->json([
                 'type' => 'success',
-                'message' => 'đăng xuất thành công'
+                'message' => 'Đăng xuất thành công'
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'type' => 'error',
-                'message' => 'có lỗi xảy ra, vui lòng thử lại'
+                'message' => 'Có lỗi xảy ra, vui lòng thử lại'
             ], 500);
         }
     }
@@ -107,13 +107,13 @@ class AuthApiController extends Controller
         try {
             return response()->json([
                 'type' => 'success',
-                'message' => 'lấy thông tin thành công',
+                'message' => 'Lấy thông tin thành công',
                 'user' => $request->user()
             ]);
         } catch (\Exception $e) {
             return response()->json([
                 'type' => 'error',
-                'message' => 'có lỗi xảy ra, vui lòng thử lại'
+                'message' => 'Có lỗi xảy ra, vui lòng thử lại'
             ], 500);
         }
     }

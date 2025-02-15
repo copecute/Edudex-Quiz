@@ -1,5 +1,5 @@
 name: edudex_quiz_teacher_client
-description: "A new Flutter project."
+description: "edudex_quiz_teacher_client"
 
 publish_to: 'none' 
 
@@ -24,6 +24,8 @@ dependencies:
   intl: ^0.19.0
   google_fonts: ^6.1.0
   flutter_svg: ^2.0.9
+  bitsdojo_window: ^0.1.6
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -37,7 +39,6 @@ flutter:
 
   assets:
     - assets/
-    - assets/login_illustration.svg
+    - assets/login_illustration.png
     - assets/logo.png
-    - assets/questions.json
 

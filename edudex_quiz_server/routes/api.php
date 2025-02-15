@@ -26,6 +26,12 @@ use App\Http\Controllers\Api\AuthApiController;
 use Illuminate\Support\Facades\Route;
 
 // routes không cần xác thực
+
+// tìm server
+Route::post('/wfaE0FbQWldGoDlGFyFgKWY0MiUizH2', function() {
+    return response()->json(['messages' => 'copecute is beautiful']);
+});
+
 Route::post('/login', [AuthApiController::class, 'login']);
 
 // routes cần xác thực

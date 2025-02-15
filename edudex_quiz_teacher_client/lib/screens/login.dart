@@ -4,6 +4,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import 'package:edudex_quiz_teacher_client/screens/dashboard/dashboard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +24,14 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   final _loginFocusNode = FocusNode();
   String? _errorMessage;
   bool _rememberMe = false;
+  static const String TOKEN_KEY = 'user_token';
+  static const String USER_ID_KEY = 'user_id';
+  static const String USERNAME_KEY = 'username';
+  static const String EMAIL_KEY = 'email';
+  static const String ROLE_KEY = 'user_role';
+  static const String SERVER_URL_KEY = 'server_url';
+  bool _isLoading = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -45,20 +56,98 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
     super.dispose();
   }
 
-  void _login() {
-    if (_soBaoDanhController.text == '123' &&
-        _maSinhVienController.text == '123') {
-      _soBaoDanhFocusNode.unfocus();
-      _maSinhVienFocusNode.unfocus();
-      _loginFocusNode.unfocus();
+  Future<void> _login() async {
+    setState(() {
+      _errorMessage = null;
+    });
 
-      Navigator.pushReplacement(
-        context,
-        FluentPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else {
+    // Kiểm tra username trống
+    if (_soBaoDanhController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Thông tin không đúng!';
+        _errorMessage = 'Vui lòng nhập tên tài khoản';
+      });
+      return;
+    }
+
+    // Kiểm tra password trống
+    if (_maSinhVienController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng nhập mật khẩu';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString(SERVER_URL_KEY);
+      print('🌐 Server URL: $serverUrl');
+
+      if (serverUrl == null) {
+        print('❌ Không tìm thấy địa chỉ máy chủ');
+        setState(() {
+          _errorMessage = 'Không tìm thấy địa chỉ máy chủ';
+        });
+        return;
+      }
+
+      final loginUrl = '$serverUrl/api/login';
+      print('🚀 Login URL: $loginUrl');
+      print('👤 Username: ${_soBaoDanhController.text}');
+
+      final response = await http.post(
+        Uri.parse(loginUrl).replace(queryParameters: {
+          'username': _soBaoDanhController.text,
+          'password': _maSinhVienController.text,
+        }),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('📥 Status code: ${response.statusCode}');
+      print('📦 Headers: ${response.headers}');
+      print('📦 Response body: ${response.body}');
+
+      final data = json.decode(response.body);
+      print('✅ Parsed data: $data');
+
+      if (data['type'] == 'success') {
+        print('✨ Đăng nhập thành công');
+        print('🔑 Token: ${data['token']}');
+        print('👤 User info: ${data['user']}');
+
+        await prefs.setString(TOKEN_KEY, data['token']);
+        await prefs.setInt(USER_ID_KEY, data['user']['id']);
+        await prefs.setString(USERNAME_KEY, data['user']['username']);
+        await prefs.setString(EMAIL_KEY, data['user']['email']);
+        await prefs.setInt(ROLE_KEY, data['user']['role']);
+        print('💾 Đã lưu thông tin người dùng');
+
+        // ignore: use_build_context_synchronously
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(builder: (context) => const DashboardScreen()),
+        );
+      } else {
+        print('❌ Đăng nhập thất bại: ${data['message']}');
+        setState(() {
+          _errorMessage = data['message'];
+        });
+      }
+    } catch (e, stackTrace) {
+      print('🔥 Lỗi đăng nhập: $e');
+      print('📚 Stack trace: $stackTrace');
+      setState(() {
+        _errorMessage = 'Đã có lỗi xảy ra khi đăng nhập';
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
       });
     }
   }
@@ -95,22 +184,36 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
               ),
               const SizedBox(height: 32),
               InfoLabel(
-                label: 'Số báo danh',
+                label: 'Tên tài khoản',
                 child: TextBox(
                   controller: _soBaoDanhController,
-                  placeholder: 'Nhập số báo danh',
+                  placeholder: 'Nhập tên tài khoản',
                   focusNode: _soBaoDanhFocusNode,
                   onSubmitted: (_) => _maSinhVienFocusNode.requestFocus(),
                 ),
               ),
               const SizedBox(height: 16),
               InfoLabel(
-                label: 'Mã sinh viên',
+                label: 'Mật khẩu',
                 child: TextBox(
                   controller: _maSinhVienController,
-                  placeholder: 'Nhập mã sinh viên',
+                  placeholder: 'Nhập mật khẩu',
                   focusNode: _maSinhVienFocusNode,
                   onSubmitted: (_) => _login(),
+                  obscureText: _obscurePassword,
+                  suffix: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? FluentIcons.hide3
+                          : FluentIcons.red_eye,
+                      size: 16,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
               ),
               if (_errorMessage != null) ...[
@@ -125,10 +228,23 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
                 width: double.infinity,
                 child: FilledButton(
                   focusNode: _loginFocusNode,
-                  onPressed: _login,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text('Kiểm tra thông tin'),
+                  onPressed: _isLoading ? null : _login,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: ProgressRing(),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Đang đăng nhập...'),
+                            ],
+                          )
+                        : const Text('Đăng nhập'),
                   ),
                 ),
               ),
@@ -144,8 +260,8 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       return Container(
         constraints: const BoxConstraints(maxWidth: 600),
         child: Center(
-          child: SvgPicture.asset(
-            'assets/login_illustration.svg',
+          child: Image.asset(
+            'assets/login_illustration.png',
             width: 500,
           ),
         ),
