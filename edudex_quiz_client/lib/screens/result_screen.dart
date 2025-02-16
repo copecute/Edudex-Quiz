@@ -5,6 +5,7 @@ import '../theme.dart';
 import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class ResultScreen extends StatelessWidget {
   final int totalQuestions;
@@ -29,11 +30,21 @@ class ResultScreen extends StatelessWidget {
         final prefs = snapshot.data!;
         final studentDataStr = prefs.getString('student_data');
         final examsDataStr = prefs.getString('exams_data');
+        final serverUrl = prefs.getString('server_url');
 
         final studentData =
             studentDataStr != null ? json.decode(studentDataStr) : null;
         final examsData =
             examsDataStr != null ? json.decode(examsDataStr) : null;
+
+        // Cập nhật URL avatar
+        if (studentData?['avatar_url'] != null && serverUrl != null) {
+          String avatarUrl = studentData!['avatar_url'];
+          if (avatarUrl.startsWith('/')) {
+            avatarUrl = avatarUrl.substring(1);
+          }
+          studentData['avatar_url'] = '$serverUrl/$avatarUrl';
+        }
 
         return Row(
           children: [
@@ -56,18 +67,20 @@ class ResultScreen extends StatelessWidget {
                           height: 120,
                           color: Colors.grey[40],
                           child: const Center(
-                            child: ProgressRing(
-                              strokeWidth: 3,
-                            ),
+                            child: ProgressRing(),
                           ),
                         );
                       },
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 100,
-                        height: 120,
-                        color: Colors.grey[40],
-                        child: const Icon(FluentIcons.contact, size: 48),
-                      ),
+                      errorBuilder: (context, error, stackTrace) {
+                        print('❌ Lỗi tải ảnh: $error');
+                        print('🔍 URL ảnh: ${studentData!['avatar_url']}');
+                        return Container(
+                          width: 100,
+                          height: 120,
+                          color: Colors.grey[40],
+                          child: const Icon(FluentIcons.contact, size: 48),
+                        );
+                      },
                     )
                   : Container(
                       width: 100,

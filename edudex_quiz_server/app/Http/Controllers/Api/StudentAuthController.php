@@ -151,4 +151,20 @@ class StudentAuthController extends Controller
             ]
         ]);
     }
+
+    public function logout(Request $request)
+    {
+        try {
+            // Xóa token hiện tại
+            $request->user()->currentAccessToken()->delete();
+
+            return response()->json([
+                'message' => 'Đăng xuất thành công'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Có lỗi xảy ra khi đăng xuất'
+            ], 500);
+        }
+    }
 } 

@@ -71,6 +71,11 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
         throw Exception('Không tìm thấy địa chỉ máy chủ');
       }
 
+      print('🔐 Đang đăng nhập...');
+      print('📡 URL: $serverUrl/api/student/login');
+      print(
+          '📝 Params: student_code=${_maSinhVienController.text}, exam_code=${_soBaoDanhController.text}');
+
       final response = await http.post(
         Uri.parse('$serverUrl/api/student/login').replace(queryParameters: {
           'student_code': _maSinhVienController.text,
@@ -82,11 +87,14 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
         },
       );
 
+      print('📥 Status code: ${response.statusCode}');
+      print('📄 Response: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
-        // Lưu thông tin đăng nhập
-        await prefs.setString('token', data['token']);
+        // Lưu thông tin đăng nhập - sửa lại cách lấy token
+        await prefs.setString('token', data['token']['access_token']);
         await prefs.setString('student_data', json.encode(data['student']));
         await prefs.setString('exams_data', json.encode(data['exams']));
 
@@ -97,11 +105,13 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
           );
         }
       } else {
+        print('❌ Lỗi đăng nhập: ${response.statusCode}');
         setState(() {
           _errorMessage = 'Thông tin đăng nhập không chính xác!';
         });
       }
     } catch (e) {
+      print('❌ Exception: $e');
       setState(() {
         _errorMessage = 'Đã có lỗi xảy ra: ${e.toString()}';
       });

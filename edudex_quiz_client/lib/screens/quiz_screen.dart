@@ -9,6 +9,7 @@ import '../theme.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -86,11 +87,21 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       final prefs = await SharedPreferences.getInstance();
       final studentDataStr = prefs.getString('student_data');
       final examsDataStr = prefs.getString('exams_data');
+      final serverUrl = prefs.getString('server_url');
 
-      if (studentDataStr != null && examsDataStr != null) {
+      if (studentDataStr != null && examsDataStr != null && serverUrl != null) {
         setState(() {
           _studentData = json.decode(studentDataStr);
           _examsData = json.decode(examsDataStr);
+
+          // Cập nhật URL avatar
+          if (_studentData!['avatar_url'] != null) {
+            String avatarUrl = _studentData!['avatar_url'];
+            if (avatarUrl.startsWith('/')) {
+              avatarUrl = avatarUrl.substring(1);
+            }
+            _studentData!['avatar_url'] = '$serverUrl/$avatarUrl';
+          }
         });
       }
     } catch (e) {
@@ -450,9 +461,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                                 height: 120,
                                 color: Colors.grey[40],
                                 child: const Center(
-                                  child: ProgressRing(
-                                    strokeWidth: 3,
-                                  ),
+                                  child: ProgressRing(),
                                 ),
                               );
                             },

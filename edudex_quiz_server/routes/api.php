@@ -47,5 +47,6 @@ Route::prefix('student')->group(function () {
     // Sử dụng middleware auth.student
     Route::middleware(['api', 'auth.student'])->group(function () {
         Route::get('profile', [StudentAuthController::class, 'profile']);
+        Route::post('logout', [StudentAuthController::class, 'logout']);
     });
 }); 

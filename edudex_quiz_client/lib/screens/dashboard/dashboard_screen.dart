@@ -2,12 +2,15 @@ import 'package:fluent_ui/fluent_ui.dart' hide Page;
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 import '../../theme.dart';
 import 'home_page.dart';
 import 'quiz_page.dart';
 import 'history_page.dart';
 import '../settings.dart';
+import '../login.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,6 +41,71 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  Future<void> _logout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final serverUrl = prefs.getString('server_url');
+
+      if (token == null || serverUrl == null) {
+        throw Exception('Không tìm thấy thông tin đăng nhập');
+      }
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/student/logout'),
+        headers: {
+          'Authorization': 'copecute $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        // Xóa thông tin đăng nhập
+        await prefs.clear();
+
+        if (mounted) {
+          // Chuyển về màn hình đăng nhập
+          Navigator.of(context).pushAndRemoveUntil(
+            FluentPageRoute(builder: (context) => const LoginScreen()),
+            (route) => false,
+          );
+        }
+      } else {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => ContentDialog(
+              title: const Text('Lỗi'),
+              content: const Text('Không thể đăng xuất. Vui lòng thử lại sau.'),
+              actions: [
+                Button(
+                  child: const Text('Đóng'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ContentDialog(
+            title: const Text('Lỗi'),
+            content: Text('Đã có lỗi xảy ra: ${e.toString()}'),
+            actions: [
+              Button(
+                child: const Text('Đóng'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -105,11 +173,32 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             title: const Text('Cài đặt'),
             body: _pages[3],
           ),
-          PaneItemSeparator(),
           PaneItem(
-            icon: const Icon(FluentIcons.settings),
+            icon: const Icon(FluentIcons.sign_out),
             title: const Text('Đăng xuất'),
-            body: _pages[3],
+            body: _pages[0],
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => ContentDialog(
+                  title: const Text('Xác nhận'),
+                  content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+                  actions: [
+                    Button(
+                      child: const Text('Không'),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    FilledButton(
+                      child: const Text('Có'),
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _logout();
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ],
       ),
