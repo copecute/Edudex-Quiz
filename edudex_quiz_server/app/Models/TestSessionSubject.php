@@ -30,4 +30,9 @@ class TestSessionSubject extends Model
         return $this->belongsToMany(TestShift::class, 'test_shift_subjects')
                     ->withTimestamps();
     }
+
+    public function testShiftSubjectRooms()
+    {
+        return $this->hasMany(TestShiftSubjectRoom::class);
+    }
 } 

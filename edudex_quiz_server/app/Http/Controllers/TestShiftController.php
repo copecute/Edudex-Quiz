@@ -70,11 +70,9 @@ class TestShiftController extends Controller
             'description' => 'nullable|string',
             'start_time' => 'required|date|after:now',
             'end_time' => 'required|date|after:start_time',
-            'test_session_subject_ids' => 'required|array',
+            'test_session_subject_ids' => 'nullable|array',
             'test_session_subject_ids.*' => 'exists:test_session_subjects,id',
-            'is_active' => 'boolean',
-            'rooms' => 'required|array',
-            'rooms.*' => 'exists:test_rooms,id'
+            'is_active' => 'boolean'
         ]);
 
         // Kiểm tra thời gian ca thi nằm trong khoảng thời gian kỳ thi
@@ -87,7 +85,6 @@ class TestShiftController extends Controller
 
         DB::beginTransaction();
         try {
-            // Tạo ca thi
             $testShift = $testSession->testShifts()->create([
                 'name' => $validated['name'],
                 'description' => $validated['description'],
@@ -96,27 +93,30 @@ class TestShiftController extends Controller
                 'is_active' => $validated['is_active'] ?? false
             ]);
 
-            // Gán môn thi cho ca thi
-            $testShift->testSessionSubjects()->attach($validated['test_session_subject_ids']);
-
-            // Gán phòng thi cho ca thi
-            $testShift->testRooms()->attach($validated['rooms']);
+            if (!empty($validated['test_session_subject_ids'])) {
+                $testShift->testSessionSubjects()->attach($validated['test_session_subject_ids']);
+            }
 
             DB::commit();
-
             return redirect()
                 ->route('test_sessions.test_shifts.index', $testSession)
                 ->with('success', 'Đã tạo ca thi mới thành công');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()
-                ->withInput()
-                ->with('error', 'Có lỗi xảy ra khi tạo ca thi: ' . $e->getMessage());
+            return back()->withInput()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
         }
     }
 
     public function edit(TestSession $testSession, TestShift $testShift)
     {
+        // Load môn thi của kỳ thi
+        $testSessionSubjects = $testSession->subjects()
+            ->withPivot('id')
+            ->get();
+
+        // Load môn thi đã chọn của ca thi
+        $testShift->load('testSessionSubjects.subject');
+
         // Lấy danh sách phòng thi đang hoạt động
         $availableRooms = TestRoom::whereHas('testLocation', function($q) {
             $q->where('is_active', true);
@@ -130,6 +130,7 @@ class TestShiftController extends Controller
         return view('test_sessions.test_shifts.edit', compact(
             'testSession', 
             'testShift',
+            'testSessionSubjects',
             'availableRooms'
         ));
     }
@@ -141,9 +142,9 @@ class TestShiftController extends Controller
             'description' => 'nullable|string',
             'start_time' => 'required|date',
             'end_time' => 'required|date|after:start_time',
-            'is_active' => 'boolean',
-            'rooms' => 'required|array',
-            'rooms.*' => 'exists:test_rooms,id'
+            'test_session_subject_ids' => 'nullable|array',
+            'test_session_subject_ids.*' => 'exists:test_session_subjects,id',
+            'is_active' => 'boolean'
         ]);
 
         // Kiểm tra thời gian ca thi nằm trong khoảng thời gian kỳ thi
@@ -154,14 +155,30 @@ class TestShiftController extends Controller
                 ->withErrors(['time' => 'Thời gian ca thi phải nằm trong khoảng thời gian của kỳ thi']);
         }
 
-        $testShift->update($validated);
-        
-        // Cập nhật danh sách phòng thi
-        $testShift->testRooms()->sync($validated['rooms']);
+        DB::beginTransaction();
+        try {
+            $testShift->update([
+                'name' => $validated['name'],
+                'description' => $validated['description'],
+                'start_time' => $validated['start_time'],
+                'end_time' => $validated['end_time'],
+                'is_active' => $validated['is_active'] ?? false
+            ]);
+            
+            if (!empty($validated['test_session_subject_ids'])) {
+                $testShift->testSessionSubjects()->sync($validated['test_session_subject_ids']);
+            } else {
+                $testShift->testSessionSubjects()->detach();
+            }
 
-        return redirect()
-            ->route('test_sessions.test_shifts.index', $testSession)
-            ->with('success', 'Đã cập nhật ca thi thành công');
+            DB::commit();
+            return redirect()
+                ->route('test_sessions.test_shifts.index', $testSession)
+                ->with('success', 'Đã cập nhật ca thi thành công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->withInput()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
+        }
     }
 
     public function destroy(TestSession $testSession, TestShift $testShift)
@@ -184,5 +201,20 @@ class TestShiftController extends Controller
     {
         $testShift->load('testSessionSubjects.subject');
         return view('test_sessions.test_shifts.show', compact('testSession', 'testShift'));
+    }
+
+    public function assignSubjects(Request $request, TestSession $testSession, TestShift $testShift)
+    {
+        $validated = $request->validate([
+            'test_session_subject_ids' => 'required|array',
+            'test_session_subject_ids.*' => 'exists:test_session_subjects,id'
+        ]);
+
+        try {
+            $testShift->testSessionSubjects()->sync($validated['test_session_subject_ids']);
+            return back()->with('success', 'Đã phân môn thi thành công');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
+        }
     }
 } 

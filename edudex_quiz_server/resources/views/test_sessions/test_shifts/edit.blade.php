@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Chỉnh sửa ca thi - Edudex Quiz')
+@section('title', 'Sửa ca thi - Edudex Quiz')
 
 @push('styles')
 <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
@@ -13,18 +13,41 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Chỉnh sửa ca thi</h5>
+                    <h5 class="mb-0">Sửa ca thi</h5>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
                         <p class="mb-0">Kỳ thi: {{ $testSession->name }}</p>
                         <p class="mb-0">Thời gian kỳ thi: {{ $testSession->start_time->format('d/m/Y H:i') }} - {{ $testSession->end_time->format('d/m/Y H:i') }}</p>
-                        <p class="mb-0">Môn thi: {{ $testShift->testSessionSubject->subject->name }} ({{ $testShift->testSessionSubject->subject->code }})</p>
                     </div>
 
                     <form action="{{ route('test_sessions.test_shifts.update', [$testSession, $testShift]) }}" method="POST">
                         @csrf
                         @method('PUT')
+
+                        <div class="mb-3">
+                            <label class="form-label">Môn thi</label>
+                            @if($testSessionSubjects->isEmpty())
+                                <div class="alert alert-warning">
+                                    Chưa có môn thi nào trong kỳ thi này. 
+                                    <a href="{{ route('test_sessions.subjects.index', $testSession) }}">Thêm môn thi</a>
+                                </div>
+                            @else
+                                <select name="test_session_subject_ids[]" 
+                                        class="form-select select2-multiple @error('test_session_subject_ids') is-invalid @enderror" 
+                                        multiple>
+                                    @foreach($testSessionSubjects as $subject)
+                                        <option value="{{ $subject->pivot->id }}" 
+                                            {{ in_array($subject->pivot->id, old('test_session_subject_ids', $testShift->testSessionSubjects->pluck('id')->toArray())) ? 'selected' : '' }}>
+                                            {{ $subject->name }} ({{ $subject->code }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('test_session_subject_ids')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            @endif
+                        </div>
 
                         <div class="mb-3">
                             <label class="form-label">Tên ca thi</label>
@@ -84,34 +107,6 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Chọn phòng thi</label>
-                            @if($availableRooms->isEmpty())
-                                <div class="alert alert-warning">
-                                    Không có phòng thi nào khả dụng. 
-                                    Vui lòng kiểm tra lại trạng thái của các phòng thi và địa điểm thi.
-                                </div>
-                            @else
-                                <select name="rooms[]" class="form-select select2-multiple @error('rooms') is-invalid @enderror" 
-                                        multiple required>
-                                    @foreach($availableRooms as $locationName => $rooms)
-                                        <optgroup label="{{ $locationName }}">
-                                            @foreach($rooms as $room)
-                                                <option value="{{ $room->id }}" 
-                                                    {{ in_array($room->id, old('rooms', $testShift->testRooms->pluck('id')->toArray())) ? 'selected' : '' }}
-                                                    data-capacity="{{ $room->capacity }}">
-                                                    {{ $room->name }} ({{ $room->code }}) - {{ $room->capacity }} thí sinh
-                                                </option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
-                                </select>
-                                @error('rooms')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            @endif
-                        </div>
-
                         <div class="text-end">
                             <a href="{{ route('test_sessions.test_shifts.index', $testSession) }}" 
                                class="btn btn-light me-2">Hủy</a>
@@ -132,22 +127,9 @@ $(document).ready(function() {
     $('.select2-multiple').select2({
         theme: 'bootstrap-5',
         width: '100%',
-        placeholder: 'Chọn phòng thi',
-        allowClear: true,
-        templateResult: formatRoom,
-        templateSelection: formatRoom
+        placeholder: 'Chọn môn thi',
+        allowClear: true
     });
 });
-
-function formatRoom(room) {
-    if (!room.id) return room.text;
-    
-    var capacity = $(room.element).data('capacity');
-    var $room = $(
-        '<span>' + room.text + '</span>'
-    );
-    
-    return $room;
-}
 </script>
 @endpush 

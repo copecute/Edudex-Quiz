@@ -2,6 +2,11 @@
 
 @section('title', 'Quản lý ca thi - Edudex Quiz')
 
+@push('styles')
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+@endpush
+
 @section('content')
 <div class="container">
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -85,7 +90,25 @@
                                     @endif
                                 </td>
                                 <td>
-                                    {{ $testShift->subject_names }}
+                                    @foreach($testShift->testSessionSubjects as $testSessionSubject)
+                                        <div>
+                                            {{ $testSessionSubject->subject->name }} ({{ $testSessionSubject->subject->code }})
+                                            @php
+                                                $subjectRoom = $testShift->testShiftSubjectRooms
+                                                    ->where('test_session_subject_id', $testSessionSubject->id)
+                                                    ->first();
+                                            @endphp
+                                            @if($subjectRoom)
+                                                <span class="text-muted">
+                                                    - Phòng {{ $subjectRoom->testRoom->name }} ({{ $subjectRoom->testRoom->code }})
+                                                </span>
+                                            @else
+                                                <span class="text-warning">
+                                                    - Chưa phân phòng
+                                                </span>
+                                            @endif
+                                        </div>
+                                    @endforeach
                                 </td>
                                 <td>{{ $testShift->start_time->format('d/m/Y') }}</td>
                                 <td>{{ $testShift->start_time->format('H:i') }} - {{ $testShift->end_time->format('H:i') }}</td>
@@ -103,8 +126,13 @@
                                             {{ $testShift->is_active ? 'Khóa' : 'Mở khóa' }}
                                         </button>
                                     </form>
-                                    <a href="{{ route('test_sessions.test_shifts.test_rooms.index', [$testSession, $testShift]) }}" 
-                                       class="btn btn-sm btn-info">Phòng thi</a>
+                                    <button type="button" class="btn btn-sm btn-success" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#assignSubjectsModal-{{ $testShift->id }}">
+                                        Phân môn thi
+                                    </button>
+                                    <a href="{{ route('test_sessions.test_shifts.subject_rooms.index', [$testSession, $testShift]) }}" 
+                                       class="btn btn-sm btn-info">Phân phòng thi</a>
                                     <a href="{{ route('test_sessions.test_shifts.edit', [$testSession, $testShift]) }}" 
                                        class="btn btn-sm btn-primary">Sửa</a>
                                     <form action="{{ route('test_sessions.test_shifts.destroy', [$testSession, $testShift]) }}" 
@@ -116,6 +144,42 @@
                                     </form>
                                 </td>
                             </tr>
+
+                            <!-- Modal phân môn thi cho mỗi ca thi -->
+                            <div class="modal fade" id="assignSubjectsModal-{{ $testShift->id }}" tabindex="-1">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title">Phân môn thi - {{ $testShift->name }}</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <form action="{{ route('test_sessions.test_shifts.assign_subjects', [$testSession, $testShift]) }}" method="POST">
+                                                @csrf
+                                                <div class="mb-3">
+                                                    <label class="form-label">Chọn môn thi</label>
+                                                    <select name="test_session_subject_ids[]" class="form-select select2-multiple" multiple>
+                                                        @foreach($testSession->testSessionSubjects as $testSessionSubject)
+                                                            <option value="{{ $testSessionSubject->id }}" 
+                                                                {{ $testShift->testSessionSubjects->contains($testSessionSubject->id) ? 'selected' : '' }}>
+                                                                {{ $testSessionSubject->subject->name }} 
+                                                                ({{ $testSessionSubject->subject->code }})
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <div class="form-text">
+                                                        Có thể chọn nhiều môn thi
+                                                    </div>
+                                                </div>
+                                                <div class="text-end">
+                                                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                    <button type="submit" class="btn btn-primary">Lưu</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             @endforeach
                         </tbody>
                     </table>
@@ -130,10 +194,31 @@
 </div>
 
 @push('scripts')
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
 $(document).ready(function() {
     // Khởi tạo tooltips
     $('[data-bs-toggle="tooltip"]').tooltip();
+
+    // Khởi tạo Select2 cho tất cả các select trong modal
+    $('.select2-multiple').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Chọn môn thi',
+        allowClear: true,
+        dropdownParent: $('.modal') // Để select2 hoạt động đúng trong modal
+    });
+
+    // Fix lỗi select2 trong modal Bootstrap
+    $(document).on('shown.bs.modal', '.modal', function () {
+        $(this).find('.select2-multiple').select2({
+            theme: 'bootstrap-5',
+            width: '100%',
+            placeholder: 'Chọn môn thi',
+            allowClear: true,
+            dropdownParent: $(this)
+        });
+    });
 });
 </script>
 @endpush
