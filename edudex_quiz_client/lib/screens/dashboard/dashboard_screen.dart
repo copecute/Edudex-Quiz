@@ -105,6 +105,12 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             title: const Text('Cài đặt'),
             body: _pages[3],
           ),
+          PaneItemSeparator(),
+          PaneItem(
+            icon: const Icon(FluentIcons.settings),
+            title: const Text('Đăng xuất'),
+            body: _pages[3],
+          ),
         ],
       ),
     );

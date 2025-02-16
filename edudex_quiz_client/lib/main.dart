@@ -4,6 +4,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:window_manager/window_manager.dart';
+import 'dart:io';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
@@ -47,6 +48,10 @@ void main() async {
       await windowManager.setPreventClose(true);
       await windowManager.setSkipTaskbar(false);
     });
+  }
+
+  if (kDebugMode) {
+    HttpOverrides.global = MyHttpOverrides();
   }
 
   runApp(const MyApp());
@@ -102,5 +107,14 @@ class MyApp extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
   }
 }
