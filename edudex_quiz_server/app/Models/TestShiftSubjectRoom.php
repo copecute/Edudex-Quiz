@@ -30,4 +30,9 @@ class TestShiftSubjectRoom extends Model
     {
         return $this->belongsTo(TestRoom::class);
     }
+
+    public function testSessionSubjectStudents()
+    {
+        return $this->hasMany(TestSessionSubjectStudent::class);
+    }
 } 

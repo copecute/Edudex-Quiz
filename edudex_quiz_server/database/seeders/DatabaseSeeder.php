@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             TestSessionSeeder::class,
             TestShiftSeeder::class,
             TestPaperSeeder::class,
+            StudentSeeder::class,
         ]);
     }
 }

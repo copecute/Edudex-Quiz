@@ -36,6 +36,7 @@ use App\Http\Controllers\TestSessionRoomController;
 use App\Http\Controllers\TestSessionSubjectController;
 use App\Http\Controllers\TestShiftSubjectRoomController;
 use App\Http\Controllers\TestPaperController;
+use App\Http\Controllers\StudentController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -138,9 +139,23 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/test_sessions/{test_session}/test_shifts/{test_shift}/assign_subjects', 
             [TestShiftController::class, 'assignSubjects'])
             ->name('test_sessions.test_shifts.assign_subjects');
+        Route::get('/test_sessions/{test_session}/subjects/{subject}/students', 
+            [TestSessionSubjectController::class, 'students'])
+            ->name('test_sessions.subjects.students');
+        Route::post('/test_sessions/{test_session}/subjects/{subject}/students', 
+            [TestSessionSubjectController::class, 'assignStudents'])
+            ->name('test_sessions.subjects.assign_students');
+        Route::delete('/test_sessions/{test_session}/subjects/{subject}/students/{student}', 
+            [TestSessionSubjectController::class, 'removeStudent'])
+            ->name('test_sessions.subjects.remove_student');
     });
 
     // Thêm routes cho test papers
     Route::resource('test_papers', TestPaperController::class);
     Route::get('/test_papers/tags/{subject}', [TestPaperController::class, 'getTagsBySubject']);
+
+    // Thêm route cho quản lý thí sinh
+    Route::middleware(['auth', 'role:0,1'])->group(function () {
+        Route::resource('students', StudentController::class);
+    });
 });

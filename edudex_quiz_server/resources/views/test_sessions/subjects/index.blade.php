@@ -65,6 +65,10 @@
                                             data-bs-target="#assignRoomModal-{{ $subject->id }}">
                                         Phân phòng
                                     </button>
+                                    <a href="{{ route('test_sessions.subjects.students', [$testSession, $subject]) }}" 
+                                       class="btn btn-sm btn-info">
+                                        Quản lý thí sinh
+                                    </a>
                                     <form action="{{ route('test_sessions.subjects.destroy', [$testSession, $subject]) }}" 
                                           method="POST" class="d-inline"
                                           onsubmit="return confirm('Bạn có chắc chắn muốn xóa?')">
