@@ -30,4 +30,17 @@ class TestSessionSubject extends Model
         return $this->belongsToMany(TestShift::class, 'test_shift_subjects')
                     ->withTimestamps();
     }
+
+    public function testShiftSubjectRooms()
+    {
+        return $this->hasMany(TestShiftSubjectRoom::class);
+    }
+
+    public function students()
+    {
+        return $this->belongsToMany(Student::class, 'test_session_subject_students')
+                    ->using(TestSessionSubjectStudent::class)
+                    ->withPivot(['exam_code', 'test_shift_subject_room_id'])
+                    ->withTimestamps();
+    }
 } 

@@ -35,12 +35,6 @@ class TestShift extends Model
         return $this->belongsTo(TestSession::class);
     }
 
-    public function testRooms()
-    {
-        return $this->belongsToMany(TestRoom::class, 'test_session_rooms')
-                    ->withTimestamps();
-    }
-
     public function testSessionSubjects()
     {
         return $this->belongsToMany(TestSessionSubject::class, 'test_shift_subjects')
@@ -105,5 +99,22 @@ class TestShift extends Model
             return 'danger';
         }
         return 'success';
+    }
+
+    public function testShiftSubjectRooms()
+    {
+        return $this->hasMany(TestShiftSubjectRoom::class);
+    }
+
+    public function getSubjectRoomsAttribute()
+    {
+        return $this->testShiftSubjectRooms->map(function($subjectRoom) {
+            return [
+                'subject_name' => $subjectRoom->testSessionSubject->subject->name,
+                'subject_code' => $subjectRoom->testSessionSubject->subject->code,
+                'room_name' => $subjectRoom->testRoom->name,
+                'room_code' => $subjectRoom->testRoom->code
+            ];
+        });
     }
 } 

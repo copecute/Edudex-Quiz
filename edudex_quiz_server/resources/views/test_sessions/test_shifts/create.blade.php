@@ -40,8 +40,7 @@
                             @else
                                 <select name="test_session_subject_ids[]" 
                                         class="form-select select2-multiple @error('test_session_subject_ids') is-invalid @enderror" 
-                                        multiple
-                                        required>
+                                        multiple>
                                     @foreach($testSessionSubjects as $subject)
                                         <option value="{{ $subject->pivot->id }}" 
                                             {{ in_array($subject->pivot->id, old('test_session_subject_ids', [])) ? 'selected' : '' }}>
@@ -113,34 +112,6 @@
                             </div>
                         </div>
 
-                        <div class="mb-3">
-                            <label class="form-label">Chọn phòng thi</label>
-                            @if($availableRooms->isEmpty())
-                                <div class="alert alert-warning">
-                                    Không có phòng thi nào khả dụng. 
-                                    Vui lòng kiểm tra lại trạng thái của các phòng thi và địa điểm thi.
-                                </div>
-                            @else
-                                <select name="rooms[]" class="form-select select2-multiple @error('rooms') is-invalid @enderror" 
-                                        multiple required>
-                                    @foreach($availableRooms as $locationName => $rooms)
-                                        <optgroup label="{{ $locationName }}">
-                                            @foreach($rooms as $room)
-                                                <option value="{{ $room->id }}" 
-                                                    {{ in_array($room->id, old('rooms', [])) ? 'selected' : '' }}
-                                                    data-capacity="{{ $room->capacity }}">
-                                                    {{ $room->name }} ({{ $room->code }}) - {{ $room->capacity }} thí sinh
-                                                </option>
-                                            @endforeach
-                                        </optgroup>
-                                    @endforeach
-                                </select>
-                                @error('rooms')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            @endif
-                        </div>
-
                         <div class="text-end">
                             <a href="{{ route('test_sessions.test_shifts.index', $testSession) }}" 
                                class="btn btn-light me-2">
@@ -165,29 +136,9 @@ $(document).ready(function() {
     $('.select2-multiple').select2({
         theme: 'bootstrap-5',
         width: '100%',
-        placeholder: 'Chọn phòng thi',
-        allowClear: true,
-        templateResult: formatRoom,
-        templateSelection: formatRoom
-    });
-
-    $('select[name="test_session_subject_ids[]"]').select2({
-        theme: 'bootstrap-5',
-        width: '100%',
         placeholder: 'Chọn môn thi',
         allowClear: true
     });
 });
-
-function formatRoom(room) {
-    if (!room.id) return room.text;
-    
-    var capacity = $(room.element).data('capacity');
-    var $room = $(
-        '<span>' + room.text + '</span>'
-    );
-    
-    return $room;
-}
 </script>
 @endpush 

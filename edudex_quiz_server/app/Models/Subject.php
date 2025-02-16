@@ -43,4 +43,14 @@ class Subject extends Model
             'id'
         )->whereHas('testSessionSubjects');
     }
+
+    public function testShiftSubjectRooms()
+    {
+        return $this->hasManyThrough(
+            TestShiftSubjectRoom::class,
+            TestSessionSubject::class,
+            'subject_id',
+            'test_session_subject_id'
+        );
+    }
 } 
