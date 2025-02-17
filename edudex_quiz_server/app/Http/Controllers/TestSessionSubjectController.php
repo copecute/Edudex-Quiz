@@ -27,8 +27,50 @@ class TestSessionSubjectController extends Controller
                 $query->whereHas('testShift', function($q) use ($testSession) {
                     $q->where('test_shifts.test_session_id', $testSession->id);
                 });
-            }, 'testShiftSubjectRooms.testShift', 'testShiftSubjectRooms.testRoom'])
-            ->get()
+            }, 'testShiftSubjectRooms.testShift', 'testShiftSubjectRooms.testRoom']);
+
+        // Tìm kiếm theo mã hoặc tên môn
+        if ($search = request('search')) {
+            $subjects->where(function($query) use ($search) {
+                $query->where('code', 'like', "%{$search}%")
+                      ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        // Lọc theo trạng thái đề thi
+        if ($status = request('status')) {
+            $subjects->whereHas('testSessionSubjects', function($query) use ($status, $testSession) {
+                $query->where('test_session_id', $testSession->id)
+                      ->when($status === 'has_test_paper', function($q) {
+                          $q->whereNotNull('test_paper_id');
+                      })
+                      ->when($status === 'no_test_paper', function($q) {
+                          $q->whereNull('test_paper_id');
+                      });
+            });
+        }
+
+        // Lọc theo trạng thái phòng thi
+        if (request()->has('has_room')) {
+            $hasRoom = request('has_room');
+            if ($hasRoom == '1') {
+                $subjects->has('testShiftSubjectRooms');
+            } elseif ($hasRoom == '0') {
+                $subjects->doesntHave('testShiftSubjectRooms');
+            }
+        }
+
+        // Lọc theo ca thi
+        if ($shiftId = request('shift')) {
+            $subjects->whereHas('testSessionSubjects', function($query) use ($testSession, $shiftId) {
+                $query->where('test_session_id', $testSession->id)
+                      ->whereHas('testShifts', function($q) use ($shiftId) {
+                          $q->where('test_shifts.id', $shiftId);
+                      });
+            });
+        }
+
+        $subjects = $subjects->get()
             ->map(function($subject) {
                 // Lấy số ca thi từ test_session_subject
                 $subject->test_shifts_count = $subject->testSessionSubjects->first()->test_shifts_count ?? 0;
@@ -55,6 +97,9 @@ class TestSessionSubjectController extends Controller
         ->groupBy('test_location.name');
 
         $testPapers = TestPaper::all(); // Lấy tất cả các đề thi
+
+        // Lấy danh sách ca thi của kỳ thi này
+        $testSession->load('testShifts');
 
         return view('test_sessions.subjects.index', compact(
             'testSession', 

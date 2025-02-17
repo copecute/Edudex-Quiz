@@ -224,6 +224,20 @@
                 </div>
             </div>
         </div>
+
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-file-alt"></i> Quản lý bài làm
+                    </h5>
+                    <p class="card-text">{{ \App\Models\TestSubmission::count() }} bài làm</p>
+                    <a href="{{ route('test-submissions.index') }}" class="btn btn-primary">
+                        <i class="fas fa-arrow-right"></i> Truy cập
+                    </a>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 @endsection

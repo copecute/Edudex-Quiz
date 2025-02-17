@@ -44,9 +44,13 @@ Route::middleware('auth.api')->group(function () {
 Route::prefix('student')->group(function () {
     Route::post('login', [StudentAuthController::class, 'login']);
     
-    // Sử dụng middleware auth.student
+    // Sử dụng middleware auth.student thay vì auth:sanctum và student
     Route::middleware(['api', 'auth.student'])->group(function () {
         Route::get('profile', [StudentAuthController::class, 'profile']);
         Route::post('logout', [StudentAuthController::class, 'logout']);
+        Route::get('test-papers/{test_session_subject_id}', [StudentAuthController::class, 'getTestPaper']);
+        Route::get('test-papers/{test_session_subject_id}/questions', [StudentAuthController::class, 'getQuestions']);
+        // Thêm route nộp bài vào cùng group middleware
+        Route::post('submit-test', [StudentAuthController::class, 'submitTest']);
     });
 }); 

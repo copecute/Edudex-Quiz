@@ -12,8 +12,11 @@ class Question extends Model
 
     protected $fillable = [
         'content',
-        'subject_id',
-        'level'
+        'type',
+        'level',
+        'score',
+        'explanation',
+        'image_url'
     ];
 
     public function subject()
