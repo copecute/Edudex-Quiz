@@ -94,30 +94,23 @@ class QuestionSeeder extends Seeder
     private function getQuestionsForSubject(string $subjectCode): array
     {
         $questionsData = [
-            'KTPM001' => [
+            'KTPM001' => array_merge(
                 [
-                    'content' => 'Mô hình thác nước (Waterfall) có bao nhiêu giai đoạn chính?',
-                    'level' => 1, // Dễ
-                    'answers' => [
-                        ['content' => '3 giai đoạn', 'is_correct' => false],
-                        ['content' => '5 giai đoạn', 'is_correct' => true],
-                        ['content' => '7 giai đoạn', 'is_correct' => false],
-                        ['content' => '9 giai đoạn', 'is_correct' => false]
+                    [
+                        'content' => 'Mô hình thác nước (Waterfall) có bao nhiêu giai đoạn chính?',
+                        'level' => 1, // Dễ
+                        'answers' => [
+                            ['content' => '3 giai đoạn', 'is_correct' => false],
+                            ['content' => '5 giai đoạn', 'is_correct' => true],
+                            ['content' => '7 giai đoạn', 'is_correct' => false],
+                            ['content' => '9 giai đoạn', 'is_correct' => false]
+                        ],
+                        'tags' => [0, 1] // Liên kết với 2 tag đầu tiên
                     ],
-                    'tags' => [0, 1] // Liên kết với 2 tag đầu tiên
+                    // Thêm câu hỏi khác ở đây...
                 ],
-                [
-                    'content' => 'Phương pháp Agile có đặc điểm gì?',
-                    'level' => 2, // Trung bình
-                    'answers' => [
-                        ['content' => 'Linh hoạt, thích ứng với thay đổi', 'is_correct' => true],
-                        ['content' => 'Cứng nhắc, kế hoạch chi tiết', 'is_correct' => false],
-                        ['content' => 'Không có tài liệu', 'is_correct' => false],
-                        ['content' => 'Không có giai đoạn kiểm thử', 'is_correct' => false]
-                    ],
-                    'tags' => [1] // Liên kết với tag thứ 2
-                ]
-            ],
+                $this->generateAdditionalQuestions('KTPM001')
+            ),
             'HTTT001' => [
                 [
                     'content' => 'Khóa chính (Primary Key) là gì?',
@@ -170,5 +163,24 @@ class QuestionSeeder extends Seeder
         ];
 
         return $questionsData[$subjectCode] ?? [];
+    }
+
+    private function generateAdditionalQuestions(string $subjectCode): array
+    {
+        $additionalQuestions = [];
+        for ($i = 1; $i <= 50; $i++) {
+            $additionalQuestions[] = [
+                'content' => "Câu hỏi số $i cho môn $subjectCode?",
+                'level' => rand(1, 3), // Tạo cấp độ ngẫu nhiên từ 1 đến 3
+                'answers' => [
+                    ['content' => 'Đáp án A', 'is_correct' => rand(0, 1) == 1],
+                    ['content' => 'Đáp án B', 'is_correct' => rand(0, 1) == 1],
+                    ['content' => 'Đáp án C', 'is_correct' => rand(0, 1) == 1],
+                    ['content' => 'Đáp án D', 'is_correct' => rand(0, 1) == 1]
+                ],
+                'tags' => [rand(0, 2)] // Liên kết với tag ngẫu nhiên
+            ];
+        }
+        return $additionalQuestions;
     }
 } 

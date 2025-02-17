@@ -148,6 +148,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/test_sessions/{test_session}/subjects/{subject}/students/{student}', 
             [TestSessionSubjectController::class, 'removeStudent'])
             ->name('test_sessions.subjects.remove_student');
+        Route::post('/test_sessions/{test_session}/subjects/{test_session_subject}/assign_test_paper', 
+            [TestSessionSubjectController::class, 'assignTestPaper'])
+            ->name('test_sessions.subjects.assign_test_paper');
     });
 
     // Thêm routes cho test papers

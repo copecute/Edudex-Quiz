@@ -17,6 +17,9 @@ return new class extends Migration
 
             // Một môn chỉ được thêm một lần trong một kỳ thi
             $table->unique(['test_session_id', 'subject_id']);
+
+            // Thêm cột test_paper_id
+            $table->foreignId('test_paper_id')->nullable()->constrained()->nullOnDelete();
         });
     }
 

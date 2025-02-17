@@ -12,34 +12,19 @@ class StudentAuthController extends Controller
     public function login(Request $request)
     {
         $validated = $request->validate([
-            'student_code' => 'required|exists:students,code',
+            'student_code' => 'required',
             'exam_code' => 'required'
         ]);
 
-        // Tìm sinh viên theo mã sinh viên và status = 1
+        // Kiểm tra xem sinh viên có tồn tại không
         $student = Student::where('code', $validated['student_code'])
             ->where('status', true) // Chỉ cho phép sinh viên đang học đăng nhập
-            ->with([
-                'majors',
-                'testSessionSubjects' => function($q) use ($validated) {
-                    $q->whereHas('testSession', function($q) {
-                        $q->where('is_active', true); // Chỉ lấy kỳ thi đang hoạt động
-                    })
-                    ->whereHas('students', function($q) use ($validated) {
-                        $q->where('test_session_subject_students.exam_code', $validated['exam_code']);
-                    });
-                },
-                'testSessionSubjects.testSession',
-                'testSessionSubjects.subject',
-                'testSessionSubjects.testShiftSubjectRooms.testRoom.testLocation',
-                'testSessionSubjects.testShiftSubjectRooms.testShift'
-            ])
             ->first();
 
         if (!$student) {
             return response()->json([
-                'message' => 'Không tìm thấy sinh viên hoặc sinh viên đã nghỉ học'
-            ], 404);
+                'message' => 'Số báo danh không đúng hoặc không phải trong thời gian thi'
+            ], 401); // Trả về mã 401
         }
 
         // Kiểm tra số báo danh trong kỳ thi đang hoạt động
@@ -52,8 +37,8 @@ class StudentAuthController extends Controller
 
         if (!$hasValidExamCode) {
             return response()->json([
-                'message' => 'Số báo danh không đúng hoặc kỳ thi không hoạt động'
-            ], 401);
+                'message' => 'Số báo danh không đúng hoặc không phải trong thời gian thi'
+            ], 401); // Trả về mã 401
         }
 
         // Tạo token cho sinh viên
@@ -99,11 +84,9 @@ class StudentAuthController extends Controller
             ];
         });
 
+        // Trả về thông tin sinh viên và token
         return response()->json([
-            'token' => [
-                'access_token' => $token,
-                'token_type' => 'copecute'
-            ],
+            'token' => $token,
             'student' => [
                 'id' => $student->id,
                 'code' => $student->code,
@@ -111,9 +94,9 @@ class StudentAuthController extends Controller
                 'email' => $student->email,
                 'phone' => $student->phone,
                 'address' => $student->address,
-                'birthday' => $student->birthday?->format('Y-m-d'), // Format lại ngày tháng
-                'gender' => $student->gender, // true: Nam, false: Nữ
-                'avatar_url' => $student->avatar_url, // Sử dụng accessor đã định nghĩa
+                'birthday' => $student->birthday?->format('Y-m-d'),
+                'gender' => $student->gender,
+                'avatar_url' => $student->avatar_url,
                 'majors' => $student->majors->map(function($major) {
                     return [
                         'id' => $major->id,

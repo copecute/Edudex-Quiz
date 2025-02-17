@@ -12,7 +12,8 @@ class TestSessionSubject extends Model
 
     protected $fillable = [
         'test_session_id',
-        'subject_id'
+        'subject_id',
+        'test_paper_id'
     ];
 
     public function testSession()
@@ -42,5 +43,10 @@ class TestSessionSubject extends Model
                     ->using(TestSessionSubjectStudent::class)
                     ->withPivot(['exam_code', 'test_shift_subject_room_id'])
                     ->withTimestamps();
+    }
+
+    public function testPaper()
+    {
+        return $this->belongsTo(TestPaper::class);
     }
 } 

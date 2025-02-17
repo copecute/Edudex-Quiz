@@ -104,6 +104,13 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
             FluentPageRoute(builder: (context) => const DashboardScreen()),
           );
         }
+      } else if (response.statusCode == 401) {
+        final data = json.decode(response.body);
+        setState(() {
+          _errorMessage =
+              data['message'] ?? 'Thông tin đăng nhập không chính xác!';
+        });
+        print('❌ Lỗi đăng nhập: ${data['message']}');
       } else {
         print('❌ Lỗi đăng nhập: ${response.statusCode}');
         setState(() {

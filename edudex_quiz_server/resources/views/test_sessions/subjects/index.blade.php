@@ -37,6 +37,7 @@
                                 <th>Tên môn</th>
                                 <th>Số ca thi</th>
                                 <th>Phòng thi</th>
+                                <th>Đề thi</th>
                                 <th>Thao tác</th>
                             </tr>
                         </thead>
@@ -55,6 +56,13 @@
                                     @endforeach
                                 </td>
                                 <td>
+                                    @if($subject->testSessionSubjects->first()->test_paper_id)
+                                        {{ $subject->testSessionSubjects->first()->testPaper->name }}
+                                    @else
+                                        Chưa phân đề thi
+                                    @endif
+                                </td>
+                                <td>
                                     <button type="button" class="btn btn-sm btn-success" 
                                             data-bs-toggle="modal" 
                                             data-bs-target="#assignShiftModal-{{ $subject->id }}">
@@ -64,6 +72,11 @@
                                             data-bs-toggle="modal" 
                                             data-bs-target="#assignRoomModal-{{ $subject->id }}">
                                         Phân phòng
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-secondary" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#assignTestPaperModal-{{ $subject->id }}">
+                                        Phân đề thi
                                     </button>
                                     <a href="{{ route('test_sessions.subjects.students', [$testSession, $subject]) }}" 
                                        class="btn btn-sm btn-info">
@@ -202,6 +215,51 @@
                                                 </div>
                                             </form>
                                         </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Modal phân đề thi cho từng môn -->
+                            <div class="modal fade" id="assignTestPaperModal-{{ $subject->id }}" 
+                                 tabindex="-1" 
+                                 aria-labelledby="assignTestPaperModalLabel-{{ $subject->id }}" 
+                                 aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <form action="{{ route('test_sessions.subjects.assign_test_paper', [
+                                                $testSession, 
+                                                $subject->testSessionSubjects->first()
+                                            ]) }}" 
+                                              method="POST">
+                                            @csrf
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="assignTestPaperModalLabel-{{ $subject->id }}">
+                                                    Phân đề thi cho môn {{ $subject->name }}
+                                                </h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <div class="mb-3">
+                                                    <label for="test_paper_id_{{ $subject->id }}" class="form-label">Chọn đề thi</label>
+                                                    <select name="test_paper_id" 
+                                                            id="test_paper_id_{{ $subject->id }}" 
+                                                            class="form-select" 
+                                                            required>
+                                                        <option value="">Chọn đề thi</option>
+                                                        @foreach($subject->available_test_papers as $testPaper)
+                                                            <option value="{{ $testPaper->id }}"
+                                                                {{ $subject->testSessionSubjects->first()->test_paper_id == $testPaper->id ? 'selected' : '' }}>
+                                                                {{ $testPaper->name }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Hủy</button>
+                                                <button type="submit" class="btn btn-primary">Phân đề thi</button>
+                                            </div>
+                                        </form>
                                     </div>
                                 </div>
                             </div>
