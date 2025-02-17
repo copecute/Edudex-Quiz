@@ -6,17 +6,28 @@ import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../utils/crypto.dart';
+import 'dart:developer';
+import 'package:process_run/process_run.dart';
 
 class ResultScreen extends StatelessWidget {
   final int totalQuestions;
   final int correctAnswers;
   final double score;
+  final List<Map<String, dynamic>> questions;
+  final Map<int, int> userAnswers;
 
   const ResultScreen({
     super.key,
     required this.totalQuestions,
     required this.correctAnswers,
     required this.score,
+    required this.questions,
+    required this.userAnswers,
   });
 
   Widget _buildStudentInfo(BuildContext context) {
@@ -72,8 +83,8 @@ class ResultScreen extends StatelessWidget {
                         );
                       },
                       errorBuilder: (context, error, stackTrace) {
-                        print('❌ Lỗi tải ảnh: $error');
-                        print('🔍 URL ảnh: ${studentData!['avatar_url']}');
+                        // print('❌ Lỗi tải ảnh: $error');
+                        // print('🔍 URL ảnh: ${studentData!['avatar_url']}');
                         return Container(
                           width: 100,
                           height: 120,
@@ -124,6 +135,180 @@ class ResultScreen extends StatelessWidget {
         );
       },
     );
+  }
+
+  Future<void> _exportResult(BuildContext context,
+      Map<String, dynamic> studentData, List<dynamic> examsData) async {
+    try {
+      final appDir = Directory.current;
+      final resultDir = Directory('${appDir.path}\\Results');
+
+      if (!await resultDir.exists()) {
+        await resultDir.create();
+      }
+
+      final now = DateTime.now();
+      final formatter = DateFormat('dd-MM-yyyy_HH-mm');
+      final fileName =
+          'ket_qua_thi_${studentData['code']}_${formatter.format(now)}.edudex';
+      final file = File('${resultDir.path}\\$fileName');
+
+      final buffer = StringBuffer();
+      buffer.writeln('KẾT QUẢ BÀI THI');
+      buffer.writeln('==============');
+      buffer.writeln();
+
+      // Thông tin thí sinh
+      buffer.writeln('THÔNG TIN THÍ SINH');
+      buffer.writeln('Mã sinh viên: ${studentData['code']}');
+      buffer.writeln('Họ và tên: ${studentData['name']}');
+      buffer.writeln(
+          'Chuyên ngành: ${studentData['majors'].firstWhere((m) => m['is_main'] == 1)['name']}');
+      buffer.writeln();
+
+      // Thông tin bài thi
+      if (examsData.isNotEmpty) {
+        buffer.writeln('THÔNG TIN BÀI THI');
+        buffer.writeln('Kỳ thi: ${examsData[0]['test_session']['name']}');
+        buffer.writeln('Môn thi: ${examsData[0]['subject']['name']}');
+        buffer.writeln(
+            'Phòng thi: ${examsData[0]['room']['name']} - ${examsData[0]['room']['location']}');
+        buffer.writeln('Ca thi: ${examsData[0]['room']['shift']['name']}');
+        buffer.writeln();
+      }
+
+      // Kết quả
+      buffer.writeln('KẾT QUẢ');
+      buffer.writeln('Tổng số câu hỏi: $totalQuestions');
+      buffer.writeln('Số câu trả lời đúng: $correctAnswers');
+      buffer.writeln('Điểm số: ${score.toStringAsFixed(1)}');
+      buffer.writeln('Kết quả: ${score >= 5.0 ? 'Đạt' : 'Không đạt'}');
+      buffer.writeln();
+
+      // Chi tiết bài làm dạng JSON đơn giản hơn
+      final detailsJson = {
+        'questions': questions.asMap().entries.map((entry) {
+          final index = entry.key;
+          final question = entry.value;
+          final selectedAnswerIndex = userAnswers[index];
+          final answers = question['answers'] as List;
+
+          return {
+            'id': question['id'],
+            'content': question['content'],
+            'level': question['level'],
+            'selected_answer': selectedAnswerIndex != null
+                ? {
+                    'id': answers[selectedAnswerIndex]['id'],
+                    'content': answers[selectedAnswerIndex]['content'],
+                  }
+                : null,
+          };
+        }).toList(),
+      };
+
+      buffer.writeln('\nCHI TIẾT BÀI LÀM');
+      buffer.writeln('===============');
+      buffer.writeln(const JsonEncoder.withIndent('  ').convert(detailsJson));
+      buffer.writeln();
+
+      buffer.writeln('Thời gian xuất kết quả: ${formatter.format(now)}');
+
+      try {
+        final plainText = buffer.toString();
+        log('Plain text length: ${plainText.length}');
+
+        final encrypted =
+            AppCrypto.encrypter.encrypt(plainText, iv: AppCrypto.iv);
+        log('Encrypted bytes length: ${encrypted.bytes.length}');
+
+        await file.writeAsBytes(encrypted.bytes);
+      } catch (e) {
+        log('Encryption error: $e');
+        rethrow;
+      }
+
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ContentDialog(
+            title: const Text('Thành công'),
+            content: Text('Đã xuất kết quả thi vào file:\n${file.path}'),
+            actions: [
+              Button(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+              FilledButton(
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(FluentIcons.folder_open),
+                    SizedBox(width: 8),
+                    Text('Mở thư mục'),
+                  ],
+                ),
+                onPressed: () async {
+                  Navigator.pop(context);
+                  try {
+                    var shell = Shell();
+                    // Mở thư mục chứa file
+                    await shell.run('explorer "${file.parent.path}"');
+                  } catch (e) {
+                    log('Error opening folder: $e');
+                    if (context.mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => ContentDialog(
+                          title: const Text('Lỗi'),
+                          content: const Text('Không thể mở thư mục'),
+                          actions: [
+                            Button(
+                              child: const Text('OK'),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      log('Export error: $e');
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ContentDialog(
+            title: const Text('Lỗi'),
+            content: Text('Không thể xuất kết quả: ${e.toString()}'),
+            actions: [
+              Button(
+                child: const Text('OK'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  String _getDifficultyText(int level) {
+    switch (level) {
+      case 1:
+        return 'Dễ';
+      case 2:
+        return 'Trung bình';
+      case 3:
+        return 'Khó';
+      default:
+        return 'Không xác định';
+    }
   }
 
   @override
@@ -183,7 +368,7 @@ class ResultScreen extends StatelessWidget {
             Expanded(
               child: Center(
                 child: Container(
-                  constraints: const BoxConstraints(maxWidth: 600),
+                  constraints: const BoxConstraints(maxWidth: 800),
                   padding: const EdgeInsets.all(32),
                   child: Card(
                     padding: const EdgeInsets.all(32),
@@ -241,25 +426,68 @@ class ResultScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 48),
-                        FilledButton(
-                          onPressed: () {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              FluentPageRoute(
-                                builder: (context) => const DashboardScreen(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            FilledButton(
+                              onPressed: () {
+                                Navigator.of(context).pushAndRemoveUntil(
+                                  FluentPageRoute(
+                                    builder: (context) =>
+                                        const DashboardScreen(),
+                                  ),
+                                  (route) => false,
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 12,
+                                ),
+                                child: Text(
+                                  'Kết thúc',
+                                  style: TextStyle(fontSize: 16),
+                                ),
                               ),
-                              (route) => false,
-                            );
-                          },
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 32,
-                              vertical: 12,
                             ),
-                            child: Text(
-                              'Kết thúc',
-                              style: TextStyle(fontSize: 16),
+                            const SizedBox(width: 16),
+                            Button(
+                              onPressed: () async {
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                final studentDataStr =
+                                    prefs.getString('student_data');
+                                final examsDataStr =
+                                    prefs.getString('exams_data');
+
+                                if (studentDataStr != null &&
+                                    examsDataStr != null) {
+                                  final studentData =
+                                      json.decode(studentDataStr);
+                                  final examsData = json.decode(examsDataStr);
+                                  _exportResult(
+                                      context, studentData, examsData);
+                                }
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 32,
+                                  vertical: 12,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(FluentIcons.download),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Xuất kết quả',
+                                      style: TextStyle(fontSize: 16),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                          ],
                         ),
                       ],
                     ),

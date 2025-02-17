@@ -10,9 +10,16 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
+import 'package:edudex_quiz_client/utils/cover_date_time.dart';
 
 class QuizScreen extends StatefulWidget {
-  const QuizScreen({super.key});
+  final int testSessionSubjectId;
+
+  const QuizScreen({
+    super.key,
+    required this.testSessionSubjectId,
+  });
 
   @override
   State<QuizScreen> createState() => _QuizScreenState();
@@ -54,6 +61,14 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   Map<String, dynamic>? _studentData;
   List<dynamic>? _examsData;
 
+  // Thêm biến lưu thông tin đề thi
+  Map<String, dynamic>? _testPaperDetails;
+
+  // Thêm biến lưu tổng thời gian
+  int _totalSeconds = 0;
+
+  final DateTime _startedAt = DateTime.now();
+
   // hàm cuộn đến câu hỏi được chọn
   void _scrollToQuestion(int index) {
     final double offset = index * _questionHeight;
@@ -68,17 +83,12 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   void initState() {
     super.initState();
     _loadUserData();
-    // tải câu hỏi khi khởi tạo
-    _loadQuestions();
-    // toàn màn hình
+    // Thay đổi _loadQuestions() thành _loadTestPaper()
+    _loadTestPaper();
     _setupFullScreen();
-    // bắt đầu đếm thời gian
     _startTimer();
-    // thêm listener cho window
     windowManager.addListener(this);
-    // khởi tạo cửa sổ
     _initializeWindow();
-    // Thêm listener cho keyboard
     RawKeyboard.instance.addListener(_handleKeyEvent);
   }
 
@@ -109,19 +119,47 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     }
   }
 
-  Future<void> _loadQuestions() async {
+  Future<void> _loadTestPaper() async {
     try {
-      // đọc file JSON từ assets
-      final String response = await DefaultAssetBundle.of(context)
-          .loadString('assets/questions.json');
-      final data = await json.decode(response);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final serverUrl = prefs.getString('server_url');
+      final examsDataStr = prefs.getString('exams_data');
 
-      setState(() {
-        _questions = List<Map<String, dynamic>>.from(data['questions']);
-        _isLoading = false;
-      });
+      if (token == null || serverUrl == null || examsDataStr == null) {
+        throw Exception('Không tìm thấy thông tin cần thiết');
+      }
+
+      final examsData = json.decode(examsDataStr);
+      if (examsData.isEmpty) {
+        throw Exception('Không có thông tin bài thi');
+      }
+
+      final testPaperId = examsData[0]['test_paper']['id'];
+
+      final response = await http.get(
+        Uri.parse('$serverUrl/api/student/test-papers/$testPaperId/questions'),
+        headers: {
+          'Authorization': 'copecute $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        setState(() {
+          _testPaperDetails = data['test_paper'];
+          _questions =
+              List<Map<String, dynamic>>.from(_testPaperDetails!['questions']);
+          _totalSeconds = _testPaperDetails!['duration'] * 60;
+          _remainingSeconds = _totalSeconds;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Không thể tải câu hỏi');
+      }
     } catch (e) {
-      debugPrint('Lỗi khi tải câu hỏi: $e');
+      print('Lỗi khi tải câu hỏi: $e');
       setState(() {
         _isLoading = false;
       });
@@ -208,7 +246,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                   child: const Text('OK'),
                   onPressed: () {
                     Navigator.pop(context);
-                    _submitQuiz(isTimeUp: true);
+                    _submitTest();
                   },
                 ),
               ],
@@ -225,78 +263,108 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  void _submitQuiz({bool isTimeUp = false}) async {
+  Future<void> _submitTest() async {
     if (_isSubmitting) return;
 
     setState(() {
       _isSubmitting = true;
     });
 
-    // nếu không phải hết giờ thì hiện dialog xác nhận
-    bool shouldSubmit = isTimeUp
-        ? true
-        : await showDialog<bool>(
-              context: context,
-              barrierDismissible: false,
-              builder: (context) => ContentDialog(
-                title: const Text('Nộp bài'),
-                content: const Text('Bạn có chắc chắn muốn nộp bài?'),
-                actions: [
-                  Button(
-                    child: const Text('Không'),
-                    onPressed: () => Navigator.pop(context, false),
-                  ),
-                  FilledButton(
-                    child: const Text('Có'),
-                    onPressed: () => Navigator.pop(context, true),
-                  ),
-                ],
-              ),
-            ) ??
-            false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      final serverUrl = prefs.getString('server_url');
 
-    if (shouldSubmit) {
-      _timer?.cancel();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-          overlays: SystemUiOverlay.values);
-      RawKeyboard.instance.removeListener(_handleKeyEvent);
-
-      // Tắt full screen và always on top
-      try {
-        if (const bool.fromEnvironment('dart.library.io')) {
-          await windowManager.setFullScreen(false);
-          await windowManager.setAlwaysOnTop(false);
-        }
-      } catch (e) {
-        // Bỏ qua lỗi khi chạy trên web
+      if (token == null || serverUrl == null) {
+        throw Exception('Không tìm thấy thông tin đăng nhập');
       }
 
-      // Tính điểm
-      int correctAnswers = 0;
-      _userAnswers.forEach((key, value) {
-        if (value == 1) {
-          correctAnswers++;
-        }
+      // Chuẩn bị dữ liệu answers
+      final List<Map<String, dynamic>> answers = [];
+      _userAnswers.forEach((questionIndex, answerIndex) {
+        // Lấy ID thật của câu hỏi và đáp án từ _questions
+        final question = _questions[questionIndex];
+        final answer = question['answers'][answerIndex];
+
+        answers.add({
+          'question_id': question['id'], // Lấy ID thật của câu hỏi
+          'answer_id': answer['id'], // Lấy ID thật của đáp án
+        });
       });
 
-      double score = (correctAnswers * 10) / _questions.length;
+      final requestBody = {
+        'test_session_subject_id': _examsData![0]['test_session_subject_id'],
+        'answers': answers,
+        'submission_file': "copecute",
+        'started_at': _startedAt.toIso8601String(),
+      };
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          FluentPageRoute(
-            builder: (context) => ResultScreen(
-              totalQuestions: _questions.length,
-              correctAnswers: correctAnswers,
-              score: score,
+      print('📤 Submit request:');
+      print('URL: $serverUrl/api/student/submit-test');
+      print('Headers: ${json.encode({
+            'Authorization': 'copecute $token',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          })}');
+      print('Body: ${json.encode(requestBody)}');
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/student/submit-test'),
+        headers: {
+          'Authorization': 'copecute $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(requestBody),
+      );
+
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
+        if (mounted) {
+          // Chuyển đến màn hình kết quả
+          Navigator.pushReplacement(
+            context,
+            FluentPageRoute(
+              builder: (context) => ResultScreen(
+                totalQuestions: data['data']['total_questions'],
+                correctAnswers: data['data']['correct_answers'],
+                score: data['data']['score'].toDouble(),
+                questions: _questions,
+                userAnswers: Map<int, int>.from(_userAnswers),
+              ),
             ),
+          );
+        }
+      } else {
+        throw Exception(data['message'] ?? 'Có lỗi xảy ra khi nộp bài');
+      }
+    } catch (e) {
+      print('❌ Submit error: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ContentDialog(
+            title: const Text('Lỗi'),
+            content: Text(e.toString()),
+            actions: [
+              Button(
+                child: const Text('Đóng'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
           ),
         );
       }
-    } else {
-      setState(() {
-        _isSubmitting = false;
-      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
     }
   }
 
@@ -466,9 +534,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                               );
                             },
                             errorBuilder: (context, error, stackTrace) {
-                              print('❌ Lỗi tải ảnh: $error');
-                              print(
-                                  '🔍 URL ảnh: ${_studentData!['avatar_url']}');
+                              // print('❌ Lỗi tải ảnh: $error');
+                              // print(
+                              //     '🔍 URL ảnh: ${_studentData!['avatar_url']}');
                               return Container(
                                 width: 100,
                                 height: 120,
@@ -550,7 +618,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                Text(_questions[questionIndex]['question'],
+                                Text(_questions[questionIndex]['content'],
                                     style: TextStyle(fontSize: _fontSize)),
                                 const SizedBox(height: 24),
                                 ...List.generate(
@@ -573,7 +641,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                                         });
                                       },
                                       content: Text(
-                                        '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]}',
+                                        '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]['content']}',
                                         style:
                                             TextStyle(fontSize: _fontSize - 2),
                                       ),
@@ -607,13 +675,14 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                         const SizedBox(height: 8),
                         // Thêm progress bar thời gian
                         ProgressBar(
-                          value: (_remainingSeconds / (1 * 60)) * 100,
+                          value: (_remainingSeconds / _totalSeconds) * 100,
                           backgroundColor: Colors.grey[30],
-                          activeColor: _remainingSeconds < 30
-                              ? Colors.red
-                              : (_remainingSeconds < 60
-                                  ? Colors.orange
-                                  : Colors.blue),
+                          activeColor:
+                              _remainingSeconds < (_totalSeconds * 0.25)
+                                  ? Colors.red
+                                  : (_remainingSeconds < (_totalSeconds * 0.5)
+                                      ? Colors.orange
+                                      : Colors.blue),
                         ),
                         const SizedBox(height: 16),
                         const Text(
@@ -680,11 +749,21 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                         ),
                         const SizedBox(height: 16),
                         FilledButton(
-                          onPressed: _submitQuiz,
-                          child: const Padding(
-                            padding: EdgeInsets.all(8.0),
-                            child: Text('Nộp bài'),
-                          ),
+                          onPressed: _isSubmitting ? null : _submitTest,
+                          child: _isSubmitting
+                              ? const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: ProgressRing(),
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text('Đang nộp bài...'),
+                                  ],
+                                )
+                              : const Text('Nộp bài'),
                         ),
                         const SizedBox(height: 8),
                         const Text(
