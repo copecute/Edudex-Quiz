@@ -32,6 +32,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   }
   window.SetQuitOnClose(true);
 
+  // Thêm đăng ký file extension
+  HKEY hKey;
+  RegCreateKeyEx(HKEY_CLASSES_ROOT, L".edudex", 0, NULL, 
+    REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL);
+  RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE*)L"EduDexQuiz.Result", 
+    sizeof(L"EduDexQuiz.Result"));
+  RegCloseKey(hKey);
+
+  RegCreateKeyEx(HKEY_CLASSES_ROOT, L"EduDexQuiz.Result", 0, NULL,
+    REG_OPTION_NON_VOLATILE, KEY_WRITE, NULL, &hKey, NULL);
+  RegSetValueEx(hKey, NULL, 0, REG_SZ, (BYTE*)L"EduDex Quiz Result File", 
+    sizeof(L"EduDex Quiz Result File"));
+  RegCloseKey(hKey);
+
   ::MSG msg;
   while (::GetMessage(&msg, nullptr, 0, 0)) {
     ::TranslateMessage(&msg);

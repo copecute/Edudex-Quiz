@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 import '../../theme.dart';
 import 'home_page.dart';
@@ -13,7 +14,14 @@ import '../settings.dart';
 import '../login.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final int? initialPage;
+  final String? fileToOpen;
+
+  const DashboardScreen({
+    super.key,
+    this.initialPage,
+    this.fileToOpen,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -22,19 +30,22 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
   bool value = false;
   final viewKey = GlobalKey(debugLabel: 'dashboard_view_key');
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = const [
-    HomePage(),
-    QuizMenuPage(),
-    HistoryPage(),
-    Settings(),
-  ];
+  int _currentIndex = 0;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
+    _pages = [
+      const HomePage(),
+      const QuizMenuPage(),
+      HistoryPage(initialFile: widget.fileToOpen),
+      const Settings(),
+    ];
+    if (widget.initialPage != null) {
+      _currentIndex = widget.initialPage!;
+    }
   }
 
   @override
@@ -61,7 +72,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
         },
       );
 
-      if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['success'] == true) {
         // Xóa thông tin đăng nhập
         await prefs.clear();
 
@@ -78,7 +91,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             context: context,
             builder: (context) => ContentDialog(
               title: const Text('Lỗi'),
-              content: const Text('Không thể đăng xuất. Vui lòng thử lại sau.'),
+              content: Text(data['message'] ??
+                  'Không thể đăng xuất. Vui lòng thử lại sau.'),
               actions: [
                 Button(
                   child: const Text('Đóng'),
@@ -147,8 +161,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
         ),
       ),
       pane: NavigationPane(
-        selected: _selectedIndex,
-        onChanged: (index) => setState(() => _selectedIndex = index),
+        selected: _currentIndex,
+        onChanged: (index) => setState(() => _currentIndex = index),
         items: [
           PaneItem(
             icon: const Icon(FluentIcons.home),
@@ -157,7 +171,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
           ),
           PaneItem(
             icon: const Icon(FluentIcons.account_activity),
-            title: const Text('Bài kiểm tra'),
+            title: const Text('Đề bài'),
             body: _pages[1],
           ),
           PaneItem(

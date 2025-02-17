@@ -93,8 +93,8 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
-        // Lưu thông tin đăng nhập - sửa lại cách lấy token
-        await prefs.setString('token', data['token']['access_token']);
+        // Sửa lại cách lấy token - token là string trực tiếp
+        await prefs.setString('token', data['token']);
         await prefs.setString('student_data', json.encode(data['student']));
         await prefs.setString('exams_data', json.encode(data['exams']));
 

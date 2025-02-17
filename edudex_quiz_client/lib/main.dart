@@ -8,8 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
+import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/history_screen.dart';
 
 const String appTitle = 'EduDex Quiz';
+
+// Thêm biến global để lưu file cần mở
+String? initialFile;
 
 bool get isDesktop {
   if (kIsWeb) return false;
@@ -20,7 +25,7 @@ bool get isDesktop {
   ].contains(defaultTargetPlatform);
 }
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await SharedPreferences.getInstance();
@@ -55,6 +60,44 @@ void main() async {
     });
   }
 
+  // Lưu đường dẫn file nếu có
+  if (args.isNotEmpty && args[0].endsWith('.edudex')) {
+    initialFile = args[0];
+  }
+
+  // Nếu mở file .edudex, hiển thị trực tiếp HistoryPage
+  if (args.isNotEmpty && args[0].endsWith('.edudex')) {
+    runApp(
+      ChangeNotifierProvider.value(
+        value: appTheme,
+        child: FluentApp(
+          title: appTitle,
+          themeMode: appTheme.mode,
+          debugShowCheckedModeBanner: false,
+          color: appTheme.color,
+          darkTheme: FluentThemeData(
+            brightness: Brightness.dark,
+            accentColor: appTheme.color,
+            visualDensity: VisualDensity.standard,
+            focusTheme: const FocusThemeData(
+              glowFactor: 0.0,
+            ),
+          ),
+          theme: FluentThemeData(
+            accentColor: appTheme.color,
+            visualDensity: VisualDensity.standard,
+            focusTheme: const FocusThemeData(
+              glowFactor: 0.0,
+            ),
+          ),
+          home: HistoryScreen(initialFile: args[0]),
+        ),
+      ),
+    );
+    return;
+  }
+
+  // Khởi chạy ứng dụng bình thường
   runApp(ChangeNotifierProvider.value(
     value: appTheme,
     child: const MyApp(),
@@ -97,7 +140,11 @@ class MyApp extends StatelessWidget {
           ),
         );
       },
-      home: const SplashScreen(),
+      home: initialFile != null
+          ? DashboardScreen(
+              initialPage: 2,
+              fileToOpen: initialFile) // 2 là index của HistoryPage
+          : const SplashScreen(),
     );
   }
 }
