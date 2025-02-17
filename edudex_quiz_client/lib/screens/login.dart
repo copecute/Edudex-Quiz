@@ -4,6 +4,9 @@ import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -21,6 +24,7 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   final _loginFocusNode = FocusNode();
   String? _errorMessage;
   bool _rememberMe = false;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -45,21 +49,85 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
     super.dispose();
   }
 
-  void _login() {
-    if (_soBaoDanhController.text == '123' &&
-        _maSinhVienController.text == '123') {
-      _soBaoDanhFocusNode.unfocus();
-      _maSinhVienFocusNode.unfocus();
-      _loginFocusNode.unfocus();
-
-      Navigator.pushReplacement(
-        context,
-        FluentPageRoute(builder: (context) => const DashboardScreen()),
-      );
-    } else {
+  Future<void> _login() async {
+    if (_soBaoDanhController.text.isEmpty ||
+        _maSinhVienController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Thông tin không đúng!';
+        _errorMessage = 'Vui lòng nhập đầy đủ thông tin!';
       });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final serverUrl = prefs.getString('server_url');
+
+      if (serverUrl == null) {
+        throw Exception('Không tìm thấy địa chỉ máy chủ');
+      }
+
+      print('🔐 Đang đăng nhập...');
+      print('📡 URL: $serverUrl/api/student/login');
+      print(
+          '📝 Params: student_code=${_maSinhVienController.text}, exam_code=${_soBaoDanhController.text}');
+
+      final response = await http.post(
+        Uri.parse('$serverUrl/api/student/login').replace(queryParameters: {
+          'student_code': _maSinhVienController.text,
+          'exam_code': _soBaoDanhController.text,
+        }),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      print('📥 Status code: ${response.statusCode}');
+      print('📄 Response: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        // Lưu thông tin đăng nhập - sửa lại cách lấy token
+        await prefs.setString('token', data['token']['access_token']);
+        await prefs.setString('student_data', json.encode(data['student']));
+        await prefs.setString('exams_data', json.encode(data['exams']));
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            FluentPageRoute(builder: (context) => const DashboardScreen()),
+          );
+        }
+      } else if (response.statusCode == 401) {
+        final data = json.decode(response.body);
+        setState(() {
+          _errorMessage =
+              data['message'] ?? 'Thông tin đăng nhập không chính xác!';
+        });
+        print('❌ Lỗi đăng nhập: ${data['message']}');
+      } else {
+        print('❌ Lỗi đăng nhập: ${response.statusCode}');
+        setState(() {
+          _errorMessage = 'Thông tin đăng nhập không chính xác!';
+        });
+      }
+    } catch (e) {
+      print('❌ Exception: $e');
+      setState(() {
+        _errorMessage = 'Đã có lỗi xảy ra: ${e.toString()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -125,10 +193,23 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
                 width: double.infinity,
                 child: FilledButton(
                   focusNode: _loginFocusNode,
-                  onPressed: _login,
-                  child: const Padding(
-                    padding: EdgeInsets.all(8.0),
-                    child: Text('Kiểm tra thông tin'),
+                  onPressed: _isLoading ? null : _login,
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: ProgressRing(),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Đang đăng nhập...'),
+                            ],
+                          )
+                        : const Text('Kiểm tra thông tin'),
                   ),
                 ),
               ),

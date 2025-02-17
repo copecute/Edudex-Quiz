@@ -23,6 +23,7 @@
 //     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\StudentAuthController;
 use Illuminate\Support\Facades\Route;
 
 // routes không cần xác thực
@@ -38,4 +39,18 @@ Route::post('/login', [AuthApiController::class, 'login']);
 Route::middleware('auth.api')->group(function () {
     Route::post('/logout', [AuthApiController::class, 'logout']);
     Route::get('/me', [AuthApiController::class, 'me']);
+});
+
+Route::prefix('student')->group(function () {
+    Route::post('login', [StudentAuthController::class, 'login']);
+    
+    // Sử dụng middleware auth.student thay vì auth:sanctum và student
+    Route::middleware(['api', 'auth.student'])->group(function () {
+        Route::get('profile', [StudentAuthController::class, 'profile']);
+        Route::post('logout', [StudentAuthController::class, 'logout']);
+        Route::get('test-papers/{test_session_subject_id}', [StudentAuthController::class, 'getTestPaper']);
+        Route::get('test-papers/{test_session_subject_id}/questions', [StudentAuthController::class, 'getQuestions']);
+        // Thêm route nộp bài vào cùng group middleware
+        Route::post('submit-test', [StudentAuthController::class, 'submitTest']);
+    });
 }); 

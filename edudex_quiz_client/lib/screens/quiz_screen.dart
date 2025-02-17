@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import '../theme.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class QuizScreen extends StatefulWidget {
   const QuizScreen({super.key});
@@ -49,6 +51,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   // biến chiều cao ước tính cho mỗi câu hỏi
   final double _questionHeight = 250;
 
+  Map<String, dynamic>? _studentData;
+  List<dynamic>? _examsData;
+
   // hàm cuộn đến câu hỏi được chọn
   void _scrollToQuestion(int index) {
     final double offset = index * _questionHeight;
@@ -62,6 +67,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
+    _loadUserData();
     // tải câu hỏi khi khởi tạo
     _loadQuestions();
     // toàn màn hình
@@ -74,6 +80,33 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     _initializeWindow();
     // Thêm listener cho keyboard
     RawKeyboard.instance.addListener(_handleKeyEvent);
+  }
+
+  Future<void> _loadUserData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentDataStr = prefs.getString('student_data');
+      final examsDataStr = prefs.getString('exams_data');
+      final serverUrl = prefs.getString('server_url');
+
+      if (studentDataStr != null && examsDataStr != null && serverUrl != null) {
+        setState(() {
+          _studentData = json.decode(studentDataStr);
+          _examsData = json.decode(examsDataStr);
+
+          // Cập nhật URL avatar
+          if (_studentData!['avatar_url'] != null) {
+            String avatarUrl = _studentData!['avatar_url'];
+            if (avatarUrl.startsWith('/')) {
+              avatarUrl = avatarUrl.substring(1);
+            }
+            _studentData!['avatar_url'] = '$serverUrl/$avatarUrl';
+          }
+        });
+      }
+    } catch (e) {
+      print('Lỗi khi tải dữ liệu: $e');
+    }
   }
 
   Future<void> _loadQuestions() async {
@@ -412,18 +445,45 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                   // Ảnh và thông tin thí sinh
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
-                    child: Image.network(
-                      'URL_ẢNH_THÍ_SINH', // Thay bằng URL ảnh thực tế
-                      width: 100,
-                      height: 120,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => Container(
-                        width: 100,
-                        height: 120,
-                        color: Colors.grey[40],
-                        child: const Icon(FluentIcons.contact, size: 48),
-                      ),
-                    ),
+                    child: _studentData?['avatar_url'] != null
+                        ? Image.network(
+                            _studentData!['avatar_url'],
+                            width: 100,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            headers: {
+                              'Accept': 'image/*',
+                            },
+                            loadingBuilder: (context, child, loadingProgress) {
+                              if (loadingProgress == null) return child;
+                              return Container(
+                                width: 100,
+                                height: 120,
+                                color: Colors.grey[40],
+                                child: const Center(
+                                  child: ProgressRing(),
+                                ),
+                              );
+                            },
+                            errorBuilder: (context, error, stackTrace) {
+                              print('❌ Lỗi tải ảnh: $error');
+                              print(
+                                  '🔍 URL ảnh: ${_studentData!['avatar_url']}');
+                              return Container(
+                                width: 100,
+                                height: 120,
+                                color: Colors.grey[40],
+                                child:
+                                    const Icon(FluentIcons.contact, size: 48),
+                              );
+                            },
+                          )
+                        : Container(
+                            width: 100,
+                            height: 120,
+                            color: Colors.grey[40],
+                            child: const Icon(FluentIcons.contact, size: 48),
+                          ),
                   ),
                   const SizedBox(width: 16),
                   Column(
@@ -432,9 +492,10 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                       const Text('Thông tin thí sinh',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text('Mã sinh viên: 2209620321'),
-                      Text('Họ và tên: Đàm Minh Giang'),
-                      Text('Lớp: 2622CNT04'),
+                      Text('Mã sinh viên: ${_studentData?['code'] ?? ''}'),
+                      Text('Họ và tên: ${_studentData?['name'] ?? ''}'),
+                      Text(
+                          'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name'] ?? ''}'),
                     ],
                   ),
                   const Spacer(),
@@ -445,9 +506,15 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                       const Text('Thông tin bài thi',
                           style: TextStyle(fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text('Tên bài thi: Bài thi kết thúc môn'),
-                      Text('Môn học: Cấu trúc dữ liệu & Giải thuật'),
-                      Text('Từ 30/06/2024 2h30 đến 3h30 cùng ngày'),
+                      if (_examsData != null && _examsData!.isNotEmpty) ...[
+                        Text(
+                            'Kỳ thi: ${_examsData![0]['test_session']['name']}'),
+                        Text('Môn thi: ${_examsData![0]['subject']['name']}'),
+                        Text(
+                            'Phòng thi: ${_examsData![0]['room']['name']} - ${_examsData![0]['room']['location']}'),
+                        Text(
+                            'Ca thi: ${_examsData![0]['room']['shift']['name']}'),
+                      ],
                     ],
                   ),
                 ],

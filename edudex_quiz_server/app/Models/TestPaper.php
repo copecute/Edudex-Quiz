@@ -57,4 +57,23 @@ class TestPaper extends Model
 
         return $rates;
     }
+
+    // Thêm relationship với questions
+    public function questions()
+    {
+        // Lấy câu hỏi thuộc cùng môn học với đề thi
+        return $this->hasManyThrough(
+            Question::class,
+            Subject::class,
+            'id', // Khóa ngoại trên bảng subjects
+            'subject_id', // Khóa ngoại trên bảng questions
+            'subject_id', // Khóa local trên bảng test_papers
+            'id' // Khóa primary trên bảng subjects
+        );
+    }
+
+    public function testSessionSubjects()
+    {
+        return $this->hasMany(TestSessionSubject::class);
+    }
 } 

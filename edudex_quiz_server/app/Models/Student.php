@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Laravel\Sanctum\HasApiTokens;
 
-class Student extends Model
+class Student extends Authenticatable
 {
-    use HasFactory, SoftDeletes;
+    use HasFactory, SoftDeletes, HasApiTokens;
 
     protected $fillable = [
         'code', // Mã sinh viên
@@ -39,9 +40,9 @@ class Student extends Model
     public function getAvatarUrlAttribute()
     {
         if ($this->avatar) {
-            return asset('upload/avatar/students/' . $this->avatar);
+            return '/upload/avatar/students/' . $this->avatar;
         }
-        return asset('images/default-avatar.jpg');
+        return null;
     }
 
     public function testSessionSubjects()

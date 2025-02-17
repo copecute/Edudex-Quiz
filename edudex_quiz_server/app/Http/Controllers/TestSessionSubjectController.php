@@ -7,6 +7,7 @@ use App\Models\Subject;
 use App\Models\TestRoom;
 use App\Models\TestSessionSubject;
 use App\Models\Student;
+use App\Models\TestPaper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -19,17 +20,64 @@ class TestSessionSubjectController extends Controller
                 $query->where('test_session_id', $testSession->id)
                       ->withCount(['testShifts' => function($q) use ($testSession) {
                           $q->where('test_shifts.test_session_id', $testSession->id);
-                      }]);
+                      }])
+                      ->with('testPaper');
             }])
             ->with(['testShiftSubjectRooms' => function($query) use ($testSession) {
                 $query->whereHas('testShift', function($q) use ($testSession) {
                     $q->where('test_shifts.test_session_id', $testSession->id);
                 });
-            }, 'testShiftSubjectRooms.testShift', 'testShiftSubjectRooms.testRoom'])
-            ->get()
+            }, 'testShiftSubjectRooms.testShift', 'testShiftSubjectRooms.testRoom']);
+
+        // Tìm kiếm theo mã hoặc tên môn
+        if ($search = request('search')) {
+            $subjects->where(function($query) use ($search) {
+                $query->where('code', 'like', "%{$search}%")
+                      ->orWhere('name', 'like', "%{$search}%");
+            });
+        }
+
+        // Lọc theo trạng thái đề thi
+        if ($status = request('status')) {
+            $subjects->whereHas('testSessionSubjects', function($query) use ($status, $testSession) {
+                $query->where('test_session_id', $testSession->id)
+                      ->when($status === 'has_test_paper', function($q) {
+                          $q->whereNotNull('test_paper_id');
+                      })
+                      ->when($status === 'no_test_paper', function($q) {
+                          $q->whereNull('test_paper_id');
+                      });
+            });
+        }
+
+        // Lọc theo trạng thái phòng thi
+        if (request()->has('has_room')) {
+            $hasRoom = request('has_room');
+            if ($hasRoom == '1') {
+                $subjects->has('testShiftSubjectRooms');
+            } elseif ($hasRoom == '0') {
+                $subjects->doesntHave('testShiftSubjectRooms');
+            }
+        }
+
+        // Lọc theo ca thi
+        if ($shiftId = request('shift')) {
+            $subjects->whereHas('testSessionSubjects', function($query) use ($testSession, $shiftId) {
+                $query->where('test_session_id', $testSession->id)
+                      ->whereHas('testShifts', function($q) use ($shiftId) {
+                          $q->where('test_shifts.id', $shiftId);
+                      });
+            });
+        }
+
+        $subjects = $subjects->get()
             ->map(function($subject) {
                 // Lấy số ca thi từ test_session_subject
                 $subject->test_shifts_count = $subject->testSessionSubjects->first()->test_shifts_count ?? 0;
+                
+                // Lấy danh sách đề thi cho môn này
+                $subject->available_test_papers = TestPaper::where('subject_id', $subject->id)->get();
+                
                 return $subject;
             });
 
@@ -48,11 +96,17 @@ class TestSessionSubjectController extends Controller
         ->get()
         ->groupBy('test_location.name');
 
+        $testPapers = TestPaper::all(); // Lấy tất cả các đề thi
+
+        // Lấy danh sách ca thi của kỳ thi này
+        $testSession->load('testShifts');
+
         return view('test_sessions.subjects.index', compact(
             'testSession', 
             'subjects',
             'availableSubjects',
-            'availableRooms'
+            'availableRooms',
+            'testPapers'
         ));
     }
 
@@ -238,5 +292,21 @@ class TestSessionSubjectController extends Controller
         $testSessionSubject->students()->detach($student->id);
 
         return back()->with('success', 'Đã xóa thí sinh khỏi môn thi thành công');
+    }
+
+    public function assignTestPaper(Request $request, TestSession $testSession, TestSessionSubject $testSessionSubject)
+    {
+        \Log::info('Request data:', $request->all()); // Log dữ liệu gửi lên
+
+        $validated = $request->validate([
+            'test_paper_id' => 'required|exists:test_papers,id',
+        ]);
+
+        // Cập nhật test_paper_id trong bảng test_session_subjects
+        TestSessionSubject::where('test_session_id', $testSession->id)
+            ->where('subject_id', $testSessionSubject->subject_id)
+            ->update(['test_paper_id' => $validated['test_paper_id']]);
+
+        return back()->with('success', 'Đã phân đề thi thành công');
     }
 } 

@@ -37,6 +37,7 @@ use App\Http\Controllers\TestSessionSubjectController;
 use App\Http\Controllers\TestShiftSubjectRoomController;
 use App\Http\Controllers\TestPaperController;
 use App\Http\Controllers\StudentController;
+use App\Http\Controllers\TestSubmissionController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -148,6 +149,9 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/test_sessions/{test_session}/subjects/{subject}/students/{student}', 
             [TestSessionSubjectController::class, 'removeStudent'])
             ->name('test_sessions.subjects.remove_student');
+        Route::post('/test_sessions/{test_session}/subjects/{test_session_subject}/assign_test_paper', 
+            [TestSessionSubjectController::class, 'assignTestPaper'])
+            ->name('test_sessions.subjects.assign_test_paper');
     });
 
     // Thêm routes cho test papers
@@ -158,4 +162,10 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware(['auth', 'role:0,1'])->group(function () {
         Route::resource('students', StudentController::class);
     });
+
+    // Sửa lại route cho test submissions
+    Route::get('/test_submissions', [TestSubmissionController::class, 'index'])
+        ->name('test-submissions.index');
+    Route::get('/test_submissions/{submission}', [TestSubmissionController::class, 'show'])
+        ->name('test-submissions.show');
 });

@@ -4,6 +4,7 @@ import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
 import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
@@ -21,6 +22,11 @@ bool get isDesktop {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await SharedPreferences.getInstance();
+
+  final appTheme = AppTheme();
+  await appTheme.loadSettings(); // Load tất cả cài đặt
 
   if (!kIsWeb &&
       [TargetPlatform.windows, TargetPlatform.android]
@@ -49,58 +55,49 @@ void main() async {
     });
   }
 
-  runApp(const MyApp());
+  runApp(ChangeNotifierProvider.value(
+    value: appTheme,
+    child: const MyApp(),
+  ));
 }
-
-final _appTheme = AppTheme();
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _appTheme,
+    final appTheme = context.watch<AppTheme>();
+    return FluentApp(
+      title: appTitle,
+      themeMode: appTheme.mode,
+      debugShowCheckedModeBanner: false,
+      color: appTheme.color,
+      darkTheme: FluentThemeData(
+        brightness: Brightness.dark,
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen(context) ? 2.0 : 0.0,
+        ),
+      ),
+      theme: FluentThemeData(
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen(context) ? 2.0 : 0.0,
+        ),
+      ),
+      locale: appTheme.locale,
       builder: (context, child) {
-        final appTheme = context.watch<AppTheme>();
-        return FluentApp(
-          title: appTitle,
-          themeMode: appTheme.mode,
-          debugShowCheckedModeBanner: false,
-          color: appTheme.color,
-          darkTheme: FluentThemeData(
-            brightness: Brightness.dark,
-            accentColor: appTheme.color,
-            visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen(context) ? 2.0 : 0.0,
-            ),
+        return Directionality(
+          textDirection: appTheme.textDirection,
+          child: NavigationPaneTheme(
+            data: const NavigationPaneThemeData(),
+            child: child!,
           ),
-          theme: FluentThemeData(
-            accentColor: appTheme.color,
-            visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen(context) ? 2.0 : 0.0,
-            ),
-          ),
-          locale: appTheme.locale,
-          builder: (context, child) {
-            return Directionality(
-              textDirection: appTheme.textDirection,
-              child: NavigationPaneTheme(
-                data: NavigationPaneThemeData(
-                  backgroundColor: appTheme.windowEffect !=
-                          flutter_acrylic.WindowEffect.disabled
-                      ? Colors.transparent
-                      : null,
-                ),
-                child: child!,
-              ),
-            );
-          },
-          home: const SplashScreen(),
         );
       },
+      home: const SplashScreen(),
     );
   }
 }

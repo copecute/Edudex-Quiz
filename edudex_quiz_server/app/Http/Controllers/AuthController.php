@@ -48,18 +48,18 @@ class AuthController extends Controller
             'username' => 'required',
             'password' => 'required'
         ], [
-            'username.required' => 'username không được để trống',
-            'password.required' => 'mật khẩu không được để trống'
+            'username.required' => 'Username không được để trống',
+            'password.required' => 'Mật khẩu không được để trống'
         ]);
 
         if (Auth::attempt($credentials)) {
             $request->session()->regenerate();
             return redirect()->intended('dashboard')
-                           ->with('success', 'đăng nhập thành công!');
+                           ->with('success', 'Đăng nhập thành công!');
         }
 
         return back()->withErrors([
-            'username' => 'thông tin đăng nhập không chính xác.',
+            'username' => 'Thông tin đăng nhập không chính xác.',
         ])->withInput($request->only('username'));
     }
 
@@ -86,18 +86,18 @@ class AuthController extends Controller
             'phoneNumber' => 'required',
             'address' => 'required',
         ], [
-            'username.required' => 'username không được để trống',
-            'username.unique' => 'username đã tồn tại',
-            'email.required' => 'email không được để trống',
-            'email.email' => 'email không đúng định dạng',
-            'email.unique' => 'email đã tồn tại',
-            'password.required' => 'mật khẩu không được để trống',
-            'password.min' => 'mật khẩu phải có ít nhất 6 ký tự',
-            'password.confirmed' => 'xác nhận mật khẩu không khớp',
-            'fullName.required' => 'họ tên không được để trống',
-            'gender.required' => 'giới tính không được để trống',
-            'phoneNumber.required' => 'số điện thoại không được để trống',
-            'address.required' => 'địa chỉ không được để trống',
+            'username.required' => 'Username không được để trống',
+            'username.unique' => 'Username đã tồn tại',
+            'email.required' => 'Email không được để trống',
+            'email.email' => 'Email không đúng định dạng',
+            'email.unique' => 'Email đã tồn tại',
+            'password.required' => 'Mật khẩu không được để trống',
+            'password.min' => 'Mật khẩu phải có ít nhất 6 ký tự',
+            'password.confirmed' => 'Xác nhận mật khẩu không khớp',
+            'fullName.required' => 'Họ tên không được để trống',
+            'gender.required' => 'Giới tính không được để trống',
+            'phoneNumber.required' => 'Số điện thoại không được để trống',
+            'address.required' => 'Địa chỉ không được để trống',
         ]);
 
         try {
@@ -119,10 +119,10 @@ class AuthController extends Controller
 
             Auth::login($user);
             return redirect()->route('dashboard')
-                           ->with('success', 'đăng ký tài khoản thành công!');
+                           ->with('success', 'Đăng ký tài khoản thành công!');
         } catch (\Exception $e) {
             return back()->withInput()
-                        ->with('error', 'đã có lỗi xảy ra khi đăng ký. vui lòng thử lại.');
+                        ->with('error', 'Đã có lỗi xảy ra khi đăng ký. Vui lòng thử lại.');
         }
     }
 
@@ -134,6 +134,6 @@ class AuthController extends Controller
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
-        return redirect('/')->with('success', 'đăng xuất thành công!');
+        return redirect('/')->with('success', 'Đăng xuất thành công!');
     }
 } 
