@@ -29,18 +29,16 @@ class HomePage extends StatelessWidget {
         final examsData = json.decode(examsDataStr);
 
         return ScaffoldPage(
-          header: const PageHeader(
-            title: Text('Trang chủ'),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           content: SingleChildScrollView(
-            padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Thông tin cá nhân
                 Card(
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16.0, vertical: 0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -71,8 +69,8 @@ class HomePage extends StatelessWidget {
                                         fit: BoxFit.cover,
                                         errorBuilder:
                                             (context, error, stackTrace) {
-                                          print(
-                                              '❌ Error loading avatar: $error');
+                                          // print(
+                                          //     '❌ Error loading avatar: $error');
                                           return const Icon(FluentIcons.contact,
                                               size: 48);
                                         },

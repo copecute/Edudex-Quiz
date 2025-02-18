@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:mutex/mutex.dart';
+import 'dart:io';
+import 'dart:async';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
@@ -15,6 +18,10 @@ const String appTitle = 'EduDex Quiz';
 
 // Thêm biến global để lưu file cần mở
 String? initialFile;
+
+// Mutex toàn cục cho ứng dụng
+final _appMutex = Mutex();
+bool _hasLock = false;
 
 bool get isDesktop {
   if (kIsWeb) return false;
@@ -28,10 +35,23 @@ bool get isDesktop {
 void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await SharedPreferences.getInstance();
+  // Nếu mở file .edudex, bỏ qua kiểm tra mutex
+  final isOpeningFile = args.isNotEmpty && args[0].endsWith('.edudex');
 
+  if (!isOpeningFile) {
+    await _initializeSingleInstance();
+    if (!_hasLock) {
+      if (Platform.isWindows) {
+        await windowManager.show();
+        await windowManager.focus();
+      }
+      exit(0);
+    }
+  }
+
+  await SharedPreferences.getInstance();
   final appTheme = AppTheme();
-  await appTheme.loadSettings(); // Load tất cả cài đặt
+  await appTheme.loadSettings();
 
   if (!kIsWeb &&
       [TargetPlatform.windows, TargetPlatform.android]
@@ -61,12 +81,12 @@ void main(List<String> args) async {
   }
 
   // Lưu đường dẫn file nếu có
-  if (args.isNotEmpty && args[0].endsWith('.edudex')) {
+  if (isOpeningFile) {
     initialFile = args[0];
   }
 
-  // Nếu mở file .edudex, hiển thị trực tiếp HistoryPage
-  if (args.isNotEmpty && args[0].endsWith('.edudex')) {
+  // Nếu mở file .edudex, hiển thị trực tiếp HistoryScreen
+  if (isOpeningFile) {
     runApp(
       ChangeNotifierProvider.value(
         value: appTheme,
@@ -97,11 +117,42 @@ void main(List<String> args) async {
     return;
   }
 
-  // Khởi chạy ứng dụng bình thường
+  // Khởi chạy ứng dụng
   runApp(ChangeNotifierProvider.value(
     value: appTheme,
     child: const MyApp(),
   ));
+}
+
+Future<void> _initializeSingleInstance() async {
+  try {
+    // Thử acquire lock
+    _hasLock = await _appMutex.protect(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final lastPing = prefs.getInt('app_last_ping') ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      // Nếu ping cuối cùng > 5 giây, coi như instance cũ đã đóng
+      if (now - lastPing > 5000) {
+        // Lưu thời gian ping mới
+        await prefs.setInt('app_last_ping', now);
+        return true;
+      }
+      return false;
+    });
+
+    // Nếu có lock, bắt đầu ping định kỳ
+    if (_hasLock) {
+      Timer.periodic(const Duration(seconds: 3), (timer) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(
+            'app_last_ping', DateTime.now().millisecondsSinceEpoch);
+      });
+    }
+  } catch (e) {
+    stderr.writeln('Lỗi khi khởi tạo single instance: $e');
+    _hasLock = false;
+  }
 }
 
 class MyApp extends StatelessWidget {

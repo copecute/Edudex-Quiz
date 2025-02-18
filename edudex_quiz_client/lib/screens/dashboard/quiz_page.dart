@@ -151,12 +151,10 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
     final shift = testPaper['shift'];
 
     return ScaffoldPage(
-      padding: const EdgeInsets.all(24),
-      header: const PageHeader(
-        title: Text('Thông tin bài thi'),
-      ),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
       content: SingleChildScrollView(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
               width: double.infinity,
@@ -255,15 +253,74 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                     style: TextStyle(fontSize: 16),
                   ),
                 ),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    FluentPageRoute(
-                      builder: (context) => QuizScreen(
-                        testSessionSubjectId: testPaper['id'],
-                      ),
-                    ),
-                  );
+                onPressed: () async {
+                  try {
+                    final prefs = await SharedPreferences.getInstance();
+                    final token = prefs.getString('token');
+                    final serverUrl = prefs.getString('server_url');
+
+                    if (token == null || serverUrl == null) {
+                      throw Exception('Không tìm thấy thông tin đăng nhập');
+                    }
+
+                    // Kiểm tra trước khi vào thi
+                    final response = await http.get(
+                      Uri.parse(
+                          '$serverUrl/api/student/test-papers/${testPaper['id']}/questions'),
+                      headers: {
+                        'Authorization': 'copecute $token',
+                        'Accept': 'application/json',
+                      },
+                    );
+
+                    final data = json.decode(response.body);
+
+                    if (response.statusCode == 200 && data['success'] == true) {
+                      if (mounted) {
+                        Navigator.push(
+                          context,
+                          FluentPageRoute(
+                            builder: (context) => QuizScreen(
+                              testSessionSubjectId: testPaper['id'],
+                            ),
+                          ),
+                        );
+                      }
+                    } else {
+                      if (mounted) {
+                        showDialog(
+                          context: context,
+                          builder: (context) => ContentDialog(
+                            title: const Text('Lỗi'),
+                            content: Text(
+                                data['message'] ?? 'Không thể bắt đầu bài thi'),
+                            actions: [
+                              Button(
+                                child: const Text('Đóng'),
+                                onPressed: () => Navigator.pop(context),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                    }
+                  } catch (e) {
+                    if (mounted) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => ContentDialog(
+                          title: const Text('Lỗi'),
+                          content: Text('Đã có lỗi xảy ra: ${e.toString()}'),
+                          actions: [
+                            Button(
+                              child: const Text('Đóng'),
+                              onPressed: () => Navigator.pop(context),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  }
                 },
               ),
             ),
