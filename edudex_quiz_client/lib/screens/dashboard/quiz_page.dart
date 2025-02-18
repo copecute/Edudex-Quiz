@@ -3,6 +3,7 @@ import '../quiz_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:edudex_quiz_client/utils/cover_date_time.dart';
 
 class QuizMenuPage extends StatefulWidget {
   const QuizMenuPage({super.key});
@@ -13,6 +14,7 @@ class QuizMenuPage extends StatefulWidget {
 
 class _QuizMenuPageState extends State<QuizMenuPage> {
   Map<String, dynamic>? _testPaperDetails;
+  List<dynamic>? _examsData;
   bool _isLoading = true;
 
   @override
@@ -33,6 +35,10 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
       if (examsDataStr != null && token != null && serverUrl != null) {
         final examsData = json.decode(examsDataStr);
         if (examsData.isNotEmpty) {
+          setState(() {
+            _examsData = examsData;
+          });
+
           final testPaperId = examsData[0]['test_paper']['id'];
           final response = await http.get(
             Uri.parse('$serverUrl/api/student/test-papers/$testPaperId'),
@@ -194,7 +200,7 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                     InfoLabel(
                       label: 'Ca thi',
                       child: Text(
-                          '${shift['name']} (${formatTime(shift['start_time'])} - ${formatTime(shift['end_time'])})'),
+                          '${shift['name']} (${DateTimeHelper.formatTime(shift['start_time'])} - ${DateTimeHelper.formatTime(shift['end_time'])})'),
                     ),
                   ],
                 ),
@@ -218,9 +224,9 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                     InfoLabel(
                       label: 'Tỷ lệ độ khó',
                       child: Text(
-                        'Dễ: ${testPaper['difficulty_rates']['easy']}% | '
-                        'Trung bình: ${testPaper['difficulty_rates']['medium']}% | '
-                        'Khó: ${testPaper['difficulty_rates']['hard']}%',
+                        'Dễ: ${testPaper['difficulty_rates']['easy'].toStringAsFixed(1)}% | '
+                        'Trung bình: ${testPaper['difficulty_rates']['medium'].toStringAsFixed(1)}% | '
+                        'Khó: ${testPaper['difficulty_rates']['hard'].toStringAsFixed(1)}%',
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -235,10 +241,19 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                         child: Text(
                           '${tag['name']}: ${tag['total_questions']} câu '
                           '(Dễ: ${questionsLevel['easy']}, TB: ${questionsLevel['medium']}, Khó: ${questionsLevel['hard']}) '
-                          '(${rates['easy']}/${rates['medium']}/${rates['hard']})',
+                          '(${double.parse(rates['easy']).toStringAsFixed(1)}%/'
+                          '${double.parse(rates['medium']).toStringAsFixed(1)}%/'
+                          '${double.parse(rates['hard']).toStringAsFixed(1)}%)',
                         ),
                       );
                     }).toList(),
+                    InfoLabel(
+                      label: 'Thông tin thêm',
+                      child: Text(
+                        'Số câu hỏi theo chủ đề: ${testPaper['questions_by_tags']} | '
+                        'Số câu hỏi ngẫu nhiên: ${testPaper['questions_random']}',
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -263,6 +278,14 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                       throw Exception('Không tìm thấy thông tin đăng nhập');
                     }
 
+                    print('📤 Request:');
+                    print(
+                        'URL: $serverUrl/api/student/test-papers/${testPaper['id']}/questions');
+                    print('Headers: ${json.encode({
+                          'Authorization': 'copecute $token',
+                          'Accept': 'application/json',
+                        })}');
+
                     // Kiểm tra trước khi vào thi
                     final response = await http.get(
                       Uri.parse(
@@ -273,20 +296,32 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                       },
                     );
 
+                    print('📥 Response status: ${response.statusCode}');
+                    print('📥 Response body: ${response.body}');
+
                     final data = json.decode(response.body);
 
-                    if (response.statusCode == 200 && data['success'] == true) {
-                      if (mounted) {
+                    print(
+                        '🔍 Test session subject ID: ${_examsData![0]['test_session_subject_id']}');
+                    print('🔍 Test paper ID: ${testPaper['id']}');
+                    print('🔍 Exams data: ${json.encode(_examsData)}');
+
+                    if (response.statusCode == 200 &&
+                        data['test_paper']?['questions'] != null) {
+                      if (mounted && _examsData != null) {
+                        print('✅ Chuyển đến màn hình thi');
                         Navigator.push(
                           context,
                           FluentPageRoute(
                             builder: (context) => QuizScreen(
-                              testSessionSubjectId: testPaper['id'],
+                              testSessionSubjectId: _examsData![0]
+                                  ['test_session_subject_id'],
                             ),
                           ),
                         );
                       }
                     } else {
+                      print('❌ Lỗi: ${data['message']}');
                       if (mounted) {
                         showDialog(
                           context: context,
@@ -305,6 +340,7 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                       }
                     }
                   } catch (e) {
+                    print('❌ Exception: $e');
                     if (mounted) {
                       showDialog(
                         context: context,
@@ -331,7 +367,7 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
   }
 
   String formatTime(String timeStr) {
-    final dateTime = DateTime.parse(timeStr);
-    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+    // Sử dụng DateTimeHelper để format thời gian sang GMT+7
+    return DateTimeHelper.formatTime(timeStr);
   }
 }

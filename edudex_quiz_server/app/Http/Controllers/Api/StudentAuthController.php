@@ -241,6 +241,16 @@ class StudentAuthController extends Controller
                 ];
             });
 
+            // Tính tổng số câu hỏi cần cho toàn bộ đề thi
+            $totalQuestionsNeeded = $tags->sum(function($tag) {
+                return $tag['questions_by_level']['easy'] + 
+                       $tag['questions_by_level']['medium'] + 
+                       $tag['questions_by_level']['hard'];
+            });
+
+            // Tính số câu hỏi còn lại cần random
+            $remainingQuestions = $testSessionSubject->testPaper->total_questions - $totalQuestionsNeeded;
+
             // Trả về thông tin đề thi
             return response()->json([
                 'test_paper' => [
@@ -253,7 +263,8 @@ class StudentAuthController extends Controller
                     ],
                     'duration' => $testSessionSubject->testPaper->duration,
                     'total_questions' => $testSessionSubject->testPaper->total_questions,
-                    // Thêm thông tin về độ khó và tags
+                    'questions_by_tags' => $totalQuestionsNeeded,
+                    'questions_random' => $remainingQuestions,
                     'difficulty_rates' => [
                         'easy' => round($difficultyRates['easy'], 1),
                         'medium' => round($difficultyRates['medium'], 1),
@@ -278,10 +289,12 @@ class StudentAuthController extends Controller
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
+                'success' => false,
                 'message' => 'Không tìm thấy thông tin đề thi'
             ], 404);
         } catch (\Exception $e) {
             return response()->json([
+                'success' => false,
                 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()
             ], 500);
         }
@@ -372,53 +385,124 @@ class StudentAuthController extends Controller
 
             // Lấy danh sách câu hỏi và đáp án
             $allQuestions = collect();
+            $usedQuestionIds = collect(); // Thêm mảng để theo dõi câu hỏi đã dùng
 
             // Lấy câu hỏi theo từng tag
             foreach ($tags as $tag) {
-                // Lấy câu hỏi theo độ khó cho mỗi tag
+                // Lấy tất cả câu hỏi của tag trước, loại bỏ các câu đã dùng
                 $tagQuestions = $testSessionSubject->testPaper->questions()
                     ->whereHas('tags', function($query) use ($tag) {
                         $query->where('tags.id', $tag['id']);
                     })
-                    ->get();
+                    ->whereNotIn('questions.id', $usedQuestionIds)
+                    ->select('questions.*');
 
-                // Lấy câu hỏi dễ
-                $easyQuestionsAvailable = $tagQuestions->where('level', 1);
-                $easyQuestionsNeeded = $tag['questions_by_level']['easy'];
-                if ($easyQuestionsAvailable->count() < $easyQuestionsNeeded) {
+                // Lấy câu hỏi và log số lượng trước khi phân loại
+                $allTagQuestions = $tagQuestions->get();
+                
+                // Phân loại theo độ khó
+                $easyQuestionsAvailable = $allTagQuestions->where('level', 1);
+                $mediumQuestionsAvailable = $allTagQuestions->where('level', 2);
+                $hardQuestionsAvailable = $allTagQuestions->where('level', 3);
+
+                // Log chi tiết để debug
+                \Log::info("Questions for tag {$tag['name']}", [
+                    'tag_id' => $tag['id'],
+                    'total_available' => $allTagQuestions->count(),
+                    'easy_count' => $easyQuestionsAvailable->count(),
+                    'medium_count' => $mediumQuestionsAvailable->count(),
+                    'hard_count' => $hardQuestionsAvailable->count(),
+                    'needed' => [
+                        'easy' => $tag['questions_by_level']['easy'],
+                        'medium' => $tag['questions_by_level']['medium'],
+                        'hard' => $tag['questions_by_level']['hard']
+                    ],
+                    'used_questions' => $usedQuestionIds->toArray()
+                ]);
+
+                // Kiểm tra số lượng trước khi random
+                $totalNeeded = $tag['questions_by_level']['easy'] + 
+                              $tag['questions_by_level']['medium'] + 
+                              $tag['questions_by_level']['hard'];
+                              
+                if ($allTagQuestions->count() < $totalNeeded) {
                     return response()->json([
                         'success' => false,
-                        'message' => "Không đủ câu hỏi dễ cho tag {$tag['name']}. Cần {$easyQuestionsNeeded} câu, chỉ có {$easyQuestionsAvailable->count()} câu."
+                        'message' => "Không đủ câu hỏi cho tag {$tag['name']}.\n".
+                                    "Chi tiết:\n".
+                                    "- Tổng số câu cần: {$totalNeeded}\n".
+                                    "- Tổng số câu có sẵn: {$allTagQuestions->count()}\n".
+                                    "- Câu dễ: cần {$tag['questions_by_level']['easy']}, có {$easyQuestionsAvailable->count()}\n" .
+                                    "- Câu trung bình: cần {$tag['questions_by_level']['medium']}, có {$mediumQuestionsAvailable->count()}\n" .
+                                    "- Câu khó: cần {$tag['questions_by_level']['hard']}, có {$hardQuestionsAvailable->count()}\n" .
+                                    "- Câu hỏi đã sử dụng: " . $usedQuestionIds->count()
                     ], 500);
                 }
-                $easyQuestions = $easyQuestionsAvailable->random($easyQuestionsNeeded);
 
-                // Lấy câu hỏi trung bình
-                $mediumQuestionsAvailable = $tagQuestions->where('level', 2);
-                $mediumQuestionsNeeded = $tag['questions_by_level']['medium'];
-                if ($mediumQuestionsAvailable->count() < $mediumQuestionsNeeded) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi trung bình cho tag {$tag['name']}. Cần {$mediumQuestionsNeeded} câu, chỉ có {$mediumQuestionsAvailable->count()} câu."
-                    ], 500);
-                }
-                $mediumQuestions = $mediumQuestionsAvailable->random($mediumQuestionsNeeded);
+                // Lấy và lưu các câu hỏi đã chọn
+                $easyQuestions = $easyQuestionsAvailable->random($tag['questions_by_level']['easy']);
+                $mediumQuestions = $mediumQuestionsAvailable->random($tag['questions_by_level']['medium']);
+                $hardQuestions = $hardQuestionsAvailable->random($tag['questions_by_level']['hard']);
 
-                // Lấy câu hỏi khó
-                $hardQuestionsAvailable = $tagQuestions->where('level', 3);
-                $hardQuestionsNeeded = $tag['questions_by_level']['hard'];
-                if ($hardQuestionsAvailable->count() < $hardQuestionsNeeded) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi khó cho tag {$tag['name']}. Cần {$hardQuestionsNeeded} câu, chỉ có {$hardQuestionsAvailable->count()} câu."
-                    ], 500);
-                }
-                $hardQuestions = $hardQuestionsAvailable->random($hardQuestionsNeeded);
+                // Cập nhật danh sách câu hỏi đã dùng
+                $usedQuestionIds = $usedQuestionIds->concat($easyQuestions->pluck('id'))
+                    ->concat($mediumQuestions->pluck('id'))
+                    ->concat($hardQuestions->pluck('id'));
 
                 // Gộp các câu hỏi lại
                 $allQuestions = $allQuestions->concat($easyQuestions)
                     ->concat($mediumQuestions)
                     ->concat($hardQuestions);
+            }
+
+            // Thêm phần lấy câu hỏi random theo độ khó
+            $remainingQuestions = $testSessionSubject->testPaper->total_questions - $allQuestions->count();
+            if ($remainingQuestions > 0) {
+                // Lấy tất cả câu hỏi còn lại (chưa được chọn)
+                $remainingPool = $testSessionSubject->testPaper->questions()
+                    ->whereNotIn('questions.id', $usedQuestionIds)
+                    ->select('questions.*')
+                    ->get();
+
+                // Log số lượng câu hỏi còn lại theo độ khó
+                \Log::info("Remaining questions pool", [
+                    'total' => $remainingPool->count(),
+                    'easy' => $remainingPool->where('level', 1)->count(),
+                    'medium' => $remainingPool->where('level', 2)->count(),
+                    'hard' => $remainingPool->where('level', 3)->count()
+                ]);
+
+                // Tính số câu hỏi cần cho mỗi độ khó dựa trên tỉ lệ tổng thể của đề
+                $easyNeeded = round($remainingQuestions * $difficultyRates['easy'] / 100);
+                $mediumNeeded = round($remainingQuestions * $difficultyRates['medium'] / 100);
+                $hardNeeded = $remainingQuestions - $easyNeeded - $mediumNeeded;
+
+                // Lấy câu hỏi theo từng độ khó
+                $easyPool = $remainingPool->where('level', 1);
+                $mediumPool = $remainingPool->where('level', 2);
+                $hardPool = $remainingPool->where('level', 3);
+
+                if ($easyPool->count() < $easyNeeded || 
+                    $mediumPool->count() < $mediumNeeded || 
+                    $hardPool->count() < $hardNeeded) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => "Không đủ câu hỏi cho phần random.\n" .
+                                    "Chi tiết:\n" .
+                                    "- Câu dễ: cần {$easyNeeded}, có {$easyPool->count()}\n" .
+                                    "- Câu TB: cần {$mediumNeeded}, có {$mediumPool->count()}\n" .
+                                    "- Câu khó: cần {$hardNeeded}, có {$hardPool->count()}"
+                    ], 500);
+                }
+
+                // Random câu hỏi theo độ khó
+                $additionalQuestions = collect()
+                    ->concat($easyPool->random($easyNeeded))
+                    ->concat($mediumPool->random($mediumNeeded))
+                    ->concat($hardPool->random($hardNeeded));
+
+                // Thêm vào danh sách câu hỏi
+                $allQuestions = $allQuestions->concat($additionalQuestions);
             }
 
             // Format câu hỏi và xáo trộn
@@ -449,8 +533,48 @@ class StudentAuthController extends Controller
 
             // Kiểm tra số lượng câu hỏi
             if ($questions->count() !== $testSessionSubject->testPaper->total_questions) {
+                // Tính tổng số câu hỏi đã lấy được cho mỗi tag
+                $tagQuestionCounts = $tags->map(function($tag) use ($allQuestions) {
+                    $tagQuestions = $allQuestions->filter(function($question) use ($tag) {
+                        return $question->tags->contains('id', $tag['id']);
+                    });
+                    
+                    return [
+                        'tag' => $tag['name'],
+                        'needed' => $tag['total_questions'],
+                        'actual' => $tagQuestions->count(),
+                        'by_level' => [
+                            'easy' => [
+                                'needed' => $tag['questions_by_level']['easy'],
+                                'actual' => $tagQuestions->where('level', 1)->count()
+                            ],
+                            'medium' => [
+                                'needed' => $tag['questions_by_level']['medium'],
+                                'actual' => $tagQuestions->where('level', 2)->count()
+                            ],
+                            'hard' => [
+                                'needed' => $tag['questions_by_level']['hard'],
+                                'actual' => $tagQuestions->where('level', 3)->count()
+                            ]
+                        ]
+                    ];
+                });
+
+                $message = "Không đủ số lượng câu hỏi theo yêu cầu.\n" .
+                           "Tổng số câu cần: {$testSessionSubject->testPaper->total_questions}, có: {$questions->count()}\n\n" .
+                           "Chi tiết theo tags:\n";
+
+                foreach ($tagQuestionCounts as $tagCount) {
+                    $message .= "- {$tagCount['tag']}:\n" .
+                               "  + Tổng cần: {$tagCount['needed']}, có: {$tagCount['actual']}\n" .
+                               "  + Dễ: cần {$tagCount['by_level']['easy']['needed']}, có {$tagCount['by_level']['easy']['actual']}\n" .
+                               "  + TB: cần {$tagCount['by_level']['medium']['needed']}, có {$tagCount['by_level']['medium']['actual']}\n" .
+                               "  + Khó: cần {$tagCount['by_level']['hard']['needed']}, có {$tagCount['by_level']['hard']['actual']}\n";
+                }
+
                 return response()->json([
-                    'message' => 'Không đủ số lượng câu hỏi theo yêu cầu'
+                    'success' => false,
+                    'message' => $message
                 ], 500);
             }
 
@@ -478,10 +602,12 @@ class StudentAuthController extends Controller
             ]);
         } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
             return response()->json([
+                'success' => false,
                 'message' => 'Không tìm thấy thông tin đề thi'
             ], 404);
         } catch (\Exception $e) {
             return response()->json([
+                'success' => false,
                 'message' => 'Có lỗi xảy ra: ' . $e->getMessage()
             ], 500);
         }
@@ -501,55 +627,8 @@ class StudentAuthController extends Controller
 
             $student = $request->user();
             $testSessionSubject = TestSessionSubject::findOrFail($validated['test_session_subject_id']);
-            
-            // Kiểm tra số lượng câu hỏi theo từng tag và độ khó
-            $testPaper = $testSessionSubject->testPaper;
-            foreach ($testPaper->tags as $tag) {
-                $tagQuestions = $tag->questions()
-                    ->whereIn('level', [1, 2, 3])
-                    ->count();
-                    
-                $requiredQuestions = $tag->pivot->num_questions;
-                
-                if ($tagQuestions < $requiredQuestions) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi cho tag {$tag->name}. Cần {$requiredQuestions} câu, chỉ có {$tagQuestions} câu."
-                    ], 400);
-                }
-                
-                // Kiểm tra từng độ khó
-                $easyRequired = ceil($requiredQuestions * $tag->pivot->easy_rate / 100);
-                $mediumRequired = ceil($requiredQuestions * $tag->pivot->medium_rate / 100);
-                $hardRequired = ceil($requiredQuestions * $tag->pivot->hard_rate / 100);
-                
-                $easyCount = $tag->questions()->where('level', 1)->count();
-                $mediumCount = $tag->questions()->where('level', 2)->count();
-                $hardCount = $tag->questions()->where('level', 3)->count();
-                
-                if ($easyCount < $easyRequired) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi dễ cho tag {$tag->name}. Cần {$easyRequired} câu, chỉ có {$easyCount} câu."
-                    ], 400);
-                }
-                
-                if ($mediumCount < $mediumRequired) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi trung bình cho tag {$tag->name}. Cần {$mediumRequired} câu, chỉ có {$mediumCount} câu."
-                    ], 400);
-                }
-                
-                if ($hardCount < $hardRequired) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => "Không đủ câu hỏi khó cho tag {$tag->name}. Cần {$hardRequired} câu, chỉ có {$hardCount} câu."
-                    ], 400);
-                }
-            }
 
-            // Kiểm tra quyền nộp bài trước
+            // Kiểm tra quyền nộp bài
             if (!$testSessionSubject->students()->where('students.id', $student->id)->exists()) {
                 return response()->json([
                     'success' => false,
@@ -615,25 +694,33 @@ class StudentAuthController extends Controller
             $score = ($correctAnswers / $totalQuestions) * 10;
 
             // Lưu file bài làm
-            $fileName = null;
-            if ($validated['submission_file']) {
-                $fileData = base64_decode($validated['submission_file']);
-                $fileName = 'submissions/' . $student->id . '_' . time() . '.edudex';
-                Storage::disk('public')->put($fileName, $fileData);
-            }
+            $submissionFile = $validated['submission_file']; // Đây là base64
+            
+            // Format tên file: mã kỳ thi-mã môn thi-mã đề thi-mã sinh viên-submitted_at.edudex
+            $fileName = sprintf(
+                '%s-%s-%s-%s-%s.edudex',
+                $testSessionSubject->test_session_id, // mã kỳ thi
+                $testSessionSubject->subject->code,    // mã môn thi
+                $testSessionSubject->test_paper_id,    // mã đề thi
+                $student->code,                        // mã sinh viên
+                now()->format('YmdHis')               // thời gian nộp
+            );
+            
+            // Decode base64 và lưu file
+            $fileContent = base64_decode($submissionFile);
+            Storage::disk('public')->put('submissions/' . $fileName, $fileContent);
 
-            // Lưu bài làm vào database
-            $submission = \App\Models\TestSubmission::create([
-                'student_id' => $student->id,
-                'test_paper_id' => $testSessionSubject->test_paper_id,
-                'test_session_subject_id' => $testSessionSubject->id,
+            // Tạo bài nộp mới
+            $submission = TestSubmission::create([
                 'test_session_id' => $testSessionSubject->test_session_id,
+                'test_session_subject_id' => $validated['test_session_subject_id'],
+                'student_id' => $student->id,
                 'subject_id' => $testSessionSubject->subject_id,
-                'score' => round($score, 2),
-                'submission_file' => $fileName,
+                'test_paper_id' => $testSessionSubject->test_paper_id,
+                'score' => $score,
+                'submission_file' => 'submissions/' . $fileName, // Lưu đường dẫn tương đối
                 'started_at' => $validated['started_at'],
                 'submitted_at' => now(),
-                'notes' => "Trả lời đúng: $correctAnswers/$totalQuestions câu"
             ]);
 
             return response()->json([
