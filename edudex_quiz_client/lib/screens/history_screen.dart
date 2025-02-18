@@ -80,23 +80,23 @@ class _HistoryScreenState extends State<HistoryScreen> with WindowListener {
         actions: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8.0),
-                child: ToggleSwitch(
-                  content: const Text('Chế độ tối'),
-                  checked: FluentTheme.of(context).brightness.isDark,
-                  onChanged: (v) {
-                    if (v) {
-                      appTheme.mode = ThemeMode.dark;
-                    } else {
-                      appTheme.mode = ThemeMode.light;
-                    }
-                  },
-                ),
-              ),
-            ),
+            // Align(
+            //   alignment: AlignmentDirectional.centerEnd,
+            //   child: Padding(
+            //     padding: const EdgeInsetsDirectional.only(end: 8.0),
+            //     child: ToggleSwitch(
+            //       content: const Text('Chế độ tối'),
+            //       checked: FluentTheme.of(context).brightness.isDark,
+            //       onChanged: (v) {
+            //         if (v) {
+            //           appTheme.mode = ThemeMode.dark;
+            //         } else {
+            //           appTheme.mode = ThemeMode.light;
+            //         }
+            //       },
+            //     ),
+            //   ),
+            // ),
             const WindowButtons(),
           ],
         ),

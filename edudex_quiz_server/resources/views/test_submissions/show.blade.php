@@ -17,7 +17,7 @@
                                     <img src="{{ url($submission->student->avatar_url) }}" 
                                          alt="Avatar" style="width: 100px; height: 100px;">
                                 @else
-                                    <img src="{{ asset('images/default-avatar.jpg') }}" 
+                                    <img src="{{ asset('upload/avatar/students/default-avatar.jpg') }}" 
                                          alt="Default Avatar" style="width: 100px; height: 100px;">
                                 @endif
                                 <div>
@@ -122,8 +122,9 @@
                         <div class="col-12">
                             <h5>File bài làm</h5>
                             <a href="{{ asset('storage/' . $submission->submission_file) }}" 
-                               class="btn btn-primary" download>
-                                <i class="fas fa-download"></i> Tải file bài làm
+                               class="btn btn-primary" 
+                               download>
+                                Tải file bài làm
                             </a>
                         </div>
                     </div>

@@ -12,6 +12,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:edudex_quiz_client/utils/cover_date_time.dart';
+import 'package:edudex_quiz_client/utils/crypto.dart';
+import 'package:intl/intl.dart';
 
 class QuizScreen extends StatefulWidget {
   final int testSessionSubjectId;
@@ -69,6 +71,16 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
   final DateTime _startedAt = DateTime.now();
 
+  // Thêm biến lưu log
+  final List<String> _actionLogs = [];
+
+  // Hàm thêm log
+  void _addLog(String action) {
+    final now = DateTime.now();
+    final timestamp = DateFormat('dd-MM-yyyy-HH-mm-ss').format(now);
+    _actionLogs.add('[$timestamp] $action');
+  }
+
   // hàm cuộn đến câu hỏi được chọn
   void _scrollToQuestion(int index) {
     final double offset = index * _questionHeight;
@@ -83,13 +95,20 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   void initState() {
     super.initState();
     _loadUserData();
-    // Thay đổi _loadQuestions() thành _loadTestPaper()
     _loadTestPaper();
     _setupFullScreen();
     _startTimer();
     windowManager.addListener(this);
     _initializeWindow();
     RawKeyboard.instance.addListener(_handleKeyEvent);
+
+    // Log kích thước màn hình khi khởi tạo
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final size = MediaQuery.of(context).size;
+      _addLog(
+          'kích thước màn hình: ${size.width.round()}x${size.height.round()}');
+      _addLog('bắt đầu làm bài');
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -147,6 +166,11 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
+
+        // Lưu test paper details vào SharedPreferences
+        await prefs.setString(
+            'test_paper_details', json.encode(data['test_paper']));
+
         setState(() {
           _testPaperDetails = data['test_paper'];
           _questions =
@@ -173,6 +197,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   }
 
   void _handleKeyEvent(RawKeyEvent event) {
+    if (event is RawKeyDownEvent) {
+      _addLog('phím: ${event.logicalKey.keyLabel}');
+    }
     // Chặn các phím Windows/Super
     if (event.isMetaPressed) {
       return;
@@ -264,6 +291,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   }
 
   Future<void> _submitTest() async {
+    _addLog('Nộp bài');
     if (_isSubmitting) return;
 
     setState(() {
@@ -279,24 +307,104 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         throw Exception('Không tìm thấy thông tin đăng nhập');
       }
 
-      // Chuẩn bị dữ liệu answers
+      // Chuẩn bị dữ liệu answers cho API
       final List<Map<String, dynamic>> answers = [];
       _userAnswers.forEach((questionIndex, answerIndex) {
-        // Lấy ID thật của câu hỏi và đáp án từ _questions
         final question = _questions[questionIndex];
         final answer = question['answers'][answerIndex];
-
         answers.add({
-          'question_id': question['id'], // Lấy ID thật của câu hỏi
-          'answer_id': answer['id'], // Lấy ID thật của đáp án
+          'question_id': question['id'],
+          'answer_id': answer['id'],
         });
       });
 
+      // Tạo nội dung submission file theo định dạng text
+      final buffer = StringBuffer();
+
+      // Phần 1: Thông tin cá nhân
+      buffer.writeln('Thông tin cá nhân:');
+      buffer.writeln('Mã sinh viên: ${_studentData?['code']}');
+      buffer.writeln('Họ và tên: ${_studentData?['name']}');
+      buffer.writeln(
+          'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name']}');
+      buffer.writeln('Số báo danh: ${_examsData![0]['exam_code']}');
+      buffer.writeln();
+
+      // Phần 2: Chi tiết đề thi
+      buffer.writeln('===============================================');
+      buffer.writeln('Chi tiết đề thi:');
+      if (_examsData != null && _examsData!.isNotEmpty) {
+        final testSession = _examsData![0]['test_session'];
+        final subject = _examsData![0]['subject'];
+        final room = _examsData![0]['room'];
+        final shift = room['shift'];
+        final testPaper = _testPaperDetails;
+
+        buffer.writeln('Kỳ thi: ${testSession['name']}');
+        buffer.writeln(
+            'Thời gian kỳ thi: ${DateTimeHelper.formatDateTime(testSession['start_date'])} - ${DateTimeHelper.formatDateTime(testSession['end_date'])}');
+        buffer.writeln('Môn thi: ${subject['name']} (${subject['code']})');
+        buffer.writeln('Ca thi: ${shift['name']}');
+        buffer.writeln(
+            'Thời gian ca thi: ${DateTimeHelper.formatDateTime(shift['start_time'])} - ${DateTimeHelper.formatDateTime(shift['end_time'])}');
+        buffer.writeln('Phòng thi: ${room['name']} - ${room['location']}');
+        buffer.writeln();
+
+        buffer.writeln('Tên đề thi: ${testPaper?['name']}');
+        buffer.writeln('Thời gian làm bài: ${testPaper?['duration']} phút');
+        buffer.writeln('Tổng số câu hỏi: ${testPaper?['total_questions']} câu');
+
+        buffer.writeln('\nTỷ lệ độ khó:');
+        final difficultyRates = testPaper?['difficulty_rates'];
+        buffer.writeln('- Dễ: ${difficultyRates['easy'].toStringAsFixed(1)}%');
+        buffer.writeln(
+            '- Trung bình: ${difficultyRates['medium'].toStringAsFixed(1)}%');
+        buffer.writeln('- Khó: ${difficultyRates['hard'].toStringAsFixed(1)}%');
+
+        buffer.writeln('\nPhân bố theo chủ đề:');
+        for (final tag in testPaper?['tags']) {
+          final questionsLevel = tag['questions_by_level'];
+          final rates = tag['rates'];
+          buffer.writeln('${tag['name']}: ${tag['total_questions']} câu');
+          buffer.writeln(
+              '- Số câu theo độ khó: Dễ (${questionsLevel['easy']}), TB (${questionsLevel['medium']}), Khó (${questionsLevel['hard']})');
+          buffer.writeln(
+              '- Tỷ lệ: ${double.parse(rates['easy']).toStringAsFixed(1)}%/${double.parse(rates['medium']).toStringAsFixed(1)}%/${double.parse(rates['hard']).toStringAsFixed(1)}%');
+        }
+      }
+      buffer.writeln();
+
+      // Phần 3: Chi tiết bài làm
+      buffer.writeln('===============================================');
+      buffer.writeln('Chi tiết bài làm:');
+      final testDetails = {
+        'test_session_subject_id': _examsData![0]['test_session_subject_id'],
+        'started_at': DateTimeHelper.formatDateTimeForAPI(_startedAt),
+        'submitted_at': DateTimeHelper.formatDateTimeForAPI(DateTime.now()),
+        'answers': answers,
+      };
+      final prettyJson =
+          const JsonEncoder.withIndent('  ').convert(testDetails);
+      buffer.writeln(prettyJson);
+      buffer.writeln();
+
+      // Phần 4: Log
+      buffer.writeln('===============================================');
+      buffer.writeln('Log:');
+      for (final log in _actionLogs) {
+        buffer.writeln(log);
+      }
+
+      // Mã hóa nội dung text
+      final encryptedData =
+          AppCrypto.encrypter.encrypt(buffer.toString(), iv: AppCrypto.iv);
+
+      // Tạo request body cho API
       final requestBody = {
         'test_session_subject_id': _examsData![0]['test_session_subject_id'],
         'answers': answers,
-        'submission_file': "copecute",
-        'started_at': DateTimeHelper.formatDateTime(_startedAt.toString()),
+        'submission_file': encryptedData.base64,
+        'started_at': DateTimeHelper.formatDateTimeForAPI(_startedAt),
       };
 
       print('📤 Submit request:');
@@ -325,7 +433,6 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
       if (response.statusCode == 200 && data['success'] == true) {
         if (mounted) {
-          // Chuyển đến màn hình kết quả
           Navigator.pushReplacement(
             context,
             FluentPageRoute(
@@ -335,6 +442,8 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                 score: data['data']['score'].toDouble(),
                 questions: _questions,
                 userAnswers: Map<int, int>.from(_userAnswers),
+                submissionFile: encryptedData.base64,
+                actionLogs: _actionLogs,
               ),
             ),
           );
@@ -431,6 +540,35 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     }
   }
 
+  // Thêm hàm xử lý click chuột
+  void _handleMouseClick(TapDownDetails details) {
+    _addLog(
+        'click chuột tại vị trí: (${details.globalPosition.dx.round()}, ${details.globalPosition.dy.round()})');
+  }
+
+  // Cập nhật hàm chọn đáp án
+  void _selectAnswer(int questionIndex, int answerIndex) {
+    setState(() {
+      _userAnswers[questionIndex] = answerIndex;
+    });
+    _addLog('chọn đáp án ${answerIndex + 1} cho câu ${questionIndex + 1}');
+  }
+
+  // Cập nhật hàm thay đổi font size
+  void _changeFontSize(double newSize) {
+    setState(() {
+      _fontSize = newSize;
+    });
+    _addLog('thay đổi cỡ chữ: $_fontSize');
+  }
+
+  // Cập nhật hàm chuyển đổi theme
+  void _toggleTheme(bool isDark) {
+    final appTheme = context.read<AppTheme>();
+    appTheme.mode = isDark ? ThemeMode.dark : ThemeMode.light;
+    _addLog('chuyển sang ${isDark ? "chế độ tối" : "chế độ sáng"}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final appTheme = context.watch<AppTheme>();
@@ -439,346 +577,348 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       return const Center(child: ProgressRing());
     }
 
-    return NavigationView(
-      appBar: NavigationAppBar(
-        automaticallyImplyLeading: false,
-        // title: const Text('Làm bài'),
-        actions: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            // Nút điều chỉnh cỡ chữ
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(FluentIcons.font_decrease),
-                  onPressed: () {
-                    setState(() {
-                      if (_fontSize > 12) {
-                        _fontSize -= 2;
-                      }
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(FluentIcons.font_size),
-                  onPressed: () {
-                    setState(() {
-                      _fontSize = 16.0; // Reset về mặc định
-                    });
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(FluentIcons.font_increase),
-                  onPressed: () {
-                    setState(() {
-                      if (_fontSize < 24) {
-                        _fontSize += 2;
-                      }
-                    });
-                  },
-                ),
-                const SizedBox(width: 16),
-              ],
-            ),
-            // Nút chuyển đổi theme
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ToggleSwitch(
-                content: const Text('Chế độ tối'),
-                checked: FluentTheme.of(context).brightness.isDark,
-                onChanged: (v) {
-                  if (v) {
-                    appTheme.mode = ThemeMode.dark;
-                  } else {
-                    appTheme.mode = ThemeMode.light;
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-      content: ScaffoldPage(
-        padding: EdgeInsets.zero,
-        content: Column(
-          children: [
-            // Header với thông tin thí sinh và bài thi
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                border: Border(bottom: BorderSide(color: Colors.grey[30]!)),
-              ),
-              child: Row(
+    return GestureDetector(
+      onTapDown: _handleMouseClick,
+      child: NavigationView(
+        appBar: NavigationAppBar(
+          automaticallyImplyLeading: false,
+          leading: Row(
+            children: const [
+              SizedBox(width: 8),
+              Icon(FluentIcons.defender_app),
+              SizedBox(width: 4),
+              Text('Được áp dụng công nghệ chống gian lận'),
+            ],
+          ),
+          actions: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // Nút điều chỉnh cỡ chữ
+              Row(
                 children: [
-                  // Ảnh và thông tin thí sinh
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: _studentData?['avatar_url'] != null
-                        ? Image.network(
-                            _studentData!['avatar_url'],
-                            width: 100,
-                            height: 120,
-                            fit: BoxFit.cover,
-                            headers: {
-                              'Accept': 'image/*',
-                            },
-                            loadingBuilder: (context, child, loadingProgress) {
-                              if (loadingProgress == null) return child;
-                              return Container(
-                                width: 100,
-                                height: 120,
-                                color: Colors.grey[40],
-                                child: const Center(
-                                  child: ProgressRing(),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stackTrace) {
-                              // print('❌ Lỗi tải ảnh: $error');
-                              // print(
-                              //     '🔍 URL ảnh: ${_studentData!['avatar_url']}');
-                              return Container(
-                                width: 100,
-                                height: 120,
-                                color: Colors.grey[40],
-                                child:
-                                    const Icon(FluentIcons.contact, size: 48),
-                              );
-                            },
-                          )
-                        : Container(
-                            width: 100,
-                            height: 120,
-                            color: Colors.grey[40],
-                            child: const Icon(FluentIcons.contact, size: 48),
-                          ),
+                  IconButton(
+                    icon: const Icon(FluentIcons.font_decrease),
+                    onPressed: () {
+                      if (_fontSize > 12) {
+                        _changeFontSize(_fontSize - 2);
+                      }
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(FluentIcons.font_size),
+                    onPressed: () {
+                      _changeFontSize(16.0);
+                    },
+                  ),
+                  IconButton(
+                    icon: const Icon(FluentIcons.font_increase),
+                    onPressed: () {
+                      if (_fontSize < 24) {
+                        _changeFontSize(_fontSize + 2);
+                      }
+                    },
                   ),
                   const SizedBox(width: 16),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Thông tin thí sinh',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text('Mã sinh viên: ${_studentData?['code'] ?? ''}'),
-                      Text('Họ và tên: ${_studentData?['name'] ?? ''}'),
-                      Text(
-                          'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name'] ?? ''}'),
-                    ],
-                  ),
-                  const Spacer(),
-                  // Thông tin bài thi
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Thông tin bài thi',
-                          style: TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      if (_examsData != null && _examsData!.isNotEmpty) ...[
-                        Text(
-                            'Kỳ thi: ${_examsData![0]['test_session']['name']}'),
-                        Text('Môn thi: ${_examsData![0]['subject']['name']}'),
-                        Text(
-                            'Phòng thi: ${_examsData![0]['room']['name']} - ${_examsData![0]['room']['location']}'),
-                        Text(
-                            'Ca thi: ${_examsData![0]['room']['shift']['name']}'),
-                      ],
-                    ],
-                  ),
                 ],
               ),
-            ),
-            // Nội dung bài thi
-            Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Phần câu hỏi
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border:
-                            Border(right: BorderSide(color: Colors.grey[30]!)),
-                      ),
-                      child: SingleChildScrollView(
-                        controller: _scrollController,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: List.generate(
-                            _questions.length,
-                            (questionIndex) => Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'CÂU ${questionIndex + 1}:',
-                                  style: const TextStyle(
-                                    color: Color(0xFFD83B01),
-                                    fontWeight: FontWeight.bold,
+              // Nút chuyển đổi theme
+              Padding(
+                padding: const EdgeInsets.only(right: 8.0),
+                child: ToggleSwitch(
+                  content: const Text('Chế độ tối'),
+                  checked: FluentTheme.of(context).brightness.isDark,
+                  onChanged: _toggleTheme,
+                ),
+              ),
+            ],
+          ),
+        ),
+        content: ScaffoldPage(
+          padding: EdgeInsets.zero,
+          content: Column(
+            children: [
+              // Header với thông tin thí sinh và bài thi
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border(bottom: BorderSide(color: Colors.grey[30]!)),
+                ),
+                child: Row(
+                  children: [
+                    // Ảnh và thông tin thí sinh
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: _studentData?['avatar_url'] != null
+                          ? Image.network(
+                              _studentData!['avatar_url'],
+                              width: 100,
+                              height: 120,
+                              fit: BoxFit.cover,
+                              headers: {
+                                'Accept': 'image/*',
+                              },
+                              loadingBuilder:
+                                  (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  width: 100,
+                                  height: 120,
+                                  color: Colors.grey[40],
+                                  child: const Center(
+                                    child: ProgressRing(),
                                   ),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(_questions[questionIndex]['content'],
-                                    style: TextStyle(fontSize: _fontSize)),
-                                const SizedBox(height: 24),
-                                ...List.generate(
-                                  _questions[questionIndex]['answers'].length,
-                                  (answerIndex) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 16),
-                                    child: RadioButton(
-                                      checked: questionIndex ==
-                                                  _currentQuestionIndex &&
-                                              _selectedAnswerIndex ==
-                                                  answerIndex ||
-                                          _userAnswers[questionIndex] ==
-                                              answerIndex,
-                                      onChanged: (value) {
-                                        setState(() {
-                                          _currentQuestionIndex = questionIndex;
-                                          _selectedAnswerIndex = answerIndex;
-                                          _userAnswers[questionIndex] =
-                                              answerIndex;
-                                        });
-                                      },
-                                      content: Text(
-                                        '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]['content']}',
-                                        style:
-                                            TextStyle(fontSize: _fontSize - 2),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(
-                                    height: 32), // Khoảng cách giữa các câu
-                              ],
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                // print('❌ Lỗi tải ảnh: $error');
+                                // print(
+                                //     '🔍 URL ảnh: ${_studentData!['avatar_url']}');
+                                return Container(
+                                  width: 100,
+                                  height: 120,
+                                  color: Colors.grey[40],
+                                  child:
+                                      const Icon(FluentIcons.contact, size: 48),
+                                );
+                              },
+                            )
+                          : Container(
+                              width: 100,
+                              height: 120,
+                              color: Colors.grey[40],
+                              child: const Icon(FluentIcons.contact, size: 48),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
-                  ),
-
-                  // Phần bên phải
-                  Container(
-                    width: 300,
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Thời gian còn lại: $_formattedTime',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        const Text('Thông tin thí sinh',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        // Thêm progress bar thời gian
-                        ProgressBar(
-                          value: (_remainingSeconds / _totalSeconds) * 100,
-                          backgroundColor: Colors.grey[30],
-                          activeColor:
-                              _remainingSeconds < (_totalSeconds * 0.25)
-                                  ? Colors.red
-                                  : (_remainingSeconds < (_totalSeconds * 0.5)
-                                      ? Colors.orange
-                                      : Colors.blue),
+                        Text('Mã sinh viên: ${_studentData?['code'] ?? ''}'),
+                        Text('Họ và tên: ${_studentData?['name'] ?? ''}'),
+                        Text(
+                            'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name'] ?? ''}'),
+                      ],
+                    ),
+                    const Spacer(),
+                    // Thông tin bài thi
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Thông tin bài thi',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        if (_examsData != null && _examsData!.isNotEmpty) ...[
+                          Text(
+                              'Kỳ thi: ${_examsData![0]['test_session']['name']}'),
+                          Text('Môn thi: ${_examsData![0]['subject']['name']}'),
+                          Text(
+                              'Phòng thi: ${_examsData![0]['room']['name']} - ${_examsData![0]['room']['location']}'),
+                          Text(
+                              'Ca thi: ${_examsData![0]['room']['shift']['name']}'),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Nội dung bài thi
+              Expanded(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Phần câu hỏi
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border(
+                              right: BorderSide(color: Colors.grey[30]!)),
                         ),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Bảng đáp án',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Expanded(
-                          child: GridView.builder(
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 4,
-                              childAspectRatio: 1,
-                              crossAxisSpacing: 8,
-                              mainAxisSpacing: 8,
-                            ),
-                            itemCount: _questions.length,
-                            itemBuilder: (context, index) {
-                              final isAnswered =
-                                  _userAnswers.containsKey(index);
-                              final isSelected = _currentQuestionIndex == index;
-
-                              return Button(
-                                onPressed: () {
-                                  setState(() {
-                                    _currentQuestionIndex = index;
-                                    _selectedAnswerIndex = _userAnswers[index];
-                                  });
-                                  _scrollToQuestion(index);
-                                },
-                                style: ButtonStyle(
-                                  padding: ButtonState.all(EdgeInsets.zero),
-                                  backgroundColor: ButtonState.all(
-                                    isAnswered
-                                        ? Colors.green.lightest
-                                        : (isSelected
-                                            ? Colors.blue.lightest
-                                            : null),
-                                  ),
-                                ),
-                                child: Stack(
-                                  children: [
-                                    Center(
-                                      child: Text('${index + 1}'),
+                        child: SingleChildScrollView(
+                          controller: _scrollController,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: List.generate(
+                              _questions.length,
+                              (questionIndex) => Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'CÂU ${questionIndex + 1}:',
+                                    style: const TextStyle(
+                                      color: Color(0xFFD83B01),
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    if (isAnswered)
-                                      Positioned(
-                                        right: 4,
-                                        bottom: 4,
-                                        child: Text(
-                                          String.fromCharCode(
-                                              65 + _userAnswers[index]!),
-                                          style: const TextStyle(fontSize: 10),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(_questions[questionIndex]['content'],
+                                      style: TextStyle(fontSize: _fontSize)),
+                                  const SizedBox(height: 24),
+                                  ...List.generate(
+                                    _questions[questionIndex]['answers'].length,
+                                    (answerIndex) => Padding(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 16),
+                                      child: RadioButton(
+                                        checked: questionIndex ==
+                                                    _currentQuestionIndex &&
+                                                _selectedAnswerIndex ==
+                                                    answerIndex ||
+                                            _userAnswers[questionIndex] ==
+                                                answerIndex,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _currentQuestionIndex =
+                                                questionIndex;
+                                            _selectedAnswerIndex = answerIndex;
+                                            _userAnswers[questionIndex] =
+                                                answerIndex;
+                                          });
+                                        },
+                                        content: Text(
+                                          '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]['content']}',
+                                          style: TextStyle(
+                                              fontSize: _fontSize - 2),
                                         ),
                                       ),
-                                  ],
-                                ),
-                              );
-                            },
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 16),
-                        FilledButton(
-                          onPressed: _isSubmitting ? null : _submitTest,
-                          child: _isSubmitting
-                              ? const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: ProgressRing(),
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text('Đang nộp bài...'),
-                                  ],
-                                )
-                              : const Text('Nộp bài'),
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'Bài thi kết thúc khi hết thời gian hoặc khi thí sinh nhấn vào nút "Nộp bài"',
-                          style:
-                              TextStyle(color: Color(0xFFD83B01), fontSize: 12),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+
+                    // Phần bên phải
+                    Container(
+                      width: 300,
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Thời gian còn lại: $_formattedTime',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Thêm progress bar thời gian
+                          ProgressBar(
+                            value: (_remainingSeconds / _totalSeconds) * 100,
+                            backgroundColor: Colors.grey[30],
+                            activeColor:
+                                _remainingSeconds < (_totalSeconds * 0.25)
+                                    ? Colors.red
+                                    : (_remainingSeconds < (_totalSeconds * 0.5)
+                                        ? Colors.orange
+                                        : Colors.blue),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Bảng đáp án',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Expanded(
+                            child: GridView.builder(
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                childAspectRatio: 1,
+                                crossAxisSpacing: 8,
+                                mainAxisSpacing: 8,
+                              ),
+                              itemCount: _questions.length,
+                              itemBuilder: (context, index) {
+                                final isAnswered =
+                                    _userAnswers.containsKey(index);
+                                final isSelected =
+                                    _currentQuestionIndex == index;
+
+                                return Button(
+                                  onPressed: () {
+                                    setState(() {
+                                      _currentQuestionIndex = index;
+                                      _selectedAnswerIndex =
+                                          _userAnswers[index];
+                                    });
+                                    _scrollToQuestion(index);
+                                  },
+                                  style: ButtonStyle(
+                                    padding: ButtonState.all(EdgeInsets.zero),
+                                    backgroundColor: ButtonState.all(
+                                      isAnswered
+                                          ? Colors.green.lightest
+                                          : (isSelected
+                                              ? Colors.blue.lightest
+                                              : null),
+                                    ),
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Center(
+                                        child: Text('${index + 1}'),
+                                      ),
+                                      if (isAnswered)
+                                        Positioned(
+                                          right: 4,
+                                          bottom: 4,
+                                          child: Text(
+                                            String.fromCharCode(
+                                                65 + _userAnswers[index]!),
+                                            style:
+                                                const TextStyle(fontSize: 10),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: _isSubmitting ? null : _submitTest,
+                            child: _isSubmitting
+                                ? const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: ProgressRing(),
+                                      ),
+                                      SizedBox(width: 8),
+                                      Text('Đang nộp bài...'),
+                                    ],
+                                  )
+                                : const Text('Nộp bài'),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Bài thi kết thúc khi hết thời gian hoặc khi thí sinh nhấn vào nút "Nộp bài"',
+                            style: TextStyle(
+                                color: Color(0xFFD83B01), fontSize: 12),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
