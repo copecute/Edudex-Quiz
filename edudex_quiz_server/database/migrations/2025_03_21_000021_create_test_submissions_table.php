@@ -22,6 +22,9 @@ return new class extends Migration
             $table->text('notes')->nullable(); // Ghi chú về bài làm
             $table->timestamps();
             $table->softDeletes();
+
+            // Thêm unique constraint
+            $table->unique(['test_session_id', 'student_id', 'subject_id'], 'unique_student_subject_per_session');
         });
     }
 

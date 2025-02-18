@@ -296,7 +296,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         'test_session_subject_id': _examsData![0]['test_session_subject_id'],
         'answers': answers,
         'submission_file': "copecute",
-        'started_at': _startedAt.toIso8601String(),
+        'started_at': DateTimeHelper.formatDateTime(_startedAt.toString()),
       };
 
       print('📤 Submit request:');

@@ -21,6 +21,11 @@ class _HistoryScreenState extends State<HistoryScreen> with WindowListener {
   void initState() {
     windowManager.addListener(this);
     super.initState();
+    _initWindow();
+  }
+
+  Future<void> _initWindow() async {
+    await windowManager.setPreventClose(true);
   }
 
   @override
@@ -39,16 +44,17 @@ class _HistoryScreenState extends State<HistoryScreen> with WindowListener {
           title: const Text('Xác nhận'),
           content: const Text('Bạn có chắc chắn muốn thoát?'),
           actions: [
-            Button(
-              child: const Text('Không'),
-              onPressed: () => Navigator.pop(context),
-            ),
             FilledButton(
               child: const Text('Có'),
               onPressed: () async {
                 Navigator.pop(context);
-                await windowManager.destroy();
+                await windowManager.setPreventClose(false);
+                await windowManager.close();
               },
+            ),
+            Button(
+              child: const Text('Không'),
+              onPressed: () => Navigator.pop(context),
             ),
           ],
         ),
