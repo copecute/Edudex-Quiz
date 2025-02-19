@@ -39,9 +39,10 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
             _examsData = examsData;
           });
 
-          final testPaperId = examsData[0]['test_paper']['id'];
+          final testSessionSubjectId = examsData[0]['test_session_subject_id'];
           final response = await http.get(
-            Uri.parse('$serverUrl/api/student/test-papers/$testPaperId'),
+            Uri.parse(
+                '$serverUrl/api/student/test-papers/$testSessionSubjectId'),
             headers: {
               'Authorization': 'copecute $token',
               'Accept': 'application/json',
@@ -277,10 +278,11 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                     if (token == null || serverUrl == null) {
                       throw Exception('Không tìm thấy thông tin đăng nhập');
                     }
-
+                    final testSessionSubjectId =
+                        _examsData![0]['test_session_subject_id'];
                     print('📤 Request:');
                     print(
-                        'URL: $serverUrl/api/student/test-papers/${testPaper['id']}/questions');
+                        'URL: $serverUrl/api/student/test-papers/$testSessionSubjectId/questions');
                     print('Headers: ${json.encode({
                           'Authorization': 'copecute $token',
                           'Accept': 'application/json',
@@ -289,7 +291,7 @@ class _QuizMenuPageState extends State<QuizMenuPage> {
                     // Kiểm tra trước khi vào thi
                     final response = await http.get(
                       Uri.parse(
-                          '$serverUrl/api/student/test-papers/${testPaper['id']}/questions'),
+                          '$serverUrl/api/student/test-papers/$testSessionSubjectId/questions'),
                       headers: {
                         'Authorization': 'copecute $token',
                         'Accept': 'application/json',

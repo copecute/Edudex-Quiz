@@ -138,7 +138,7 @@
                                 </td>
                                 <td>
                                     @if($subject->testSessionSubjects->first()->test_paper_id)
-                                        {{ $subject->testSessionSubjects->first()->testPaper->name }}
+                                        {{ $subject->testSessionSubjects->first()->testPaper->name ?? 'Chưa phân đề thi' }}
                                     @else
                                         Chưa phân đề thi
                                     @endif

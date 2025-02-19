@@ -10,6 +10,7 @@ use App\Models\TestSessionSubject;
 use Illuminate\Support\Facades\Storage;
 use App\Models\TestSubmission;
 use Illuminate\Support\Facades\Log;
+use App\Models\TestPaper;
 
 class StudentAuthController extends Controller
 {
@@ -27,6 +28,7 @@ class StudentAuthController extends Controller
 
         if (!$student) {
             return response()->json([
+                'success' => false,
                 'message' => 'Số báo danh không đúng hoặc không phải trong thời gian thi'
             ], 401); // Trả về mã 401
         }
@@ -41,6 +43,7 @@ class StudentAuthController extends Controller
 
         if (!$hasValidExamCode) {
             return response()->json([
+                'success' => false,
                 'message' => 'Số báo danh không đúng hoặc không phải trong thời gian thi'
             ], 401); // Trả về mã 401
         }
@@ -198,13 +201,23 @@ class StudentAuthController extends Controller
 
             if (!$currentShiftRoom) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Chưa đến giờ thi hoặc đã hết giờ thi'
                 ], 403);
+            }
+
+            // Thêm kiểm tra testPaper tồn tại
+            if (!$testSessionSubject->testPaper) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Đề thi không tồn tại'
+                ], 404);
             }
 
             // Kiểm tra xem đã được phân đề thi chưa
             if (!$testSessionSubject->test_paper_id) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Môn thi chưa được phân đề thi'
                 ], 404);
             }
@@ -347,6 +360,7 @@ class StudentAuthController extends Controller
             // Kiểm tra xem đã được phân đề thi chưa
             if (!$testSessionSubject->test_paper_id) {
                 return response()->json([
+                    'success' => false,
                     'message' => 'Môn thi chưa được phân đề thi'
                 ], 404);
             }

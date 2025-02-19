@@ -143,33 +143,34 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final serverUrl = prefs.getString('server_url');
-      final examsDataStr = prefs.getString('exams_data');
 
-      if (token == null || serverUrl == null || examsDataStr == null) {
+      if (token == null || serverUrl == null) {
         throw Exception('Không tìm thấy thông tin cần thiết');
       }
 
-      final examsData = json.decode(examsDataStr);
-      if (examsData.isEmpty) {
-        throw Exception('Không có thông tin bài thi');
-      }
+      final url =
+          '$serverUrl/api/student/test-papers/${widget.testSessionSubjectId}/questions';
 
-      final testPaperId = examsData[0]['test_paper']['id'];
+      print('📤 Load test paper request:');
+      print('URL: $url');
+      print('Headers: ${json.encode({
+            'Authorization': 'copecute $token',
+            'Accept': 'application/json',
+          })}');
 
       final response = await http.get(
-        Uri.parse('$serverUrl/api/student/test-papers/$testPaperId/questions'),
+        Uri.parse(url),
         headers: {
           'Authorization': 'copecute $token',
           'Accept': 'application/json',
         },
       );
 
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        // Lưu test paper details vào SharedPreferences
-        await prefs.setString(
-            'test_paper_details', json.encode(data['test_paper']));
 
         setState(() {
           _testPaperDetails = data['test_paper'];
@@ -180,13 +181,15 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
           _isLoading = false;
         });
       } else {
-        throw Exception('Không thể tải câu hỏi');
+        throw Exception(
+            'Không thể tải câu hỏi: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      print('Lỗi khi tải câu hỏi: $e');
+      print('❌ Load test paper error: $e');
       setState(() {
         _isLoading = false;
       });
+      rethrow;
     }
   }
 
@@ -811,7 +814,10 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                           const SizedBox(height: 8),
                           // Thêm progress bar thời gian
                           ProgressBar(
-                            value: (_remainingSeconds / _totalSeconds) * 100,
+                            value: _totalSeconds > 0
+                                ? (_remainingSeconds / _totalSeconds * 100)
+                                    .clamp(0, 100)
+                                : 0,
                             backgroundColor: Colors.grey[30],
                             activeColor:
                                 _remainingSeconds < (_totalSeconds * 0.25)
