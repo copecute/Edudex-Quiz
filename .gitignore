@@ -4,6 +4,7 @@
 *.ipr
 *.iws
 *.bkp
+*.tmp
 .$*
 ~$*
 .idea/
