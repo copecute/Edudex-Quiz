@@ -68,6 +68,25 @@
                                            data-bs-toggle="tooltip" 
                                            title="{{ $testPaper->description }}"></i>
                                     @endif
+                                    @php
+                                        $details = $testPaper->getAvailableQuestionsDetail();
+                                    @endphp
+                                    @if($details['total_available'] < $details['total_required'])
+                                        <i class="fas fa-exclamation-triangle text-warning"
+                                           data-bs-toggle="tooltip"
+                                           data-bs-html="true"
+                                           title="Thiếu câu hỏi: Hiện chỉ có {{ $details['total_available'] }}/{{ $details['total_required'] }} câu hỏi thỏa mãn yêu cầu<br><br>
+                                           Chi tiết theo tag:<br>
+                                           @foreach($details['tags'] as $tagName => $tagDetails)
+                                           - {{ $tagName }}: {{ $tagDetails['total_available'] }}/{{ $tagDetails['total_required'] }} câu<br>
+                                           @if($tagName !== 'Random')
+                                             + Dễ: {{ $tagDetails['easy']['available'] }}/{{ $tagDetails['easy']['required'] }}<br>
+                                             + TB: {{ $tagDetails['medium']['available'] }}/{{ $tagDetails['medium']['required'] }}<br>
+                                             + Khó: {{ $tagDetails['hard']['available'] }}/{{ $tagDetails['hard']['required'] }}<br>
+                                           @endif
+                                           @endforeach
+                                           "></i>
+                                    @endif
                                 </td>
                                 <td>{{ $testPaper->subject->name }}</td>
                                 <td>{{ $testPaper->duration }}</td>
@@ -122,7 +141,15 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    $('[data-bs-toggle="tooltip"]').tooltip();
+    // Khởi tạo tooltip với các tùy chọn
+    $('[data-bs-toggle="tooltip"]').tooltip({
+        placement: 'top',
+        html: true,
+        delay: {
+            show: 100,
+            hide: 100
+        }
+    });
 });
 </script>
 @endpush
