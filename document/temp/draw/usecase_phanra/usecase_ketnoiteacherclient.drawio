@@ -1,0 +1,32 @@
+<mxfile host="Electron" modified="2025-02-25T08:35:03.219Z" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/22.1.16 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="o6OAWylwwSK3rWxXzSDZ" version="22.1.16" type="device">
+  <diagram name="Page-1" id="pnbr0oCoJasoM0-3lq2N">
+    <mxGraphModel dx="1050" dy="621" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-1" value="Kết nối&lt;br&gt;Teacher Client" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="414" y="290" width="110" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-2" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;fontSize=14;endArrow=open;endFill=0;" edge="1" parent="1" source="gVCtSwSNcA4PESnQNQP8-1" target="gVCtSwSNcA4PESnQNQP8-3">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="503" y="294" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-3" value="Cấu hình phòng thi" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="610" y="295" width="90" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-6" value="&amp;lt;&amp;lt;include&amp;gt;&amp;gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="535" y="290" width="60" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-7" value="Thí sinh" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="290" y="285" width="30" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="gVCtSwSNcA4PESnQNQP8-8" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="gVCtSwSNcA4PESnQNQP8-7" target="gVCtSwSNcA4PESnQNQP8-1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="419" y="326" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
