@@ -1,0 +1,11 @@
+# Logs
+*.log
+*.iml
+*.ipr
+*.iws
+*.bkp
+*.tmp
+.$*
+~$*
+.idea/
+.vscode/
