@@ -8,6 +8,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
+import 'services/database_service.dart';
+import 'services/api_service.dart';
+import 'services/tcp_server_service.dart';
+import 'providers/exam_provider.dart';
+import 'providers/student_provider.dart';
+import 'providers/tcp_server_provider.dart';
+import 'services/log_service.dart';
 
 const String appTitle = 'EduDex Quiz';
 
@@ -27,6 +34,14 @@ void main() async {
 
   final appTheme = AppTheme();
   await appTheme.loadSettings(); // Load tất cả cài đặt
+
+  final logService = LogService();
+  final databaseService = DatabaseService();
+  final apiService = ApiService();
+  final tcpService = TcpServerService(
+    dbService: databaseService,
+    logService: logService,
+  );
 
   if (!kIsWeb &&
       [TargetPlatform.windows, TargetPlatform.android]
@@ -55,10 +70,36 @@ void main() async {
     });
   }
 
-  runApp(ChangeNotifierProvider.value(
-    value: appTheme,
-    child: const MyApp(),
-  ));
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: appTheme),
+        Provider<DatabaseService>.value(value: databaseService),
+        Provider<ApiService>.value(value: apiService),
+        Provider<TcpServerService>.value(value: tcpService),
+        ChangeNotifierProvider(
+          create: (context) => ExamProvider(
+            dbService: databaseService,
+            apiService: apiService,
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => StudentProvider(
+            dbService: databaseService,
+          ),
+        ),
+        Provider<LogService>.value(value: logService),
+        ChangeNotifierProvider(
+          create: (context) => TCPServerProvider(
+            tcpService: tcpService,
+            dbService: databaseService,
+            logService: logService,
+          ),
+        ),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
