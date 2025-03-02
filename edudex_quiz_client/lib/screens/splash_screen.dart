@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:window_manager/window_manager.dart';
 import '../theme.dart';
 import 'login.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'dart:io';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:network_info_plus/network_info_plus.dart';
+import '../services/connection_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,163 +17,173 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with WindowListener {
-  final TextEditingController _codeController = TextEditingController();
+  final TextEditingController _ipController = TextEditingController();
   bool _isLoading = false;
-  static const String SERVER_URL_KEY = 'server_url';
-
-  String _formatServerUrl(String url) {
-    String formattedUrl = url.trim();
-
-    // Loại bỏ dấu "/" ở cuối nếu có
-    while (formattedUrl.endsWith('/')) {
-      formattedUrl = formattedUrl.substring(0, formattedUrl.length - 1);
-    }
-
-    // Thêm https:// nếu chưa có protocol
-    if (!formattedUrl.startsWith('http://') &&
-        !formattedUrl.startsWith('https://')) {
-      formattedUrl = 'https://$formattedUrl';
-      print('🔒 Tự động thêm https:// vào URL');
-    }
-
-    return '$formattedUrl/api/wfaE0FbQWldGoDlGFyFgKWY0MiUizH2';
-  }
+  static const String TEACHER_IP_KEY = 'teacher_ip';
+  static const int STUDENT_PORT = 8688; // Port cho student
+  static const int TEACHER_PORT = 8689; // Port của teacher
+  bool _isSearching = false;
+  List<String> _foundTeachers = [];
+  final ConnectionService _connectionService = ConnectionService();
+  bool _isInitializing = true; // Thêm biến theo dõi trạng thái khởi tạo
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
-    _loadSavedServerUrl();
+    _initialize();
   }
 
-  Future<void> _loadSavedServerUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedUrl = prefs.getString(SERVER_URL_KEY);
-    if (savedUrl != null) {
-      setState(() {
-        _codeController.text = savedUrl;
-      });
-      print('🔄 Tìm thấy địa chỉ server đã lưu: $savedUrl');
-      // Tự động kết nối
-      await _handleSubmit();
-    } else {
-      print('❌ Không tìm thấy địa chỉ server đã lưu');
-    }
-  }
-
-  Future<void> _saveServerUrl(String url) async {
-    String cleanUrl = url.trim();
-
-    // Loại bỏ dấu "/" ở cuối nếu có
-    while (cleanUrl.endsWith('/')) {
-      cleanUrl = cleanUrl.substring(0, cleanUrl.length - 1);
-    }
-
-    // Thêm https:// nếu chưa có protocol khi lưu
-    if (!cleanUrl.startsWith('http://') && !cleanUrl.startsWith('https://')) {
-      cleanUrl = 'https://$cleanUrl';
-      print('🔒 Tự động thêm https:// trước khi lưu URL');
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(SERVER_URL_KEY, cleanUrl);
-    print('💾 Đã lưu địa chỉ server (đã clean): $cleanUrl');
-  }
-
-  Future<void> _handleSubmit() async {
-    if (_codeController.text.isEmpty) {
-      print('❌ Địa chỉ máy chủ trống');
-      return;
-    }
-
+  Future<void> _searchTeachers() async {
     setState(() {
-      _isLoading = true;
+      _isSearching = true;
+      _foundTeachers.clear();
     });
 
     try {
-      String baseUrl = _codeController.text.trim();
-      while (baseUrl.endsWith('/')) {
-        baseUrl = baseUrl.substring(0, baseUrl.length - 1);
-      }
+      final commonSubnets = [
+        '192.168.1',
+        '192.168.0',
+        '10.0.0',
+        '10.0.1',
+        '172.16.0'
+      ];
 
-      // Loại bỏ protocol nếu có
-      if (baseUrl.startsWith('http://')) {
-        baseUrl = baseUrl.substring(7);
-      } else if (baseUrl.startsWith('https://')) {
-        baseUrl = baseUrl.substring(8);
-      }
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => ContentDialog(
+          title: Row(
+            children: [
+              const ProgressRing(strokeWidth: 3),
+              const SizedBox(width: 16),
+              const Text('Đang tìm kiếm...'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Vui lòng chờ...'),
+            ],
+          ),
+        ),
+      );
 
-      print('🌐 Thử kết nối tới server: $baseUrl');
+      print('🔍 Đang tìm kiếm teacher...');
 
-      // Thử HTTPS trước
-      try {
-        final httpsUrl = 'https://$baseUrl/api/wfaE0FbQWldGoDlGFyFgKWY0MiUizH2';
-        print('🔒 Thử kết nối HTTPS: $httpsUrl');
+      for (final subnet in commonSubnets) {
+        final futures = <Future>[];
+        for (int i = 1; i < 20; i++) {
+          final ip = '$subnet.$i';
+          futures.add(_checkTeacherClient(ip));
+        }
+        await Future.wait(futures);
 
-        final response = await http.post(
-          Uri.parse(httpsUrl),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          print('✅ Kết nối HTTPS thành công');
-          await _handleResponse(response, 'https://$baseUrl');
+        // Nếu tìm thấy teacher, kết nối ngay
+        if (_foundTeachers.isNotEmpty) {
+          Navigator.pop(context); // Đóng dialog tìm kiếm
+          final teacherIp = _foundTeachers.first;
+          _ipController.text = teacherIp;
+          await _handleConnect();
           return;
         }
-      } catch (e) {
-        print('⚠️ Kết nối HTTPS thất bại: $e');
       }
 
-      // Nếu HTTPS thất bại, thử HTTP
-      try {
-        final httpUrl = 'http://$baseUrl/api/wfaE0FbQWldGoDlGFyFgKWY0MiUizH2';
-        print('🔓 Thử kết nối HTTP: $httpUrl');
+      Navigator.pop(context); // Đóng dialog tìm kiếm
 
-        final response = await http.post(
-          Uri.parse(httpUrl),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-          },
-        );
-
-        if (response.statusCode == 200) {
-          print('✅ Kết nối HTTP thành công');
-          await _handleResponse(response, 'http://$baseUrl');
-          return;
-        }
-      } catch (e) {
-        print('⚠️ Kết nối HTTP thất bại: $e');
-      }
-
-      // Nếu cả hai đều thất bại
-      if (mounted) {
+      // Hiển thị kết quả
+      if (_foundTeachers.isEmpty) {
         showDialog(
           context: context,
           builder: (context) => ContentDialog(
-            title: const Text('Lỗi'),
-            content: const Text('Không thể kết nối đến máy chủ'),
+            title: const Text('Không tìm thấy'),
+            content: const Text(
+              'Không tìm thấy máy giáo viên trong mạng.\n'
+              'Vui lòng kiểm tra:\n'
+              '• Máy giáo viên đã bật chưa\n'
+              '• Máy giáo viên có trong cùng mạng LAN không\n'
+              '• Phần mềm giáo viên đã chạy chưa',
+              style: TextStyle(height: 1.5),
+            ),
             actions: [
               Button(
                 child: const Text('Đóng'),
                 onPressed: () => Navigator.pop(context),
               ),
+              FilledButton(
+                child: const Text('Thử lại'),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _searchTeachers();
+                },
+              ),
             ],
           ),
         );
       }
-    } catch (e, stackTrace) {
-      print('🔥 Lỗi: $e');
-      print('📚 Stack trace: $stackTrace');
+    } catch (e) {
+      Navigator.pop(context); // Đóng dialog tìm kiếm
+      showDialog(
+        context: context,
+        builder: (context) => ContentDialog(
+          title: const Text('Lỗi'),
+          content: Text('Không thể tìm kiếm: ${e.toString()}'),
+          actions: [
+            Button(
+              child: const Text('Đóng'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      setState(() {
+        _isSearching = false;
+      });
+    }
+  }
+
+  Future<void> _checkTeacherClient(String ip) async {
+    try {
+      print('🔍 Kiểm tra IP: $ip');
+      await _connectionService.connectToTeacher(ip);
+      setState(() => _foundTeachers.add(ip));
+      print('✅ Tìm thấy teacher tại: $ip');
+      // await _connectionService.disconnect();
+    } catch (e) {
+      // Bỏ qua lỗi kết nối - IP không phải teacher
+    }
+  }
+
+  Future<void> _handleConnect() async {
+    if (_ipController.text.isEmpty) {
+      print('❌ Địa chỉ IP trống');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final ip = _ipController.text.trim();
+      await _connectionService.connectToTeacher(ip);
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    } catch (e) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => ContentDialog(
-            title: const Text('Lỗi'),
-            content: const Text('Đã có lỗi xảy ra khi kết nối đến máy chủ'),
+            title: const Text('Lỗi kết nối'),
+            content: SelectableText(
+              e.toString().replaceAll('Exception: ', ''),
+              style: const TextStyle(height: 1.5),
+            ),
             actions: [
               Button(
                 child: const Text('Đóng'),
@@ -183,35 +195,53 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
       }
     } finally {
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     }
   }
 
-  Future<void> _handleResponse(http.Response response, String baseUrl) async {
-    final data = json.decode(response.body);
-    print('✅ Parsed data: $data');
+  Future<void> _initialize() async {
+    try {
+      setState(() => _isInitializing = true);
 
-    if (data['messages'] == 'copecute is beautiful') {
-      print('✨ Xác thực server thành công');
-      await _saveServerUrl(baseUrl);
-      print('💾 Đã lưu địa chỉ server: $baseUrl');
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          FluentPageRoute(builder: (context) => const LoginScreen()),
-        );
+      // 1. Khởi tạo TCP server trước
+      await _connectionService.startServer();
+      print('✅ Đã khởi tạo TCP server');
+
+      // 2. Load saved IP
+      final prefs = await SharedPreferences.getInstance();
+      final savedIP = prefs.getString(TEACHER_IP_KEY);
+
+      // 3. Delay cho splash screen
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 4. Nếu có saved IP thì thử kết nối
+      if (savedIP != null) {
+        _ipController.text = savedIP;
+        print('🔄 Tìm thấy IP teacher đã lưu: $savedIP');
+        try {
+          await _handleConnect();
+          return; // Kết nối thành công thì return luôn
+        } catch (e) {
+          print('❌ Không thể kết nối tới IP đã lưu: $e');
+          // Kết nối thất bại thì tiếp tục tìm kiếm
+        }
       }
-    } else {
-      print('❌ Message không hợp lệ: ${data['messages']}');
+
+      // 5. Tự động tìm kiếm teacher
+      if (mounted) {
+        setState(() =>
+            _isInitializing = false); // Tắt loading để hiện giao diện tìm kiếm
+        await _searchTeachers(); // Tự động tìm kiếm
+      }
+    } catch (e) {
+      print('❌ Lỗi khởi tạo: $e');
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => ContentDialog(
             title: const Text('Lỗi'),
-            content: const Text('Máy chủ không hợp lệ'),
+            content: Text('Không thể khởi tạo: $e'),
             actions: [
               Button(
                 child: const Text('Đóng'),
@@ -221,11 +251,47 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
           ),
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isInitializing) {
+      return NavigationView(
+        content: ScaffoldPage(
+          padding: EdgeInsets.zero,
+          content: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/logo.png',
+                  width: 200,
+                  height: 200,
+                ),
+                const SizedBox(height: 32),
+                const ProgressRing(),
+                const SizedBox(height: 16),
+                const Text(
+                  'Đang khởi tạo môi trường...',
+                  style: TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'EduDex Quiz',
+                  style: FluentTheme.of(context).typography.titleLarge,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final appTheme = context.watch<AppTheme>();
 
     return NavigationView(
@@ -234,7 +300,6 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
         title: const DragToMoveArea(
           child: Align(
             alignment: AlignmentDirectional.centerStart,
-            // child: Text('EduDex Quiz'),
           ),
         ),
         actions: Row(
@@ -276,28 +341,66 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
               SizedBox(
                 width: 300,
                 child: TextBox(
-                  controller: _codeController,
-                  placeholder: 'Nhập địa chỉ máy chủ',
+                  controller: _ipController,
+                  placeholder: 'Nhập địa chỉ IP của giáo viên',
                 ),
               ),
               const SizedBox(height: 20),
-              FilledButton(
-                onPressed: _isLoading ? null : _handleSubmit,
-                child: _isLoading
-                    ? const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: ProgressRing(),
-                          ),
-                          SizedBox(width: 8),
-                          Text('Đang kết nối...'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  FilledButton(
+                    onPressed: _isLoading ? null : _handleConnect,
+                    child: _isLoading
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: ProgressRing(),
+                              ),
+                              SizedBox(width: 8),
+                              Text('Đang kết nối...'),
+                            ],
+                          )
+                        : const Text('Kết nối'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: _isSearching ? null : _searchTeachers,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (_isSearching) ...[
+                          const ProgressRing(strokeWidth: 2),
+                          const SizedBox(width: 8),
                         ],
-                      )
-                    : const Text('Xác nhận'),
+                        const Icon(FluentIcons.search),
+                        const SizedBox(width: 8),
+                        Text(_isSearching
+                            ? 'Đang tìm kiếm...'
+                            : 'Tự động tìm kiếm'),
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              if (_foundTeachers.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                const Text('Đã tìm thấy:'),
+                const SizedBox(height: 8),
+                ...List.generate(
+                  _foundTeachers.length,
+                  (index) => Button(
+                    onPressed: () {
+                      _ipController.text = _foundTeachers[index];
+                      _handleConnect();
+                    },
+                    child: Text(_foundTeachers[index]),
+                  ),
+                ),
+              ],
               const SizedBox(height: 20),
               Text(
                 'EduDex Quiz',
@@ -312,8 +415,9 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
 
   @override
   void dispose() {
+    _connectionService.dispose();
     windowManager.removeListener(this);
-    _codeController.dispose();
+    _ipController.dispose();
     super.dispose();
   }
 
