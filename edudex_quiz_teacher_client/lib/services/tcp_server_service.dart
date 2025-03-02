@@ -8,6 +8,8 @@ import '../services/database_service.dart';
 import '../constants/message_types.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import '../services/log_service.dart';
+import '../models/room_settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class TcpServerService {
   ServerSocket? _server;
@@ -16,6 +18,7 @@ class TcpServerService {
   final LogService _logService;
   static const int DEFAULT_PORT = 8689;
   String? _localIp;
+  late RoomSettings _settings;
 
   // Callback để cập nhật số lượng client trong provider
   Function(int)? onClientCountChanged;
@@ -25,7 +28,56 @@ class TcpServerService {
     required LogService logService,
     this.onClientCountChanged,
   })  : _dbService = dbService,
-        _logService = logService;
+        _logService = logService {
+    _initSettings();
+  }
+
+  Future<void> _initSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Load settings từ SharedPreferences, nếu không có thì dùng giá trị mặc định
+      _settings = RoomSettings(
+        startIp: prefs.getString('room_start_ip') ?? '192.168.0.10',
+        endIp: prefs.getString('room_end_ip') ?? '192.168.0.200',
+        blockedIps: prefs.getStringList('room_blocked_ips') ?? [],
+        maxComputers: prefs.getInt('room_max_computers') ?? 50,
+      );
+
+      _logService.log('✅ Đã load cài đặt phòng thi: $_settings');
+    } catch (e) {
+      // Nếu có lỗi thì dùng giá trị mặc định
+      _settings = RoomSettings(
+        startIp: '192.168.0.10',
+        endIp: '192.168.0.200',
+        blockedIps: [],
+        maxComputers: 50,
+      );
+      _logService.log('❌ Lỗi load cài đặt, dùng mặc định: $e',
+          level: LogLevel.error);
+    }
+  }
+
+  Future<void> updateSettings(RoomSettings settings) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+
+      // Lưu settings mới vào SharedPreferences
+      await prefs.setString('room_start_ip', settings.startIp);
+      await prefs.setString('room_end_ip', settings.endIp);
+      await prefs.setStringList('room_blocked_ips', settings.blockedIps);
+      await prefs.setInt('room_max_computers', settings.maxComputers);
+
+      // Cập nhật settings hiện tại
+      _settings = settings;
+      _logService.log('✅ Đã lưu cài đặt phòng thi: $_settings');
+    } catch (e) {
+      _logService.log('❌ Lỗi lưu cài đặt: $e', level: LogLevel.error);
+      rethrow;
+    }
+  }
+
+  RoomSettings get settings => _settings;
 
   Future<String?> get localIp async {
     if (_localIp != null) return _localIp;
@@ -50,15 +102,32 @@ class TcpServerService {
       }
 
       _server!.listen((Socket client) {
-        _logService.log(
-            'Client connected: ${client.remoteAddress.address}:${client.remotePort}');
+        final clientIp = client.remoteAddress.address;
+        final clientId = '$clientIp:${client.remotePort}';
+
+        // Kiểm tra IP có được phép không
+        if (!_settings.isIpAllowed(clientIp)) {
+          _logService.log('❌ Từ chối kết nối từ IP không được phép: $clientIp');
+          client.close();
+          return;
+        }
+
+        // Kiểm tra số lượng máy
+        final connectedIps =
+            _connectedClients.keys.map((id) => id.split(':')[0]).toSet();
+        if (connectedIps.length >= _settings.maxComputers) {
+          _logService.log('❌ Từ chối kết nối: Đã đạt số lượng máy tối đa');
+          client.close();
+          return;
+        }
+
+        _logService.log('📥 Nhận kết nối từ: $clientId');
 
         String buffer = '';
         client.listen(
           (List<int> data) {
             try {
               buffer += utf8.decode(data);
-
               while (buffer.contains('\n')) {
                 final parts = buffer.split('\n');
                 final message = parts[0];
@@ -69,27 +138,23 @@ class TcpServerService {
                     final jsonData = json.decode(message);
                     _handleClientMessage(client, jsonData);
                   } catch (e) {
-                    _logService.log('Error parsing JSON: $e',
+                    _logService.log('❌ Lỗi parse JSON: $e',
                         level: LogLevel.error);
-                    _sendError(client, 'Invalid JSON format');
                   }
                 }
               }
             } catch (e) {
-              _logService.log('Error processing message: $e',
-                  level: LogLevel.error);
-              _sendError(client, 'Error processing message');
+              _logService.log('❌ Lỗi xử lý dữ liệu: $e', level: LogLevel.error);
             }
           },
           onError: (error) {
-            _logService.log('Error from client: $error', level: LogLevel.error);
-            _removeClient(client);
+            _logService.log('❌ Lỗi kết nối: $error', level: LogLevel.error);
           },
           onDone: () {
             _logService
-                .log('Client disconnected: ${client.remoteAddress.address}');
-            _removeClient(client);
+                .log('Client ${client.remoteAddress.address} ngắt kết nối');
           },
+          cancelOnError: false,
         );
       });
     } catch (e) {
@@ -101,24 +166,28 @@ class TcpServerService {
   void _handleClientMessage(Socket client, Map<String, dynamic> data) {
     try {
       final messageType = data['type'];
+      final clientId = '${client.remoteAddress.address}:${client.remotePort}';
       _logService.log('📥 Nhận message type: $messageType, Data: $data');
 
       switch (messageType) {
         case MessageTypes.CHECK_TEACHER:
-          final clientId =
-              '${client.remoteAddress.address}:${client.remotePort}';
           _logService.log('🔄 Xử lý CHECK_TEACHER từ client: $clientId');
 
+          // Thêm vào danh sách sau khi xác thực thành công
+          _connectedClients[clientId] = client;
+          onClientCountChanged?.call(_connectedClients.length);
+
+          // Gửi response và giữ kết nối
           final response = {
             'type': 'TEACHER_OK',
             'timestamp': DateTime.now().toIso8601String()
           };
-          _logService.log('📤 Gửi response: $response');
           _sendMessage(client, response);
-
-          _connectedClients[clientId] = client;
-          onClientCountChanged?.call(_connectedClients.length);
           _logService.log('✅ Đã xác thực student: $clientId');
+          break;
+
+        case 'HEARTBEAT':
+          // Không cần làm gì, chỉ để duy trì kết nối
           break;
 
         case MessageTypes.LOGIN:
@@ -271,16 +340,13 @@ class TcpServerService {
     });
   }
 
-  void _removeClient(Socket client) {
-    String? clientId;
-    _connectedClients.forEach((id, socket) {
-      if (socket == client) clientId = id;
-    });
-    if (clientId != null) {
+  void disconnectClient(String clientId) {
+    final client = _connectedClients[clientId];
+    if (client != null) {
+      client.close();
       _connectedClients.remove(clientId);
       onClientCountChanged?.call(_connectedClients.length);
-      _logService.log('Removed client: $clientId');
-      client.close();
+      _logService.log('❌ Đã ngắt kết nối client: $clientId');
     }
   }
 
@@ -293,4 +359,8 @@ class TcpServerService {
     onClientCountChanged?.call(0);
     _logService.log('TCP Server stopped');
   }
+
+  Map<String, Socket> get connectedClients => _connectedClients;
+
+  bool get isRunning => _server != null;
 }

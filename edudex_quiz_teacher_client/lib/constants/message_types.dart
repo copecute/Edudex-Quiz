@@ -10,4 +10,5 @@ class MessageTypes {
   // Thêm message types mới
   static const String CHECK_TEACHER = 'CHECK_TEACHER';
   static const String TEACHER_OK = 'TEACHER_OK';
+  static const String HEARTBEAT = 'HEARTBEAT';
 }

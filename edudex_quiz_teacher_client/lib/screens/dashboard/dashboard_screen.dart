@@ -13,6 +13,10 @@ import '../login.dart';
 import 'quiz_management.dart';
 import 'student_management.dart';
 import 'statistics.dart';
+import 'exam_room_screen.dart';
+import '../../services/tcp_server_service.dart';
+import '../../services/log_service.dart';
+import '../../services/database_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -33,6 +37,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
     StatisticsPage(),
     Settings(),
   ];
+
+  final TcpServerService _tcpService;
+  final LogService _logService;
+
+  _DashboardScreenState()
+      : _tcpService = TcpServerService(
+          dbService: DatabaseService(),
+          logService: LogService(),
+        ),
+        _logService = LogService();
 
   @override
   void initState() {
@@ -168,6 +182,14 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             icon: const Icon(FluentIcons.b_i_dashboard),
             title: const Text('Thống kê'),
             body: _pages[3],
+          ),
+          PaneItem(
+            icon: const Icon(FluentIcons.room),
+            title: const Text('Phòng thi'),
+            body: ExamRoomScreen(
+              tcpService: _tcpService,
+              logService: _logService,
+            ),
           ),
         ],
         footerItems: [

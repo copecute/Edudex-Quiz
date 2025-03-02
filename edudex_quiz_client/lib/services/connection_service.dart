@@ -13,6 +13,7 @@ class ConnectionService {
   ServerSocket? _server;
   Socket? _teacherSocket;
   String? _teacherIP;
+  final Map<String, Socket> _connectedClients = {};
 
   late StreamController<Map<String, dynamic>> _messageController =
       StreamController<Map<String, dynamic>>.broadcast();
@@ -21,29 +22,30 @@ class ConnectionService {
   bool get isConnected =>
       _teacherSocket != null && _teacherSocket!.address.address == _teacherIP;
 
-  Future<void> startServer() async {
-    if (_server != null) return;
-
+  Future<void> startServer({int port = STUDENT_PORT}) async {
     try {
-      _server = await ServerSocket.bind('0.0.0.0', STUDENT_PORT);
-      print('✅ Student server đang lắng nghe trên port $STUDENT_PORT');
+      _server =
+          await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
+      print('TCP Server listening on port $port');
 
-      _server!.listen(
-        (socket) {
-          print(
-              '📥 Nhận kết nối từ: ${socket.remoteAddress.address}:${socket.remotePort}');
+      final interfaces = await NetworkInterface.list();
+      final ip = interfaces
+          .expand((interface) => interface.addresses)
+          .firstWhere((addr) => addr.type == InternetAddressType.IPv4)
+          .address;
+      print('Student IP: $ip');
 
-          if (socket.remoteAddress.address != _teacherIP) {
-            print('❌ Từ chối kết nối không phải từ teacher');
-            socket.close();
-            return;
-          }
+      _server!.listen((Socket client) {
+        final clientIp = client.remoteAddress.address;
+        final clientId = '$clientIp:${client.remotePort}';
 
-          String buffer = '';
-          socket.listen(
-            (data) {
+        print('📥 Nhận kết nối từ: $clientId');
+
+        String buffer = '';
+        client.listen(
+          (List<int> data) {
+            try {
               buffer += utf8.decode(data);
-
               while (buffer.contains('\n')) {
                 final parts = buffer.split('\n');
                 final message = parts[0];
@@ -52,141 +54,80 @@ class ConnectionService {
                 if (message.isNotEmpty) {
                   try {
                     final jsonData = json.decode(message);
-                    print('📥 Nhận tin nhắn từ teacher: $jsonData');
-                    _messageController.add(jsonData);
+                    print('📥 Nhận tin nhắn: $jsonData');
+
+                    switch (jsonData['type']) {
+                      case 'HEARTBEAT':
+                        print('💓 Nhận heartbeat từ teacher');
+                        client.write(json.encode({
+                              'type': 'HEARTBEAT_RESPONSE',
+                              'timestamp': DateTime.now().toIso8601String(),
+                            }) +
+                            '\n');
+                        print('💓 Đã gửi phản hồi heartbeat');
+                        break;
+
+                      default:
+                        _messageController.add(jsonData);
+                        break;
+                    }
                   } catch (e) {
                     print('❌ Lỗi parse JSON: $e');
                   }
                 }
               }
-            },
-            onError: (error) => print('❌ Lỗi khi nhận tin nhắn: $error'),
-            onDone: () {
-              print('❌ Teacher đã ngắt kết nối');
-              socket.close();
-            },
-          );
-        },
-        onError: (error) => print('❌ Lỗi server: $error'),
-      );
+            } catch (e) {
+              print('❌ Lỗi xử lý dữ liệu: $e');
+            }
+          },
+          onError: (error) {
+            print('❌ Lỗi kết nối: $error');
+          },
+          onDone: () {
+            print('Client ${client.remoteAddress.address} ngắt kết nối');
+          },
+          cancelOnError: false,
+        );
+      });
     } catch (e) {
-      print('❌ Không thể khởi tạo server: $e');
+      print('Error starting server: $e');
       rethrow;
     }
   }
 
   Future<void> connectToTeacher(String ip) async {
-    String errorMessage = '';
     try {
       _teacherIP = ip;
+      _teacherSocket = await Socket.connect(ip, TEACHER_PORT,
+          timeout: const Duration(seconds: 5));
 
-      // Kết nối tới teacher
-      try {
-        _teacherSocket = await Socket.connect(ip, TEACHER_PORT,
-            timeout: const Duration(seconds: 5));
-      } on SocketException catch (e) {
-        // Xử lý chi tiết từng loại lỗi socket
-        if (e.osError?.errorCode == 10061) {
-          // Connection refused
-          errorMessage = '''
-Không thể kết nối tới teacher!!
+      // Thiết lập listener trước
+      _setupSocketListener();
 
-Nguyên nhân: Port 8689 bị từ chối kết nối
-Hướng dẫn:
-1. Kiểm tra teacher đã khởi động chưa
-2. Kiểm tra tường lửa có chặn port 8689
-3. Đảm bảo IP teacher ($ip) chính xác
+      // Gửi CHECK_TEACHER
+      _sendJson({
+        'type': 'CHECK_TEACHER',
+        'timestamp': DateTime.now().toIso8601String()
+      });
 
-Chi tiết: ${e.message}''';
-        } else if (e.osError?.errorCode == 10060) {
-          // Connection timed out
-          errorMessage = '''
-Không thể kết nối tới teacher!!!
+      // Đợi TEACHER_OK và giữ kết nối
+      await _messageController.stream
+          .firstWhere((msg) => msg['type'] == 'TEACHER_OK')
+          .timeout(const Duration(seconds: 5));
 
-Nguyên nhân: Kết nối bị timeout
-Hướng dẫn:
-1. Kiểm tra IP teacher ($ip) có đúng không
-2. Đảm bảo teacher và student trong cùng mạng LAN
-3. Thử tắt tường lửa và antivirus
+      print('✅ Đã kết nối thành công với teacher');
 
-Chi tiết: ${e.message}''';
+      // Gửi heartbeat định kỳ
+      Timer.periodic(const Duration(seconds: 30), (timer) {
+        if (isConnected) {
+          _sendJson({
+            'type': 'HEARTBEAT',
+            'timestamp': DateTime.now().toIso8601String()
+          });
         } else {
-          errorMessage = '''
-Không thể kết nối tới teacher!!!!
-
-Nguyên nhân: Lỗi kết nối mạng
-Hướng dẫn:
-1. Kiểm tra kết nối mạng
-2. Kiểm tra IP teacher ($ip)
-3. Đảm bảo teacher đang chạy
-
-Mã lỗi: ${e.osError?.errorCode}
-Chi tiết: ${e.message}''';
+          timer.cancel();
         }
-        throw Exception(errorMessage);
-      }
-
-      // Thiết lập và gửi message
-      try {
-        await _messageController.close();
-        _messageController = StreamController<Map<String, dynamic>>.broadcast();
-        _setupSocketListener();
-        _sendJson({
-          'type': 'CHECK_TEACHER',
-          'timestamp': DateTime.now().toIso8601String()
-        });
-      } catch (e) {
-        errorMessage = '''
-Lỗi khi thiết lập kết nối!
-
-Hướng dẫn:
-1. Thử khởi động lại ứng dụng
-2. Kiểm tra quyền truy cập mạng
-
-Chi tiết lỗi: $e''';
-        throw Exception(errorMessage);
-      }
-
-      // Đợi response
-      try {
-        final response = await _messageController.stream.first
-            .timeout(const Duration(seconds: 5));
-
-        print('📥 Nhận được response từ teacher: $response');
-
-        if (response['type'] != 'TEACHER_OK') {
-          throw Exception('''
-Phản hồi không hợp lệ từ teacher!
-
-Hướng dẫn:
-1. Kiểm tra phiên bản phần mềm teacher và student
-2. Thử khởi động lại cả teacher và student
-
-Response type nhận được: ${response['type']}
-Response data: $response''');
-        }
-      } catch (e) {
-        if (e is TimeoutException) {
-          errorMessage = '''
-Không nhận được phản hồi từ teacher!
-
-Hướng dẫn:
-1. Kiểm tra teacher có đang chạy không
-2. Kiểm tra IP teacher đã nhập đúng chưa
-3. Kiểm tra kết nối mạng giữa teacher và student
-4. Đảm bảo port 8689 không bị chặn''';
-        } else {
-          errorMessage = '''
-Lỗi khi chờ phản hồi từ teacher!
-
-Hướng dẫn:
-1. Thử kết nối lại
-2. Kiểm tra kết nối mạng
-
-Chi tiết lỗi: $e''';
-        }
-        throw Exception(errorMessage);
-      }
+      });
     } catch (e) {
       await disconnect();
       rethrow;
@@ -216,12 +157,11 @@ Chi tiết lỗi: $e''';
       },
       onError: (error) {
         print('❌ Lỗi kết nối: $error');
-        disconnect();
       },
       onDone: () {
         print('❌ Mất kết nối với teacher');
-        disconnect();
       },
+      cancelOnError: false,
     );
   }
 

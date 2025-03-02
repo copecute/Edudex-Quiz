@@ -1,7 +1,9 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../services/tcp_server_service.dart';
 import '../services/database_service.dart';
 import '../services/log_service.dart';
+import '../models/room_settings.dart';
 
 class TCPServerProvider extends ChangeNotifier {
   final TcpServerService _tcpService;
@@ -30,7 +32,8 @@ class TCPServerProvider extends ChangeNotifier {
 
   bool get isRunning => _isRunning;
   String? get error => _error;
-  int get connectedClients => _connectedClients;
+  Map<String, Socket> get connectedClients => _tcpService.connectedClients;
+  int get connectedClientCount => connectedClients.length;
 
   Future<void> startServer({int port = 8689}) async {
     try {
@@ -60,5 +63,23 @@ class TCPServerProvider extends ChangeNotifier {
 
   Future<String?> getTeacherIp() async {
     return await _tcpService.localIp;
+  }
+
+  void blockIp(String ip) {
+    final settings = RoomSettings(
+      startIp: '192.168.0.10',
+      endIp: '192.168.0.200',
+      blockedIps: [..._tcpService.settings.blockedIps, ip],
+      maxComputers: _tcpService.settings.maxComputers,
+    );
+    _tcpService.updateSettings(settings);
+    notifyListeners();
+  }
+
+  RoomSettings get settings => _tcpService.settings;
+
+  void updateSettings(RoomSettings newSettings) {
+    _tcpService.updateSettings(newSettings);
+    notifyListeners();
   }
 }
