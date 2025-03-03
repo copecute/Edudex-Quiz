@@ -35,7 +35,7 @@ class QuestionsTemplateExport implements FromArray, WithHeadings, ShouldAutoSize
             ],
             [
                 'Câu hỏi mẫu 1?',
-                'https://example.com/image1.jpg',
+                'https://i.imgur.com/pOLBCYC.png',
                 'LTCB',
                 'easy',
                 'Biến, Kiểu dữ liệu',

@@ -3,8 +3,8 @@
 @section('title', 'Chỉnh sửa câu hỏi')
 
 @section('styles')
-<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-<link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+<link href="{{ asset('bootstrap-5.3.3/select2/css/select2.min.css') }}" rel="stylesheet" />
+<link href="{{ asset('bootstrap-5.3.3/select2/css/select2-bootstrap-5-theme.min.css') }}" rel="stylesheet" />
 @endsection
 
 @section('content')
@@ -47,7 +47,7 @@
                                     <label for="link_media" class="form-label">Link media</label>
                                     <input type="url" class="form-control @error('link_media') is-invalid @enderror" 
                                            id="link_media" name="link_media" value="{{ old('link_media', $question->link_media) }}"
-                                           placeholder="https://example.com/image.jpg">
+                                           placeholder="https://minhgiang.pro/image.jpg">
                                     @error('link_media')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -159,7 +159,7 @@
 </div>
 
 @push('scripts')
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="{{ asset('bootstrap-5.3.3/select2/js/select2.min.js') }}"></script>
 <script>
 $(document).ready(function() {
     // Khởi tạo Select2 cho tags

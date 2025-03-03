@@ -167,11 +167,6 @@ footer {
     object-fit: cover;
 }
 
-/* Quick action cards hover */
-.bg-light:hover {
-    background-color: var(--primary-light) !important;
-}
-
 /* Card icon background */
 .icon-bg-primary {
     background-color: var(--primary-color);

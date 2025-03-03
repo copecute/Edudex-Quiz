@@ -114,6 +114,11 @@
                                     <i class="fas fa-question-circle me-2"></i> Ngân hàng câu hỏi
                                 </a>
                             </li>
+                            <li>
+                                <a class="dropdown-item" href="{{ route('exams.index') }}">
+                                    <i class="fas fa-file-alt me-2"></i> Danh sách đề thi
+                                </a>
+                            </li>
                         </ul>
                     </li>
                     @endif

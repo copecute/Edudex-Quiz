@@ -266,6 +266,9 @@
                                         <a href="{{ route('questions.index') }}" class="list-group-item list-group-item-action">
                                             <i class="fas fa-question-circle me-2"></i>Ngân hàng câu hỏi
                                         </a>
+                                        <a href="{{ route('exams.index') }}" class="list-group-item list-group-item-action">
+                                            <i class="fas fa-file-alt me-2"></i>Danh sách đề thi
+                                        </a>
                                     </div>
                                 </div>
                             </div>

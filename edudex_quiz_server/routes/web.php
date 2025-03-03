@@ -15,6 +15,7 @@ use App\Http\Controllers\FacultyController;
 use App\Http\Controllers\MajorController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\QuestionController;
+use App\Http\Controllers\ExamController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -134,6 +135,14 @@ Route::middleware('auth')->group(function () {
     Route::post('questions-import', [QuestionController::class, 'import'])->name('questions.import');
     Route::get('questions-template', [QuestionController::class, 'downloadTemplate'])->name('questions.template');
     Route::resource('questions', QuestionController::class);
+
+    // Exam Routes
+    Route::resource('exams', ExamController::class);
+    Route::get('exams/tags-by-subject', [ExamController::class, 'getTagsBySubject'])->name('exams.tags');
+    Route::get('exams/tools/import-export', [ExamController::class, 'importExportTools'])->name('exams.tools');
+    Route::get('exams-export', [ExamController::class, 'export'])->name('exams.export');
+    Route::post('exams-import', [ExamController::class, 'import'])->name('exams.import');
+    Route::get('exams-template', [ExamController::class, 'downloadTemplate'])->name('exams.template');
 });
 
 // Add this route for handling avatar images
