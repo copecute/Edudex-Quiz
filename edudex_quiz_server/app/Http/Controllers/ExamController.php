@@ -189,16 +189,6 @@ class ExamController extends Controller
         }
     }
 
-    public function getTagsBySubject(Request $request)
-    {
-        $tags = Tag::where('subject_code', $request->subject_code)
-            ->get()
-            ->map(function($tag) {
-                return ['id' => $tag->id, 'text' => $tag->name];
-            });
-        return response()->json($tags);
-    }
-
     public function export()
     {
         return Excel::download(new ExamsExport, 'danh_sach_de_thi.xlsx');
@@ -226,5 +216,15 @@ class ExamController extends Controller
     public function importExportTools()
     {
         return view('exams.tools');
+    }
+
+    public function getBySubject(Subject $subject)
+    {
+        $exams = Exam::where('subject_code', $subject->code)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+        
+        return response()->json($exams);
     }
 } 

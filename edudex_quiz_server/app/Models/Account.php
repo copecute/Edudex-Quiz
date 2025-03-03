@@ -37,4 +37,9 @@ class Account extends Authenticatable
     {
         return $this->hasOne(AccountInfo::class);
     }
+
+    public function examPeriodProctors()
+    {
+        return $this->hasMany(ExamPeriodProctor::class);
+    }
 } 
