@@ -306,9 +306,11 @@
                                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ App\Models\ExamShift::count() }}</div>
                                         </div>
                                         <div class="col-auto">
-                                            <a href="{{ route('exam-shifts.index') }}" class="text-decoration-none">
-                                                <i class="fas fa-clock fa-2x text-gray-300"></i>
-                                            </a>
+                                            @if(isset($examPeriod))
+                                                <a href="{{ route('exam-shifts.index', ['examPeriod' => $examPeriod->id]) }}" class="text-decoration-none">
+                                                    <i class="fas fa-clock fa-2x text-gray-300"></i>
+                                                </a>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
