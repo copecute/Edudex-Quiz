@@ -1,0 +1,61 @@
+===================================================================================================
+Đăng nhập:
+POST /api/login
+username:admin
+password:123
+___________________________________________________________________________________________________
+{
+    "status": "success",
+    "message": "Đăng nhập thành công",
+    "data": {
+        "token": "2|6VvI9BFDGoYvvSkQE0zsxC8Eyohyo1pbbGlMFG5p0d7b22ff",
+        "user": {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@minhgiang.pro",
+            "role": 2,
+            "info": {
+                "full_name": "Đàm Minh Giang",
+                "date_of_birth": "2001-10-29T00:00:00.000000Z",
+                "gender": true,
+                "phone": "0333332444",
+                "address": "Hà Nội",
+                "avatar": null
+            }
+        }
+    }
+}
+
+===================================================================================================
+Đăng xuất:
+POST /api/logout
+Authorization: copecute {token}
+___________________________________________________________________________________________________
+{
+    "status": "success",
+    "message": "Đăng xuất thành công"
+}
+===================================================================================================
+Thông tin cá nhân:
+POST /api/profile
+Authorization: copecute {token}
+___________________________________________________________________________________________________
+{
+    "status": "success",
+    "data": {
+        "user": {
+            "id": 1,
+            "username": "admin",
+            "email": "admin@minhgiang.pro",
+            "role": 2,
+            "info": {
+                "full_name": "Đàm Minh Giang",
+                "date_of_birth": "2001-10-29T00:00:00.000000Z",
+                "gender": true,
+                "phone": "0333332444",
+                "address": "Hà Nội",
+                "avatar": null
+            }
+        }
+    }
+}
