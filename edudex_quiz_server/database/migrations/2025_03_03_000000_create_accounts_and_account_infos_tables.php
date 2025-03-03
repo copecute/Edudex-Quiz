@@ -39,8 +39,10 @@ return new class extends Migration {
         $accountId = DB::table('accounts')->insertGetId([
             'username' => 'admin',
             'email' => 'admin@minhgiang.pro',
-            'password' => bcrypt('123'),
+            'password' => bcrypt('123456'),
             'role' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
 
         // Tự động thêm thông tin cho tài khoản vừa tạo
@@ -51,6 +53,8 @@ return new class extends Migration {
             'gender' => true,
             'phoneNumber' => '0333332444',
             'address' => 'Hà Nội',
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
     }
 
