@@ -1,0 +1,449 @@
+/* Theme variables */
+:root {
+    /* Light theme */
+    --primary-color: #2957A4;
+    --primary-hover: #234785;
+    --primary-light: #eef2f8;
+    --bg-color: #ffffff;
+    --text-color: #212529;
+    --border-color: #dee2e6;
+    --card-bg: #ffffff;
+    --sidebar-bg: #ffffff;
+    --header-bg: var(--primary-color);
+}
+
+[data-bs-theme="dark"] {
+    /* Dark theme */
+    --primary-color: #3b6fc9;
+    --primary-hover: #2957A4;
+    --primary-light: #1a2942;
+    --bg-color: #1a1d20;
+    --text-color: #e9ecef;
+    --border-color: #2d3238;
+    --card-bg: #242729;
+    --sidebar-bg: #242729;
+    --header-bg: #242729;
+}
+
+/* Custom styles */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+a {
+    text-decoration: none;
+}
+
+main {
+    flex: 1;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    transition: none;
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    font-weight: bold;
+}
+
+footer {
+    margin-top: auto;
+}
+
+/* Toast styles */
+.toast-container {
+    z-index: 1056;
+}
+
+.toast {
+    min-width: 300px;
+}
+
+.toast .toast-body {
+    padding: 0.75rem 0.5rem;
+}
+
+.toast i {
+    margin-right: 0.5rem;
+}
+
+/* Navbar styles */
+.navbar {
+    background-color: var(--header-bg) !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    padding: 0;
+}
+
+.navbar-brand {
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 1rem;
+}
+
+.nav-link {
+    font-weight: 500;
+}
+
+.nav-link.active {
+    position: relative;
+}
+
+.nav-link.active:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 3px;
+    background-color: #fff;
+    border-radius: 3px;
+}
+
+/* Card styles */
+.card:hover {
+    transform: none;
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+/* Quick action cards */
+.bg-primary {
+    background-color: var(--primary-color) !important;
+}
+
+.text-primary {
+    color: var(--primary-color) !important;
+}
+
+.btn-primary {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.btn-outline-primary {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-outline-primary:hover {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+/* Footer styles */
+.footer {
+    box-shadow: 0 -2px 4px rgba(0,0,0,.1);
+}
+
+.social-links a {
+    transition: color .2s;
+}
+
+.social-links a:hover {
+    color: var(--primary-color) !important;
+}
+
+/* Avatar styles */
+.rounded-circle {
+    object-fit: cover;
+}
+
+/* Quick action cards hover */
+.bg-light:hover {
+    background-color: var(--primary-light) !important;
+}
+
+/* Card icon background */
+.icon-bg-primary {
+    background-color: var(--primary-color);
+    transition: none;
+}
+
+.card:hover .icon-bg-primary {
+    transform: none;
+}
+
+/* Welcome card styles */
+.welcome-card {
+    background: var(--primary-color) !important;
+    border: none;
+}
+
+/* Action card styles */
+.action-card {
+    transition: none;
+    cursor: default;
+}
+
+.action-card:hover {
+    transform: none;
+    background-color: #f8f9fa !important;
+}
+
+.action-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background-color: rgba(41, 87, 164, 0.1);
+}
+
+/* Navbar improvements */
+.navbar .nav-link {
+    padding: 0.8rem 1rem;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.navbar .nav-link:hover {
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.navbar .nav-link.active:after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 3px;
+    background-color: #fff;
+    border-radius: 3px;
+}
+
+/* Stats card improvements */
+.icon-bg-primary {
+    transition: none;
+}
+
+.card:hover .icon-bg-primary {
+    transform: none;
+}
+
+/* Dropdown improvements */
+.dropdown-item {
+    padding: 0.7rem 1.2rem;
+    color: var(--text-color);
+}
+
+.dropdown-item:active {
+    background-color: var(--primary-color);
+}
+
+/* Mobile navbar adjustments */
+@media (max-width: 991.98px) {
+    .navbar-brand {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        margin: 0;
+        padding: 0.8rem;
+    }
+    
+    .navbar-toggler {
+        padding: 0.8rem;
+        border: none;
+    }
+    
+    .navbar-toggler:focus {
+        box-shadow: none;
+    }
+}
+
+/* Sidebar styles */
+.offcanvas {
+    width: 280px;
+    background-color: var(--sidebar-bg);
+    color: var(--text-color);
+}
+
+.offcanvas-header {
+    min-height: 64px;
+}
+
+.list-group-item {
+    border: none;
+    padding: 0.8rem 1rem;
+    background-color: transparent;
+    color: var(--text-color);
+}
+
+.list-group-item.active {
+    background-color: var(--primary-light);
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    color: var(--primary-color);
+}
+
+.sidebar-item .list-group-item {
+    position: relative;
+}
+
+.sidebar-item .fa-chevron-down {
+    transition: transform 0.2s;
+}
+
+.sidebar-item .collapse.show + .fa-chevron-down,
+.sidebar-item .collapsing + .fa-chevron-down {
+    transform: rotate(180deg);
+}
+
+/* Error page styles */
+.error-page {
+    padding: 2rem;
+}
+
+.error-icon {
+    animation: float 3s ease-in-out infinite;
+}
+
+.error-page .display-1 {
+    font-size: 6rem;
+    text-shadow: 2px 2px 0 var(--primary-light);
+}
+
+/* Float animation */
+@keyframes float {
+    0% {
+        transform: translateY(0px);
+    }
+    50% {
+        transform: translateY(-10px);
+    }
+    100% {
+        transform: translateY(0px);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .error-page .display-1 {
+        font-size: 4rem;
+    }
+    
+    .error-icon svg {
+        width: 80px;
+        height: 80px;
+    }
+}
+
+/* Desktop navbar improvements */
+@media (min-width: 992px) {
+    .navbar-nav .nav-item {
+        display: flex;
+        align-items: stretch;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 1.5rem 1.2rem !important;
+        font-weight: 500;
+        position: relative;
+        transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+        background-color: rgba(255, 255, 255, 0.1);
+        color: #fff !important;
+    }
+
+    .nav-link.active {
+        background-color: rgba(255, 255, 255, 0.15);
+    }
+
+    .nav-link.active:after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background-color: #fff;
+        border-radius: 3px 3px 0 0;
+        transform: none;
+    }
+
+    /* Dropdown improvements */
+    .navbar .dropdown-menu {
+        margin-top: 0;
+        border: none;
+        border-radius: 0 0 0.5rem 0.5rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .navbar .dropdown-item {
+        padding: 0.8rem 1.5rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .navbar .dropdown-item:hover {
+        background-color: var(--primary-light);
+        color: var(--primary-color);
+    }
+
+    /* User dropdown */
+    .navbar .user-dropdown .nav-link {
+        padding: 0.8rem 1.2rem !important;
+    }
+
+    .navbar .user-dropdown .nav-link:hover {
+        background-color: transparent;
+    }
+}
+
+/* Apply theme colors */
+.navbar {
+    background-color: var(--header-bg) !important;
+}
+
+.card {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.offcanvas {
+    background-color: var(--sidebar-bg);
+    color: var(--text-color);
+}
+
+.list-group-item {
+    background-color: transparent;
+    color: var(--text-color);
+}
+
+.dropdown-menu {
+    background-color: var(--card-bg);
+    border-color: var(--border-color);
+}
+
+.dropdown-divider {
+    border-color: var(--border-color);
+} 

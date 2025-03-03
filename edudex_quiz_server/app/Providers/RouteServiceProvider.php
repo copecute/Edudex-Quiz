@@ -4,11 +4,10 @@ namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Route;
-use App\Http\Middleware\ApiStudentAuthentication;
 
 class RouteServiceProvider extends ServiceProvider
 {
-    public const HOME = '/dashboard';
+    public const HOME = '/dashboard'; // hoặc đường dẫn khác tùy ý
 
     /**
      * Define your route model bindings, pattern filters, etc.
@@ -28,9 +27,6 @@ class RouteServiceProvider extends ServiceProvider
             Route::middleware('web')
                 ->namespace($this->namespace)
                 ->group(base_path('routes/web.php'));
-
-            // Đăng ký middleware
-            Route::aliasMiddleware('auth.student', ApiStudentAuthentication::class);
         });
     }
 

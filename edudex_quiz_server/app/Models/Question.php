@@ -2,31 +2,22 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Question extends Model
 {
-    use HasFactory, SoftDeletes;
-
     protected $fillable = [
         'content',
-        'type',
-        'level',
-        'score',
-        'explanation',
-        'image_url'
+        'link_media',
+        'subject_code',
+        'difficulty'
     ];
+
+    protected $with = ['answers', 'tags']; // Eager load mặc định
 
     public function subject()
     {
-        return $this->belongsTo(Subject::class);
-    }
-
-    public function answers()
-    {
-        return $this->hasMany(Answer::class);
+        return $this->belongsTo(Subject::class, 'subject_code', 'code');
     }
 
     public function tags()
@@ -34,18 +25,32 @@ class Question extends Model
         return $this->belongsToMany(Tag::class);
     }
 
+    public function answers()
+    {
+        return $this->hasMany(Answer::class);
+    }
+
+    // Helper method để lấy đáp án đúng
     public function getCorrectAnswer()
     {
         return $this->answers()->where('is_correct', true)->first();
     }
 
-    public function getLevelText()
+    // Scope để lọc theo độ khó
+    public function scopeByDifficulty($query, $difficulty)
     {
-        return match($this->level) {
-            1 => 'Dễ',
-            2 => 'Trung bình',
-            3 => 'Khó',
-            default => 'Không xác định'
-        };
+        if ($difficulty) {
+            return $query->where('difficulty', $difficulty);
+        }
+        return $query;
+    }
+
+    // Scope để tìm kiếm
+    public function scopeSearch($query, $search)
+    {
+        if ($search) {
+            return $query->where('content', 'like', "%{$search}%");
+        }
+        return $query;
     }
 } 

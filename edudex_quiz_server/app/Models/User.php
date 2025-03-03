@@ -1,53 +1,30 @@
 <?php
-//                       _oo0oo_
-//                      o8888888o
-//                      88" . "88
-//                      (| -_- |)
-//                      0\  =  /0
-//                    ___/`---'\___
-//                  .' \\|     |// '.
-//                 / \\|||  :  |||// \
-//                / _||||| -:- |||||- \
-//               |   | \\\  -  /// |   |
-//               | \_|  ''\---/''  |_/ |
-//               \  .-\__  '-'  ___/-. /
-//             ___'. .'  /--.--\  `. .'___
-//          ."" '<  `.___\_<|>_/___.' >' "".
-//         | | :  `- \`.;`\ _ /`;.`/ - ` : | |
-//         \  \ `_.   \_ __\ /__ _/   .-` /  /
-//     =====`-.____`.___ \_____/___.-`___.-'=====
-//                       `=---='
-//
-//     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//            amen đà phật, không bao giờ BUG
-//     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasFactory, Notifiable;
 
     /**
-     * các thuộc tính có thể gán hàng loạt
+     * The attributes that are mass assignable.
      *
      * @var list<string>
      */
     protected $fillable = [
-        'username',
+        'name',
         'email',
         'password',
-        'role',
     ];
 
     /**
-     * các thuộc tính nên ẩn khi truy vấn
+     * The attributes that should be hidden for serialization.
      *
      * @var list<string>
      */
@@ -57,7 +34,7 @@ class User extends Authenticatable
     ];
 
     /**
-     * các thuộc tính nên được ép kiểu
+     * Get the attributes that should be cast.
      *
      * @return array<string, string>
      */
@@ -67,23 +44,5 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
-    }
-
-    /**
-     * lấy tên trường dùng để đăng nhập
-     *
-     * @return string
-     */
-    public function username()
-    {
-        return 'username';
-    }
-
-    /**
-     * quan hệ với bảng thông tin người dùng
-     */
-    public function userInfo()
-    {
-        return $this->hasOne(UserInfo::class);
     }
 }

@@ -3,9 +3,9 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Route;
-use App\Http\Middleware\ApiStudentAuthentication;
+use App\Http\Middleware\Role\AdminRole;
+use App\Http\Middleware\Role\TeacherRole;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -22,10 +22,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Thêm dòng này để sử dụng Bootstrap 5 pagination
-        Paginator::useBootstrapFive();
-
-        // Đăng ký middleware
-        Route::aliasMiddleware('auth.student', ApiStudentAuthentication::class);
+        Route::aliasMiddleware('admin', AdminRole::class);
+        Route::aliasMiddleware('teacher', TeacherRole::class);
     }
 }

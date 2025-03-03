@@ -4,18 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Models\Faculty;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\FacultiesExport;
+use App\Imports\FacultiesImport;
+use App\Exports\FacultiesTemplateExport;
 
 class FacultyController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Faculty::with('majors');
+        $query = Faculty::query();
 
-        // Tìm kiếm theo tên hoặc mã
-        if ($search = $request->input('search')) {
+        // Tìm kiếm
+        if ($request->search) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
@@ -30,17 +35,19 @@ class FacultyController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'code' => 'required|unique:faculties|max:50',
-            'name' => 'required|max:255',
+        $request->validate([
+            'code' => 'required|unique:faculties',
+            'name' => 'required',
             'description' => 'nullable'
         ]);
 
-        Faculty::create($validated);
-
-        return redirect()
-            ->route('faculties.index')
-            ->with('success', 'Đã thêm khoa mới thành công');
+        try {
+            Faculty::create($request->all());
+            return redirect()->route('faculties.index')
+                ->with('success', 'Thêm khoa thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi thêm khoa!');
+        }
     }
 
     public function edit(Faculty $faculty)
@@ -50,24 +57,58 @@ class FacultyController extends Controller
 
     public function update(Request $request, Faculty $faculty)
     {
-        $validated = $request->validate([
-            'code' => 'required|max:50|unique:faculties,code,' . $faculty->id,
-            'name' => 'required|max:255',
+        $request->validate([
+            'code' => 'required|unique:faculties,code,'.$faculty->id,
+            'name' => 'required',
             'description' => 'nullable'
         ]);
 
-        $faculty->update($validated);
-
-        return redirect()
-            ->route('faculties.index')
-            ->with('success', 'Đã cập nhật khoa thành công');
+        try {
+            $faculty->update($request->all());
+            return redirect()->route('faculties.index')
+                ->with('success', 'Cập nhật khoa thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi cập nhật khoa!');
+        }
     }
 
     public function destroy(Faculty $faculty)
     {
-        $faculty->delete();
-        return redirect()
-            ->route('faculties.index')
-            ->with('success', 'Đã xóa khoa thành công');
+        try {
+            $faculty->delete();
+            return redirect()->route('faculties.index')
+                ->with('success', 'Xóa khoa thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi xóa khoa!');
+        }
+    }
+
+    public function export()
+    {
+        return Excel::download(new FacultiesExport, 'khoa.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls'
+        ]);
+
+        try {
+            Excel::import(new FacultiesImport, $request->file('file'));
+            return back()->with('success', 'Import dữ liệu thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi import: ' . $e->getMessage());
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new FacultiesTemplateExport, 'template_khoa.xlsx');
+    }
+
+    public function importExportTools()
+    {
+        return view('faculties.tools');
     }
 } 

@@ -4,92 +4,124 @@ namespace App\Http\Controllers;
 
 use App\Models\Subject;
 use App\Models\Major;
-use App\Models\Faculty;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\SubjectsExport;
+use App\Imports\SubjectsImport;
+use App\Exports\SubjectsTemplateExport;
 
 class SubjectController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Subject::with(['major.faculty']);
+        $query = Subject::with('major.faculty');
 
-        // Tìm kiếm theo tên hoặc mã
-        if ($search = $request->input('search')) {
+        // Tìm kiếm
+        if ($request->search) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
         // Lọc theo ngành
-        if ($majorId = $request->input('major_id')) {
-            $query->where('major_id', $majorId);
-        }
-        // Lọc theo khoa
-        elseif ($facultyId = $request->input('faculty_id')) {
-            $query->whereHas('major', function($q) use ($facultyId) {
-                $q->where('faculty_id', $facultyId);
-            });
+        if ($request->major_id) {
+            $query->where('major_id', $request->major_id);
         }
 
         $subjects = $query->paginate(10);
-        $faculties = Faculty::all();
-        $majors = Major::all();
-        
-        return view('subjects.index', compact('subjects', 'faculties', 'majors'));
+        $majors = Major::with('faculty')->get();
+        return view('subjects.index', compact('subjects', 'majors'));
     }
 
     public function create()
     {
-        $faculties = Faculty::with('majors')->get();
-        return view('subjects.create', compact('faculties'));
+        $majors = Major::with('faculty')->get();
+        return view('subjects.create', compact('majors'));
     }
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'code' => 'required|unique:subjects|max:50',
-            'name' => 'required|max:255',
-            'description' => 'nullable',
-            'credits' => 'required|integer|min:1|max:10',
-            'major_id' => 'required|exists:majors,id'
+        $request->validate([
+            'code' => 'required|unique:subjects',
+            'name' => 'required',
+            'credits' => 'required|integer|min:1',
+            'major_id' => 'required|exists:majors,id',
+            'description' => 'nullable'
         ]);
 
-        Subject::create($validated);
-
-        return redirect()
-            ->route('subjects.index')
-            ->with('success', 'Đã thêm môn học mới thành công');
+        try {
+            Subject::create($request->all());
+            return redirect()->route('subjects.index')
+                ->with('success', 'Thêm môn học thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi thêm môn học!');
+        }
     }
 
     public function edit(Subject $subject)
     {
-        $faculties = Faculty::with('majors')->get();
-        return view('subjects.edit', compact('subject', 'faculties'));
+        $majors = Major::with('faculty')->get();
+        return view('subjects.edit', compact('subject', 'majors'));
     }
 
     public function update(Request $request, Subject $subject)
     {
-        $validated = $request->validate([
-            'code' => 'required|max:50|unique:subjects,code,' . $subject->id,
-            'name' => 'required|max:255',
-            'description' => 'nullable',
-            'credits' => 'required|integer|min:1|max:10',
-            'major_id' => 'required|exists:majors,id'
+        $request->validate([
+            'code' => 'required|unique:subjects,code,'.$subject->id,
+            'name' => 'required',
+            'credits' => 'required|integer|min:1',
+            'major_id' => 'required|exists:majors,id',
+            'description' => 'nullable'
         ]);
 
-        $subject->update($validated);
-
-        return redirect()
-            ->route('subjects.index')
-            ->with('success', 'Đã cập nhật môn học thành công');
+        try {
+            $subject->update($request->all());
+            return redirect()->route('subjects.index')
+                ->with('success', 'Cập nhật môn học thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi cập nhật môn học!');
+        }
     }
 
     public function destroy(Subject $subject)
     {
-        $subject->delete();
-        return redirect()
-            ->route('subjects.index')
-            ->with('success', 'Đã xóa môn học thành công');
+        try {
+            $subject->delete();
+            return redirect()->route('subjects.index')
+                ->with('success', 'Xóa môn học thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi xóa môn học!');
+        }
+    }
+
+    public function export()
+    {
+        return Excel::download(new SubjectsExport, 'mon_hoc.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls'
+        ]);
+
+        try {
+            Excel::import(new SubjectsImport, $request->file('file'));
+            return back()->with('success', 'Import dữ liệu thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi import: ' . $e->getMessage());
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new SubjectsTemplateExport, 'template_mon_hoc.xlsx');
+    }
+
+    public function importExportTools()
+    {
+        return view('subjects.tools');
     }
 } 

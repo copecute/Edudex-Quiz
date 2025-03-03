@@ -5,6 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\Major;
 use App\Models\Faculty;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
+use App\Exports\MajorsExport;
+use App\Imports\MajorsImport;
+use App\Exports\MajorsTemplateExport;
 
 class MajorController extends Controller
 {
@@ -12,22 +16,22 @@ class MajorController extends Controller
     {
         $query = Major::with('faculty');
 
-        // Tìm kiếm theo tên hoặc mã
-        if ($search = $request->input('search')) {
+        // Tìm kiếm
+        if ($request->search) {
+            $search = $request->search;
             $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhere('name', 'like', "%{$search}%");
             });
         }
 
         // Lọc theo khoa
-        if ($facultyId = $request->input('faculty_id')) {
-            $query->where('faculty_id', $facultyId);
+        if ($request->faculty_id) {
+            $query->where('faculty_id', $request->faculty_id);
         }
 
         $majors = $query->paginate(10);
         $faculties = Faculty::all();
-        
         return view('majors.index', compact('majors', 'faculties'));
     }
 
@@ -39,18 +43,20 @@ class MajorController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'code' => 'required|unique:majors|max:50',
-            'name' => 'required|max:255',
-            'description' => 'nullable',
-            'faculty_id' => 'required|exists:faculties,id'
+        $request->validate([
+            'code' => 'required|unique:majors',
+            'name' => 'required',
+            'faculty_id' => 'required|exists:faculties,id',
+            'description' => 'nullable'
         ]);
 
-        Major::create($validated);
-
-        return redirect()
-            ->route('majors.index')
-            ->with('success', 'Đã thêm ngành mới thành công');
+        try {
+            Major::create($request->all());
+            return redirect()->route('majors.index')
+                ->with('success', 'Thêm ngành thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi thêm ngành!');
+        }
     }
 
     public function edit(Major $major)
@@ -61,25 +67,59 @@ class MajorController extends Controller
 
     public function update(Request $request, Major $major)
     {
-        $validated = $request->validate([
-            'code' => 'required|max:50|unique:majors,code,' . $major->id,
-            'name' => 'required|max:255',
-            'description' => 'nullable',
-            'faculty_id' => 'required|exists:faculties,id'
+        $request->validate([
+            'code' => 'required|unique:majors,code,'.$major->id,
+            'name' => 'required',
+            'faculty_id' => 'required|exists:faculties,id',
+            'description' => 'nullable'
         ]);
 
-        $major->update($validated);
-
-        return redirect()
-            ->route('majors.index')
-            ->with('success', 'Đã cập nhật ngành thành công');
+        try {
+            $major->update($request->all());
+            return redirect()->route('majors.index')
+                ->with('success', 'Cập nhật ngành thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi cập nhật ngành!');
+        }
     }
 
     public function destroy(Major $major)
     {
-        $major->delete();
-        return redirect()
-            ->route('majors.index')
-            ->with('success', 'Đã xóa ngành thành công');
+        try {
+            $major->delete();
+            return redirect()->route('majors.index')
+                ->with('success', 'Xóa ngành thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi xóa ngành!');
+        }
+    }
+
+    public function export()
+    {
+        return Excel::download(new MajorsExport, 'nganh.xlsx');
+    }
+
+    public function import(Request $request)
+    {
+        $request->validate([
+            'file' => 'required|mimes:xlsx,xls'
+        ]);
+
+        try {
+            Excel::import(new MajorsImport, $request->file('file'));
+            return back()->with('success', 'Import dữ liệu thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi import: ' . $e->getMessage());
+        }
+    }
+
+    public function downloadTemplate()
+    {
+        return Excel::download(new MajorsTemplateExport, 'template_nganh.xlsx');
+    }
+
+    public function importExportTools()
+    {
+        return view('majors.tools');
     }
 } 

@@ -1,77 +1,67 @@
 @extends('layouts.app')
 
-@section('title', 'Chỉnh sửa môn học - Edudex Quiz')
+@section('title', 'Chỉnh sửa môn học')
 
 @section('content')
 <div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
+    <div class="row">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="/">Trang chủ</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('subjects.index') }}">Quản lý môn học</a></li>
+                    <li class="breadcrumb-item active">Chỉnh sửa</li>
+                </ol>
+            </nav>
+
             <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Chỉnh sửa môn học</h5>
+                <div class="card-header">
+                    <h5 class="mb-0">
+                        <i class="fas fa-edit text-primary me-2"></i>
+                        Chỉnh sửa môn học
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <form action="{{ route('subjects.update', $subject) }}" method="POST">
+                    <form action="{{ route('subjects.update', $subject->id) }}" method="POST">
                         @csrf
                         @method('PUT')
-                        
                         <div class="mb-3">
-                            <label class="form-label">Mã môn học</label>
-                            <input type="text" name="code" 
-                                   value="{{ old('code', $subject->code) }}" 
-                                   class="form-control @error('code') is-invalid @enderror" required>
+                            <label for="code" class="form-label">Mã môn học <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control @error('code') is-invalid @enderror" 
+                                   id="code" name="code" value="{{ old('code', $subject->code) }}" required>
                             @error('code')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Tên môn học</label>
-                            <input type="text" name="name" 
-                                   value="{{ old('name', $subject->name) }}" 
-                                   class="form-control @error('name') is-invalid @enderror" required>
+                            <label for="name" class="form-label">Tên môn học <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control @error('name') is-invalid @enderror" 
+                                   id="name" name="name" value="{{ old('name', $subject->name) }}" required>
                             @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Số tín chỉ</label>
-                            <input type="number" name="credits" 
-                                   value="{{ old('credits', $subject->credits) }}" 
-                                   class="form-control @error('credits') is-invalid @enderror" 
-                                   min="1" max="10" required>
+                            <label for="credits" class="form-label">Số tín chỉ <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control @error('credits') is-invalid @enderror" 
+                                   id="credits" name="credits" value="{{ old('credits', $subject->credits) }}" min="1" required>
                             @error('credits')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Khoa</label>
-                            <select class="form-select" id="faculty-select">
-                                <option value="">Chọn khoa</option>
-                                @foreach($faculties as $faculty)
-                                    <option value="{{ $faculty->id }}"
-                                        {{ $subject->major->faculty_id == $faculty->id ? 'selected' : '' }}>
-                                        {{ $faculty->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label">Ngành</label>
-                            <select name="major_id" class="form-select @error('major_id') is-invalid @enderror" 
-                                    id="major-select" required>
+                            <label for="major_id" class="form-label">Ngành <span class="text-danger">*</span></label>
+                            <select class="form-select @error('major_id') is-invalid @enderror" 
+                                    id="major_id" name="major_id" required>
                                 <option value="">Chọn ngành</option>
-                                @foreach($faculties as $faculty)
-                                    @foreach($faculty->majors as $major)
-                                        <option value="{{ $major->id }}" 
-                                            data-faculty="{{ $faculty->id }}"
-                                            {{ old('major_id', $subject->major_id) == $major->id ? 'selected' : '' }}>
-                                            {{ $major->name }}
-                                        </option>
-                                    @endforeach
+                                @foreach($majors as $major)
+                                    <option value="{{ $major->id }}" 
+                                        {{ (old('major_id', $subject->major_id) == $major->id) ? 'selected' : '' }}>
+                                        {{ $major->name }} ({{ $major->faculty->name }})
+                                    </option>
                                 @endforeach
                             </select>
                             @error('major_id')
@@ -80,14 +70,21 @@
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Mô tả</label>
-                            <textarea name="description" class="form-control" 
-                                      rows="3">{{ old('description', $subject->description) }}</textarea>
+                            <label for="description" class="form-label">Mô tả</label>
+                            <textarea class="form-control @error('description') is-invalid @enderror" 
+                                      id="description" name="description" rows="3">{{ old('description', $subject->description) }}</textarea>
+                            @error('description')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
 
                         <div class="text-end">
-                            <a href="{{ route('subjects.index') }}" class="btn btn-light me-2">Hủy</a>
-                            <button type="submit" class="btn btn-primary">Cập nhật</button>
+                            <a href="{{ route('subjects.index') }}" class="btn btn-secondary">
+                                <i class="fas fa-times me-2"></i>Hủy
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-2"></i>Lưu
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -95,35 +92,4 @@
         </div>
     </div>
 </div>
-
-@push('scripts')
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const facultySelect = document.getElementById('faculty-select');
-    const majorSelect = document.getElementById('major-select');
-    const majorOptions = Array.from(majorSelect.options);
-
-    facultySelect.addEventListener('change', function() {
-        const selectedFacultyId = this.value;
-        
-        // Reset major select
-        majorSelect.value = '';
-        
-        // Show/hide major options based on selected faculty
-        majorOptions.forEach(option => {
-            if (!selectedFacultyId || option.dataset.faculty === selectedFacultyId) {
-                option.style.display = '';
-            } else {
-                option.style.display = 'none';
-            }
-        });
-    });
-
-    // Trigger change event on page load if faculty is selected
-    if (facultySelect.value) {
-        facultySelect.dispatchEvent(new Event('change'));
-    }
-});
-</script>
-@endpush
 @endsection 

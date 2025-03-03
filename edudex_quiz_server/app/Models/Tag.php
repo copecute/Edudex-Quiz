@@ -2,18 +2,18 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Tag extends Model
 {
-    use HasFactory;
-
-    protected $fillable = ['name', 'subject_id'];
+    protected $fillable = [
+        'name',
+        'subject_code'
+    ];
 
     public function subject()
     {
-        return $this->belongsTo(Subject::class);
+        return $this->belongsTo(Subject::class, 'subject_code', 'code');
     }
 
     public function questions()

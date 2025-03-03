@@ -3,62 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>@yield('title', 'Edudex Quiz')</title>
-
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{{ asset('css/copecute.css') }}" rel="stylesheet">
-    
-    <!-- Font Awesome Free CDN -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" 
-          integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" 
-          crossorigin="anonymous" referrerpolicy="no-referrer" />
-    
-    <!-- Stack for additional styles -->
-    @stack('styles')
-    
-    <style>
-        body {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        main {
-            flex: 1;
-        }
-    </style>
+    <title>@yield('title', 'Trang chủ')</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="{{ asset('bootstrap-5.3.3/css/bootstrap.min.css') }}" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="{{ asset('font-awesome-6-pro/css/all.min.css') }}" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="{{ asset('css/style.css') }}" rel="stylesheet">
+    <script src="{{ asset('js/theme.js') }}"></script>
+    <script src="{{ asset('js/jquery-3.7.1.min.js') }}"></script>
+    @yield('styles')
 </head>
 <body>
     @include('layouts.header')
-
+    
     <main class="py-4">
-        <!-- Flash Messages -->
-        <div class="container mb-4">
-            @if (session('success'))
-                <div class="alert alert-success">
-                    {{ session('success') }}
-                </div>
-            @endif
-
-            @if (session('error'))
-                <div class="alert alert-danger">
-                    {{ session('error') }}
-                </div>
-            @endif
-        </div>
-
         @yield('content')
     </main>
 
     @include('layouts.footer')
+    
+    <!-- Toast Notifications -->
+    @include('components.toast')
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Bootstrap 5 JS -->
+    <script src="{{ asset('bootstrap-5.3.3/js/bootstrap.bundle.min.js') }}"></script>
     
-    <!-- Bootstrap Bundle with Popper -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Stack for additional scripts -->
+    <!-- Toast Init Script -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+            var toastList = toastElList.map(function(toastEl) {
+                var toast = new bootstrap.Toast(toastEl, {
+                    autohide: true,
+                    delay: 3000
+                });
+                toast.show();
+                return toast;
+            });
+        });
+    </script>
+
     @stack('scripts')
+
+    <!-- Thêm vào trước đóng thẻ body -->
+    <div id="toast-container" class="toast-container position-fixed top-0 end-0 p-3">
+        <!-- Toasts sẽ được thêm vào đây -->
+    </div>
 </body>
-</html>
+</html> 

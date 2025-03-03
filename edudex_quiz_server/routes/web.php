@@ -1,171 +1,167 @@
 <?php
-//                       _oo0oo_
-//                      o8888888o
-//                      88" . "88
-//                      (| -_- |)
-//                      0\  =  /0
-//                    ___/`---'\___
-//                  .' \\|     |// '.
-//                 / \\|||  :  |||// \
-//                / _||||| -:- |||||- \
-//               |   | \\\  -  /// |   |
-//               | \_|  ''\---/''  |_/ |
-//               \  .-\__  '-'  ___/-. /
-//             ___'. .'  /--.--\  `. .'___
-//          ."" '<  `.___\_<|>_/___.' >' "".
-//         | | :  `- \`.;`\ _ /`;.`/ - ` : | |
-//         \  \ `_.   \_ __\ /__ _/   .-` /  /
-//     =====`-.____`.___ \_____/___.-`___.-'=====
-//                       `=---='
-//
-//     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//            amen đà phật, không bao giờ BUG
-//     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-use App\Http\Controllers\AuthController;
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\UserController;
+use App\Http\Controllers\AccountController;
+use App\Http\Controllers\ProfileController;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\File;
+use App\Http\Controllers\TestController;
+use App\Http\Controllers\FacilityController;
+use App\Http\Controllers\RoomController;
 use App\Http\Controllers\FacultyController;
 use App\Http\Controllers\MajorController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\QuestionController;
-use App\Http\Controllers\TestSessionController;
-use App\Http\Controllers\TestShiftController;
-use App\Http\Controllers\TestLocationController;
-use App\Http\Controllers\TestRoomController;
-use App\Http\Controllers\TestSessionRoomController;
-use App\Http\Controllers\TestSessionSubjectController;
-use App\Http\Controllers\TestShiftSubjectRoomController;
-use App\Http\Controllers\TestPaperController;
-use App\Http\Controllers\StudentController;
-use App\Http\Controllers\TestSubmissionController;
-use Illuminate\Support\Facades\Route;
 
+// Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
+    if (Auth::check()) {
+        return view('dashboard.index');
+    }
     return redirect()->route('login');
 });
 
-// Auth routes
-Route::middleware(['guest'])->group(function () {
-    Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-    Route::post('/register', [AuthController::class, 'register']);
+// Authentication Routes
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
+    Route::post('/login', [LoginController::class, 'login']);
+    Route::get('/register', [RegisterController::class, 'showRegistrationForm'])->name('register');
+    Route::post('/register', [RegisterController::class, 'register']);
 });
 
-Route::post('/logout', [AuthController::class, 'logout'])->name('logout')->middleware('auth');
-
-// Dashboard routes
-Route::middleware(['auth'])->group(function () {
+Route::middleware('auth')->group(function () {
+    Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+    
+    // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
+    
+    // Account Management
+    Route::resource('accounts', AccountController::class);
+    
+    // Account Import/Export
+    Route::get('accounts/tools/import-export', [AccountController::class, 'importExportTools'])
+        ->name('accounts.tools');
+    Route::get('accounts-export', [AccountController::class, 'export'])
+        ->name('accounts.export');
+    Route::post('accounts-import', [AccountController::class, 'import'])
+        ->name('accounts.import');
+    Route::get('accounts-template', [AccountController::class, 'downloadTemplate'])
+        ->name('accounts.template');
+    // Profile Routes
+    Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
+    Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
-    // Test routes
-    Route::get('/test/admin', function () {
-        return view('test.admin');
-    })->middleware('role:0');
+    // Test Routes với phân quyền
+    Route::get('/test/admin', [TestController::class, 'admin'])
+        ->middleware('admin')
+        ->name('test.admin');
 
-    Route::get('/test/teacher', function () {
-        return view('test.teacher');
-    })->middleware('role:1');
+    Route::get('/test/teacher', [TestController::class, 'teacher'])
+        ->middleware('teacher')
+        ->name('test.teacher');
 
-    Route::get('/test/staff', function () {
-        return view('test.staff');
-    })->middleware('role:2');
+    Route::get('/test/staff', [TestController::class, 'staff'])
+        ->name('test.staff'); // Tất cả user đều có thể truy cập
 
-    // Routes quản lý user (cần quyền admin)
-    Route::middleware(['role:0'])->group(function () {
-        Route::get('/users', [UserController::class, 'index'])->name('users.index');
-        Route::get('/users/create', [UserController::class, 'create'])->name('users.create');
-        Route::post('/users', [UserController::class, 'store'])->name('users.store');
-        Route::get('/users/{user}/edit', [UserController::class, 'edit'])->name('users.edit');
-        Route::put('/users/{user}', [UserController::class, 'update'])->name('users.update');
-        Route::delete('/users/{user}', [UserController::class, 'destroy'])->name('users.destroy');
-    });
+    // Facility Routes
+    Route::resource('facilities', FacilityController::class);
+    Route::put('facilities/{facility}/toggle-status', [FacilityController::class, 'toggleStatus'])
+        ->name('facilities.toggle-status');
+    Route::get('facilities-export', [FacilityController::class, 'export'])
+        ->name('facilities.export');
+    Route::post('facilities-import', [FacilityController::class, 'import'])
+        ->name('facilities.import');
+    Route::get('facilities-template', [FacilityController::class, 'downloadTemplate'])
+        ->name('facilities.template');
 
-    // Routes quản lý khoa, ngành, môn học và câu hỏi (chỉ admin mới truy cập được)
-    Route::middleware(['role:0'])->group(function () {
+    // Room Routes
+    Route::resource('rooms', RoomController::class);
+    Route::put('rooms/{room}/toggle-status', [RoomController::class, 'toggleStatus'])
+        ->name('rooms.toggle-status');
+    Route::get('rooms-export', [RoomController::class, 'export'])
+        ->name('rooms.export');
+    Route::post('rooms-import', [RoomController::class, 'import'])
+        ->name('rooms.import');
+    Route::get('rooms-template', [RoomController::class, 'downloadTemplate'])
+        ->name('rooms.template');
+
+    // Facility Import/Export
+    Route::get('facilities/tools/import-export', [FacilityController::class, 'importExportTools'])
+        ->name('facilities.tools');
+
+    // Room Import/Export  
+    Route::get('rooms/tools/import-export', [RoomController::class, 'importExportTools'])
+        ->name('rooms.tools');
+
+    // Account Routes
+    Route::put('accounts/{account}/toggle-status', [AccountController::class, 'toggleStatus'])
+        ->name('accounts.toggle-status');
+
         Route::resource('faculties', FacultyController::class);
-        Route::resource('majors', MajorController::class);
-        Route::resource('subjects', SubjectController::class);
-        Route::resource('questions', QuestionController::class);
-        Route::get('/questions/tags/{subject}', [QuestionController::class, 'getTagsBySubject']);
-        Route::resource('test_sessions', TestSessionController::class);
-        Route::put('/test_sessions/{testSession}/toggle-status', [TestSessionController::class, 'toggleStatus'])
-            ->name('test_sessions.toggle-status');
-        Route::resource('test_sessions.test_shifts', TestShiftController::class);
-        Route::put(
-            '/test_sessions/{test_session}/test_shifts/{test_shift}/toggle-status',
-            [TestShiftController::class, 'toggleStatus']
-        )
-            ->name('test_sessions.test_shifts.toggle-status');
-        Route::resource('test_locations', TestLocationController::class);
-        Route::put(
-            '/test_locations/{testLocation}/toggle-status',
-            [TestLocationController::class, 'toggleStatus']
-        )
-            ->name('test_locations.toggle-status');
-        Route::resource('test_rooms', TestRoomController::class);
-        Route::put(
-            '/test_rooms/{testRoom}/toggle-status',
-            [TestRoomController::class, 'toggleStatus']
-        )
-            ->name('test_rooms.toggle-status');
-        Route::get(
-            '/test_sessions/{test_session}/test_shifts/{test_shift}/rooms',
-            [TestSessionRoomController::class, 'index']
-        )
-            ->name('test_sessions.test_shifts.test_rooms.index');
-        Route::put(
-            '/test_sessions/{test_session}/test_shifts/{test_shift}/rooms',
-            [TestSessionRoomController::class, 'update']
-        )
-            ->name('test_sessions.test_shifts.test_rooms.update');
-        Route::get('/test_sessions/{test_session}/subjects', 
-            [TestSessionSubjectController::class, 'index'])
-            ->name('test_sessions.subjects.index');
-        Route::post('/test_sessions/{test_session}/subjects', 
-            [TestSessionSubjectController::class, 'store'])
-            ->name('test_sessions.subjects.store');
-        Route::delete('/test_sessions/{test_session}/subjects/{subject}', 
-            [TestSessionSubjectController::class, 'destroy'])
-            ->name('test_sessions.subjects.destroy');
-        Route::get('test_sessions/{test_session}/test_shifts/{test_shift}/subject_rooms', [TestShiftSubjectRoomController::class, 'index'])
-            ->name('test_sessions.test_shifts.subject_rooms.index');
-        Route::post('test_sessions/{test_session}/test_shifts/{test_shift}/subject_rooms', [TestShiftSubjectRoomController::class, 'store'])
-            ->name('test_sessions.test_shifts.subject_rooms.store');
-        Route::delete('test_sessions/{test_session}/test_shifts/{test_shift}/subject_rooms/{subject_room}', [TestShiftSubjectRoomController::class, 'destroy'])
-            ->name('test_sessions.test_shifts.subject_rooms.destroy');
-        Route::post('/test_sessions/{test_session}/subjects/{subject}/assign_shifts', 
-            [TestSessionSubjectController::class, 'assignShifts'])
-            ->name('test_sessions.subjects.assign_shifts');
-        Route::post('/test_sessions/{test_session}/test_shifts/{test_shift}/assign_subjects', 
-            [TestShiftController::class, 'assignSubjects'])
-            ->name('test_sessions.test_shifts.assign_subjects');
-        Route::get('/test_sessions/{test_session}/subjects/{subject}/students', 
-            [TestSessionSubjectController::class, 'students'])
-            ->name('test_sessions.subjects.students');
-        Route::post('/test_sessions/{test_session}/subjects/{subject}/students', 
-            [TestSessionSubjectController::class, 'assignStudents'])
-            ->name('test_sessions.subjects.assign_students');
-        Route::delete('/test_sessions/{test_session}/subjects/{subject}/students/{student}', 
-            [TestSessionSubjectController::class, 'removeStudent'])
-            ->name('test_sessions.subjects.remove_student');
-        Route::post('/test_sessions/{test_session}/subjects/{test_session_subject}/assign_test_paper', 
-            [TestSessionSubjectController::class, 'assignTestPaper'])
-            ->name('test_sessions.subjects.assign_test_paper');
-    });
+        Route::put('faculties/{faculty}/toggle-status', [FacultyController::class, 'toggleStatus'])
+            ->name('faculties.toggle-status');
+        Route::get('faculties-export', [FacultyController::class, 'export'])
+            ->name('faculties.export');
+        Route::post('faculties-import', [FacultyController::class, 'import'])
+            ->name('faculties.import');
+        Route::get('faculties-template', [FacultyController::class, 'downloadTemplate'])
+            ->name('faculties.template');
+        Route::get('faculties/tools/import-export', [FacultyController::class, 'importExportTools'])
+            ->name('faculties.tools');
+            
+    // Major Routes
+    Route::resource('majors', MajorController::class);
+    Route::get('majors-export', [MajorController::class, 'export'])->name('majors.export');
+    Route::post('majors-import', [MajorController::class, 'import'])->name('majors.import');
+    Route::get('majors-template', [MajorController::class, 'downloadTemplate'])->name('majors.template');
+    Route::get('majors/tools/import-export', [MajorController::class, 'importExportTools'])->name('majors.tools');
 
-    // Thêm routes cho test papers
-    Route::resource('test_papers', TestPaperController::class);
-    Route::get('/test_papers/tags/{subject}', [TestPaperController::class, 'getTagsBySubject']);
+    // Subject Routes
+    Route::resource('subjects', SubjectController::class);
+    Route::get('subjects-export', [SubjectController::class, 'export'])->name('subjects.export');
+    Route::post('subjects-import', [SubjectController::class, 'import'])->name('subjects.import');
+    Route::get('subjects-template', [SubjectController::class, 'downloadTemplate'])->name('subjects.template');
+    Route::get('subjects/tools/import-export', [SubjectController::class, 'importExportTools'])->name('subjects.tools');
 
-    // Thêm route cho quản lý thí sinh
-    Route::middleware(['auth', 'role:0,1'])->group(function () {
-        Route::resource('students', StudentController::class);
-    });
-
-    // Sửa lại route cho test submissions
-    Route::get('/test_submissions', [TestSubmissionController::class, 'index'])
-        ->name('test-submissions.index');
-    Route::get('/test_submissions/{submission}', [TestSubmissionController::class, 'show'])
-        ->name('test-submissions.show');
+    // Question Routes
+    Route::get('questions/tags-by-subject', [QuestionController::class, 'getTagsBySubject'])->name('questions.tags');
+    Route::get('questions/tools/import-export', [QuestionController::class, 'importExportTools'])->name('questions.tools');
+    Route::get('questions-export', [QuestionController::class, 'export'])->name('questions.export');
+    Route::post('questions-import', [QuestionController::class, 'import'])->name('questions.import');
+    Route::get('questions-template', [QuestionController::class, 'downloadTemplate'])->name('questions.template');
+    Route::resource('questions', QuestionController::class);
 });
+
+// Add this route for handling avatar images
+Route::get('storage/avatars/{filename}', function ($filename) {
+    $path = storage_path('app/public/avatars/' . $filename);
+    
+    if (!File::exists($path)) {
+        abort(404);
+    }
+    
+    return response()->file($path);
+})->where('filename', '.*');
+
+if (app()->environment('local')) {
+    // Error pages preview routes
+    Route::get('/400', function () {
+        return response()->view('errors.400', [], 400);
+    });
+
+    Route::get('/401', function () {
+        return response()->view('errors.401', [], 401);
+    });
+
+    Route::get('/403', function () {
+        return response()->view('errors.403', [], 403);
+    });
+
+    Route::get('/404', function () {
+        return response()->view('errors.404', [], 404);
+    });
+}
