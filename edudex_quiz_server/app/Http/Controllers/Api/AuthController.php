@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Auth\AuthenticationException;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 class AuthController extends Controller
 {
@@ -22,113 +21,97 @@ class AuthController extends Controller
             'password' => 'required'
         ]);
 
-        if (Auth::attempt($request->only('username', 'password'))) {
-            $user = Auth::user()->load('accountInfo');
-            $token = $user->createToken('auth-token')->plainTextToken;
-
-            $userInfo = [
-                'full_name' => $user->accountInfo->fullName,
-                'date_of_birth' => $user->accountInfo->birthday,
-                'gender' => $user->accountInfo->gender,
-                'phone' => $user->accountInfo->phoneNumber,
-                'address' => $user->accountInfo->address,
-                'avatar' => $user->accountInfo->avatar,
-            ];
-
-            $userData = [
-                'id' => $user->id,
-                'username' => $user->username,
-                'email' => $user->email,
-                'role' => $user->role,
-            ];
-
+        // Kiểm tra thông tin đăng nhập
+        if (!Auth::attempt($request->only('username', 'password'))) {
             return response()->json([
-                'status' => 'success',
-                'message' => 'Đăng nhập thành công',
-                'data' => [
-                    'token' => $token,
-                    'user' => array_merge(
-                        $userData,
-                        ['info' => $userInfo]
-                    )
-                ]
-            ]);
+                'status' => 'error',
+                'message' => 'Thông tin đăng nhập không chính xác'
+            ], Response::HTTP_UNAUTHORIZED);
         }
 
+        $user = Auth::user();
+
+        // Kiểm tra tài khoản có bị khóa không
+        if (!$user->is_active) {
+            Auth::logout();
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Tài khoản đã bị khóa'
+            ], Response::HTTP_FORBIDDEN);
+        }
+
+        $token = $user->createToken('api-token')->plainTextToken;
+
         return response()->json([
-            'status' => 'error',
-            'message' => 'Thông tin đăng nhập không chính xác'
-        ], Response::HTTP_UNAUTHORIZED);
+            'status' => 'success',
+            'message' => 'Đăng nhập thành công',
+            'data' => [
+                'token' => $token,
+                'user' => [
+                    'id' => $user->id,
+                    'username' => $user->username,
+                    'email' => $user->email,
+                    'role' => $user->role,
+                ],
+                'info' => [
+                    'full_name' => $user->accountInfo->fullName,
+                    'date_of_birth' => $user->accountInfo->birthday,
+                    'gender' => $user->accountInfo->gender,
+                    'phone' => $user->accountInfo->phoneNumber,
+                    'address' => $user->accountInfo->address,
+                    'avatar' => $user->accountInfo->avatar,
+                ]
+            ]
+        ]);
     }
 
     /**
-     * Đăng xuất
+     * Đăng xuất và xóa token
      */
     public function logout(Request $request)
     {
         try {
-            if (!$request->user()) {
-                throw new AuthenticationException();
+            // Xóa token hiện tại
+            if ($request->user() && $request->user()->currentAccessToken()) {
+                $request->user()->currentAccessToken()->delete();
             }
 
-            // Lấy token từ request
-            $token = $request->auth_token;
-            
-            if (!$token) {
-                throw new AuthenticationException('Token không hợp lệ');
-            }
-
-            // Xóa token
-            $token->delete();
-            
             return response()->json([
                 'status' => 'success',
                 'message' => 'Đăng xuất thành công'
             ]);
-        } catch (AuthenticationException $e) {
+        } catch (\Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Chưa đăng nhập'
-            ], Response::HTTP_UNAUTHORIZED);
-        } catch (Throwable $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Đã xảy ra lỗi khi đăng xuất'
+                'message' => 'Có lỗi xảy ra khi đăng xuất'
             ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Lấy thông tin profile của user
+     * Lấy thông tin người dùng đang đăng nhập
      */
     public function profile(Request $request)
     {
         try {
-            if (!$request->user()) {
-                throw new AuthenticationException();
-            }
-
-            $user = $request->user()->load('accountInfo');
-            
+            $user = $request->user();
             return response()->json([
                 'status' => 'success',
                 'data' => [
-                    'user' => array_merge(
-                        [
-                            'id' => $user->id,
-                            'username' => $user->username,
-                            'email' => $user->email,
-                            'role' => $user->role,
-                        ],
-                        ['info' => [
-                            'full_name' => $user->accountInfo->fullName,
-                            'date_of_birth' => $user->accountInfo->birthday,
-                            'gender' => $user->accountInfo->gender,
-                            'phone' => $user->accountInfo->phoneNumber,
-                            'address' => $user->accountInfo->address,
-                            'avatar' => $user->accountInfo->avatar,
-                        ]]
-                    )
+                    'user' => [
+                        'id' => $user->id,
+                        'username' => $user->username,
+                        'email' => $user->email,
+                        'role' => $user->role,
+                    ],
+                    'info' => [
+                        'full_name' => $user->accountInfo->fullName,
+                        'date_of_birth' => $user->accountInfo->birthday,
+                        'gender' => $user->accountInfo->gender,
+                        'phone' => $user->accountInfo->phoneNumber,
+                        'address' => $user->accountInfo->address,
+                        'avatar' => $user->accountInfo->avatar,
+                    ]
                 ]
             ]);
         } catch (AuthenticationException $e) {
@@ -138,4 +121,4 @@ class AuthController extends Controller
             ], Response::HTTP_UNAUTHORIZED);
         }
     }
-} 
+}
