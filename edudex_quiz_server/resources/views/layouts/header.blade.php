@@ -122,6 +122,30 @@
                         </ul>
                     </li>
                     @endif
+                    <!-- Quản lý kỳ thi -->
+                    @if(Auth::user()->role === 2)
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-calendar-alt me-1"></i> Tổ chức kỳ Thi
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li>
+                                <a class="dropdown-item {{ request()->routeIs('exam-periods.*') ? 'active' : '' }}" 
+                                   href="{{ route('exam-periods.index') }}">
+                                    <i class="fas fa-calendar-alt me-2"></i> Danh sách kỳ thi
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item
+                                {{-- {{ request()->routeIs('exam-periods.*') ? 'active' : '' }} --}}
+                                 " 
+                                   href="{{ route('exam-periods.index') }}">
+                                    <i class="fas fa-file-alt me-2"></i> Trình hướng dẫn tổ chức kỳ thi
+                                </a>
+                            </li>
+                        </ul>
+                    </li>
+                    @endif
                 </ul>
                 @endauth
 

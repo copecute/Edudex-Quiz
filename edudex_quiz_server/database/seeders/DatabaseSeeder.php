@@ -21,6 +21,8 @@ class DatabaseSeeder extends Seeder
             TagSeeder::class,
             QuestionSeeder::class,
             ExamSeeder::class,
+            ExamPeriodSeeder::class,
+            ExamShiftSeeder::class,
         ]);
     }
 }

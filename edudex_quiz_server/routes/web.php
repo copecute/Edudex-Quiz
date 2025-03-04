@@ -16,6 +16,12 @@ use App\Http\Controllers\MajorController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\ExamController;
+use App\Http\Controllers\ExamPeriodController;
+use App\Http\Controllers\ExamShiftController;
+use App\Http\Controllers\ExamPeriodSubjectController;
+use App\Http\Controllers\ExamPeriodSubjectStudentController;
+use App\Http\Controllers\ExamPeriodProctorController;
+use App\Http\Controllers\ExamPeriodRoomController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -138,11 +144,117 @@ Route::middleware('auth')->group(function () {
 
     // Exam Routes
     Route::resource('exams', ExamController::class);
-    Route::get('exams/tags-by-subject', [ExamController::class, 'getTagsBySubject'])->name('exams.tags');
     Route::get('exams/tools/import-export', [ExamController::class, 'importExportTools'])->name('exams.tools');
     Route::get('exams-export', [ExamController::class, 'export'])->name('exams.export');
     Route::post('exams-import', [ExamController::class, 'import'])->name('exams.import');
     Route::get('exams-template', [ExamController::class, 'downloadTemplate'])->name('exams.template');
+    Route::get('/exams/by-subject/{subject}', [ExamController::class, 'getBySubject'])
+        ->name('exams.by-subject');
+
+    // Thay thế routes quản lý thí sinh cũ
+    Route::prefix('exam-periods/{examPeriod}/subjects/{examPeriodSubject}/students')->group(function () {
+        Route::get('/', [ExamPeriodSubjectStudentController::class, 'index'])
+            ->name('exam-period-subject-students.index');
+        Route::get('/create', [ExamPeriodSubjectStudentController::class, 'create'])
+            ->name('exam-period-subject-students.create');
+        Route::post('/', [ExamPeriodSubjectStudentController::class, 'store'])
+            ->name('exam-period-subject-students.store');
+        Route::get('/{student}/edit', [ExamPeriodSubjectStudentController::class, 'edit'])
+            ->name('exam-period-subject-students.edit');
+        Route::put('/{student}', [ExamPeriodSubjectStudentController::class, 'update'])
+            ->name('exam-period-subject-students.update');
+        Route::delete('/{student}', [ExamPeriodSubjectStudentController::class, 'destroy'])
+            ->name('exam-period-subject-students.destroy');
+
+        // Import/Export routes
+        Route::get('/tools', [ExamPeriodSubjectStudentController::class, 'importExportTools'])
+            ->name('exam-period-subject-students.tools');
+        Route::get('/template', [ExamPeriodSubjectStudentController::class, 'downloadTemplate'])
+            ->name('exam-period-subject-students.template');
+        Route::post('/import', [ExamPeriodSubjectStudentController::class, 'import'])
+            ->name('exam-period-subject-students.import');
+        Route::get('/export', [ExamPeriodSubjectStudentController::class, 'export'])
+            ->name('exam-period-subject-students.export');
+    });
+
+    // Exam Period Proctors
+    Route::prefix('exam-periods/{examPeriod}/proctors')->group(function () {
+        Route::get('/', [ExamPeriodProctorController::class, 'index'])
+            ->name('exam-period-proctors.index');
+        Route::get('/assign', [ExamPeriodProctorController::class, 'assign'])
+            ->name('exam-period-proctors.assign');
+        Route::post('/', [ExamPeriodProctorController::class, 'store'])
+            ->name('exam-period-proctors.store');
+        Route::delete('/{proctor}', [ExamPeriodProctorController::class, 'destroy'])
+            ->name('exam-period-proctors.destroy');
+        
+        // Import/Export routes
+        Route::get('/tools', [ExamPeriodProctorController::class, 'importExportTools'])
+            ->name('exam-period-proctors.tools');
+        Route::post('/import', [ExamPeriodProctorController::class, 'import'])
+            ->name('exam-period-proctors.import');
+        Route::get('/export', [ExamPeriodProctorController::class, 'export'])
+            ->name('exam-period-proctors.export');
+        Route::get('/template', [ExamPeriodProctorController::class, 'downloadTemplate'])
+            ->name('exam-period-proctors.template');
+    });
+
+    // Routes cho phòng thi trong kỳ thi
+    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->group(function () {
+        Route::get('/', [ExamPeriodRoomController::class, 'index'])->name('index');
+        Route::get('/assign', [ExamPeriodRoomController::class, 'assign'])->name('assign');
+        Route::post('/', [ExamPeriodRoomController::class, 'store'])->name('store');
+        Route::delete('/', [ExamPeriodRoomController::class, 'destroy'])->name('destroy');
+        Route::delete('/multiple', [ExamPeriodRoomController::class, 'destroyMultiple'])->name('destroy-multiple');
+        Route::get('/tools', [ExamPeriodRoomController::class, 'importExportTools'])->name('tools');
+        Route::get('/template', [ExamPeriodRoomController::class, 'downloadTemplate'])->name('template');
+        Route::post('/import', [ExamPeriodRoomController::class, 'import'])->name('import');
+        Route::get('/export', [ExamPeriodRoomController::class, 'export'])->name('export');
+    });
+});
+
+// Quản lý kỳ thi
+Route::middleware(['auth', 'admin'])->group(function () {
+    Route::get('/exam-periods/tools', [ExamPeriodController::class, 'importExportTools'])->name('exam-periods.tools');
+    Route::get('/exam-periods/template', [ExamPeriodController::class, 'downloadTemplate'])->name('exam-periods.template');
+    Route::post('/exam-periods/import', [ExamPeriodController::class, 'import'])->name('exam-periods.import');
+    Route::get('/exam-periods/export', [ExamPeriodController::class, 'export'])->name('exam-periods.export');
+    Route::put('/exam-periods/{examPeriod}/toggle-status', [ExamPeriodController::class, 'toggleStatus'])->name('exam-periods.toggle-status');
+    Route::resource('exam-periods', ExamPeriodController::class);
+
+    // Thay thế route exam-shifts cũ bằng nested route
+    Route::prefix('exam-periods/{examPeriod}/shifts')->group(function () {
+        Route::get('/', [ExamShiftController::class, 'index'])
+            ->name('exam-shifts.index');
+        Route::get('/create', [ExamShiftController::class, 'create'])
+            ->name('exam-shifts.create');
+        Route::post('/', [ExamShiftController::class, 'store'])
+            ->name('exam-shifts.store');
+        Route::get('/{examShift}/edit', [ExamShiftController::class, 'edit'])
+            ->name('exam-shifts.edit');
+        Route::put('/{examShift}', [ExamShiftController::class, 'update'])
+            ->name('exam-shifts.update');
+        Route::delete('/{examShift}', [ExamShiftController::class, 'destroy'])
+            ->name('exam-shifts.destroy');
+        Route::put('/{examShift}/toggle-status', [ExamShiftController::class, 'toggleStatus'])
+            ->name('exam-shifts.toggle-status');
+    });
+
+    // Thay thế route exam-period-subjects cũ bằng nested route
+    Route::prefix('exam-periods/{examPeriod}/subjects')->group(function () {
+        Route::get('/', [ExamPeriodSubjectController::class, 'index'])
+            ->name('exam-period-subjects.index');
+        Route::get('/create', [ExamPeriodSubjectController::class, 'create'])
+            ->name('exam-period-subjects.create');
+        Route::post('/', [ExamPeriodSubjectController::class, 'store'])
+            ->name('exam-period-subjects.store');
+        Route::get('/{examPeriodSubject}/edit', [ExamPeriodSubjectController::class, 'edit'])
+            ->name('exam-period-subjects.edit');
+        Route::put('/{examPeriodSubject}', [ExamPeriodSubjectController::class, 'update'])
+            ->name('exam-period-subjects.update');
+        Route::delete('/{examPeriodSubject}', [ExamPeriodSubjectController::class, 'destroy'])
+            ->name('exam-period-subjects.destroy');
+    });
 });
 
 // Add this route for handling avatar images
