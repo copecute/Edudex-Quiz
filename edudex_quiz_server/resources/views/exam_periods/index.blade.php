@@ -136,18 +136,34 @@
                                             </a>
                                         </li>
                                         <li>
-                                            <a class="dropdown-item" href="{{ route('exam-period-rooms.index', $examPeriod) }}">
-                                                <i class="fas fa-door-open me-2"></i> Phòng thi
-                                            </a>
-                                        </li>
-                                        <li>
                                             <a class="dropdown-item" href="{{ route('exam-period-subjects.index', $examPeriod) }}">
                                                 <i class="fas fa-book me-2"></i> Môn thi
                                             </a>
                                         </li>
                                         <li>
+                                            <a class="dropdown-item" href="{{ route('exam-period-rooms.index', $examPeriod) }}">
+                                                <i class="fas fa-door-open me-2"></i> Phòng thi
+                                            </a>
+                                        </li>
+                                        <li>
                                             <a class="dropdown-item" href="{{ route('exam-period-proctors.index', $examPeriod) }}">
                                                 <i class="fas fa-user-tie me-2"></i> Cán bộ coi thi
+                                            </a>
+                                        </li>
+                                        <li><hr class="dropdown-divider"></li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-periods.assignment.subjects', $examPeriod) }}">
+                                                <i class="fas fa-tasks me-2"></i> Phân công môn thi - ca thi
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-periods.assignment.rooms', $examPeriod) }}">
+                                                <i class="fas fa-door-open me-2"></i> Phân công phòng thi
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-periods.assignment.proctors', $examPeriod) }}">
+                                                <i class="fas fa-user-tie me-2"></i> Phân công CBCT
                                             </a>
                                         </li>
                                     </ul>

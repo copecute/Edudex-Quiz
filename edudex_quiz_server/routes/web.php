@@ -22,6 +22,7 @@ use App\Http\Controllers\ExamPeriodSubjectController;
 use App\Http\Controllers\ExamPeriodSubjectStudentController;
 use App\Http\Controllers\ExamPeriodProctorController;
 use App\Http\Controllers\ExamPeriodRoomController;
+use App\Http\Controllers\ExamPeriodAssignmentController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -210,6 +211,21 @@ Route::middleware('auth')->group(function () {
         Route::get('/template', [ExamPeriodRoomController::class, 'downloadTemplate'])->name('template');
         Route::post('/import', [ExamPeriodRoomController::class, 'import'])->name('import');
         Route::get('/export', [ExamPeriodRoomController::class, 'export'])->name('export');
+    });
+
+    // Phân công kỳ thi
+    Route::prefix('exam-periods/{examPeriod}/assignment')->name('exam-periods.assignment.')->group(function () {
+        // Phân công ca thi cho môn thi
+        Route::get('/subjects', [ExamPeriodAssignmentController::class, 'subjects'])->name('subjects');
+        Route::post('/subjects', [ExamPeriodAssignmentController::class, 'assignSubjects'])->name('subjects.store');
+        
+        // Phân công phòng thi cho ca thi
+        Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
+        Route::post('/rooms', [ExamPeriodAssignmentController::class, 'assignRooms'])->name('rooms.store');
+        
+        // Phân công CBCT cho phòng thi
+        Route::get('/proctors', [ExamPeriodAssignmentController::class, 'proctors'])->name('proctors');
+        Route::post('/proctors', [ExamPeriodAssignmentController::class, 'assignProctors'])->name('proctors.store');
     });
 });
 
