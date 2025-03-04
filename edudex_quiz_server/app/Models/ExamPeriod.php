@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Carbon\Carbon;
 
 class ExamPeriod extends Model
 {
@@ -24,18 +25,44 @@ class ExamPeriod extends Model
     public function scopeSearch($query, $search)
     {
         if ($search) {
-            return $query->where('name', 'like', "%{$search}%")
-                        ->orWhere('description', 'like', "%{$search}%");
+            return $query->where('name', 'like', "%{$search}%");
         }
         return $query;
     }
 
     // Scope để lọc theo trạng thái
-    public function scopeActive($query, $status = null)
+    public function scopeFilterByStatus($query, $status)
     {
-        if ($status !== null) {
-            return $query->where('is_active', $status);
+        $now = now();
+        
+        switch ($status) {
+            case 'ongoing':
+                return $query->where('is_active', true)
+                            ->where('start_time', '<=', $now)
+                            ->where('end_time', '>=', $now);
+            case 'upcoming':
+                return $query->where('is_active', true)
+                            ->where('start_time', '>', $now);
+            case 'completed':
+                return $query->where('is_active', true)
+                            ->where('end_time', '<', $now);
+            case 'locked':
+                return $query->where('is_active', false);
+            default:
+                return $query;
         }
+    }
+
+    public function scopeFilterByDateRange($query, $startDate, $endDate)
+    {
+        if ($startDate) {
+            $query->where('start_time', '>=', Carbon::parse($startDate)->startOfDay());
+        }
+        
+        if ($endDate) {
+            $query->where('end_time', '<=', Carbon::parse($endDate)->endOfDay());
+        }
+        
         return $query;
     }
 

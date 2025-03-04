@@ -13,8 +13,9 @@
                 </ol>
             </nav>
 
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
+            <!-- Header Card -->
+            <div class="card mb-4">
+                <div class="card-body d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Danh sách kỳ thi</h5>
                     <div>
                         <a href="{{ route('exam-periods.tools') }}" class="btn btn-secondary">
@@ -25,15 +26,17 @@
                         </a>
                     </div>
                 </div>
+            </div>
 
+            <!-- Search Form -->
+            <div class="card mb-4">
                 <div class="card-body">
-                    <!-- Search Form -->
-                    <form action="{{ route('exam-periods.index') }}" method="GET" class="mb-3">
+                    <form action="{{ route('exam-periods.index') }}" method="GET">
                         <div class="row g-3">
                             <div class="col-md-4">
                                 <div class="input-group">
                                     <input type="text" class="form-control" id="search" name="search" 
-                                           placeholder="Tìm kiếm..." value="{{ request('search') }}">
+                                           placeholder="Tìm theo tên kỳ thi..." value="{{ request('search') }}">
                                     <button class="btn btn-outline-secondary" type="submit">
                                         <i class="fas fa-search"></i>
                                     </button>
@@ -42,95 +45,179 @@
                             <div class="col-md-3">
                                 <select class="form-select" name="status" onchange="this.form.submit()">
                                     <option value="">Tất cả trạng thái</option>
-                                    <option value="1" {{ request('status') === '1' ? 'selected' : '' }}>Hoạt động</option>
-                                    <option value="0" {{ request('status') === '0' ? 'selected' : '' }}>Khóa</option>
+                                    <option value="ongoing" {{ request('status') === 'ongoing' ? 'selected' : '' }}>
+                                        Đang diễn ra
+                                    </option>
+                                    <option value="upcoming" {{ request('status') === 'upcoming' ? 'selected' : '' }}>
+                                        Sắp diễn ra
+                                    </option>
+                                    <option value="completed" {{ request('status') === 'completed' ? 'selected' : '' }}>
+                                        Đã kết thúc
+                                    </option>
+                                    <option value="locked" {{ request('status') === 'locked' ? 'selected' : '' }}>
+                                        Đã khóa
+                                    </option>
                                 </select>
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" class="form-control" name="start_date" 
+                                       placeholder="Từ ngày" value="{{ request('start_date') }}">
+                            </div>
+                            <div class="col-md-2">
+                                <input type="date" class="form-control" name="end_date" 
+                                       placeholder="Đến ngày" value="{{ request('end_date') }}">
+                            </div>
+                            <div class="col-md-1">
+                                <button type="button" class="btn btn-outline-secondary" onclick="clearFilters()">
+                                    <i class="fas fa-times"></i>
+                                </button>
                             </div>
                         </div>
                     </form>
+                </div>
+            </div>
 
-                    <!-- Table -->
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>#</th>
-                                    <th>Tên kỳ thi</th>
-                                    <th>Thời gian bắt đầu</th>
-                                    <th>Thời gian kết thúc</th>
-                                    <th>Trạng thái</th>
-                                    <th>Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @forelse ($examPeriods as $examPeriod)
-                                <tr>
-                                    <td>{{ $examPeriod->id }}</td>
-                                    <td>
-                                        {{ $examPeriod->name }}
-                                        @if ($examPeriod->description)
-                                            <i class="fas fa-info-circle text-info" 
-                                               data-bs-toggle="tooltip" 
-                                               title="{{ $examPeriod->description }}"></i>
+            <!-- Exam Periods Grid -->
+            <div class="row g-4">
+                @forelse ($examPeriods as $examPeriod)
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">{{ $examPeriod->name }}</h6>
+                            @php
+                                $now = now();
+                                $status = '';
+                                $statusClass = '';
+                                
+                                if (!$examPeriod->is_active) {
+                                    $status = 'Đã khóa';
+                                    $statusClass = 'bg-secondary';
+                                } else if ($now->between($examPeriod->start_time, $examPeriod->end_time)) {
+                                    $status = 'Đang diễn ra';
+                                    $statusClass = 'bg-success';
+                                } else if ($now->lt($examPeriod->start_time)) {
+                                    $daysLeft = $now->diffInDays($examPeriod->start_time);
+                                    $status = "Sắp diễn ra (còn {$daysLeft} ngày)";
+                                    $statusClass = 'bg-info text-dark';
+                                } else {
+                                    $status = 'Đã kết thúc';
+                                    $statusClass = 'bg-danger';
+                                }
+                            @endphp
+                            <span class="badge {{ $statusClass }}">{{ $status }}</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Thời gian bắt đầu:</small>
+                                <span><i class="fas fa-calendar-alt me-1"></i> {{ $examPeriod->start_time->format('d/m/Y') }}</span>
+                            </div>
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Thời gian kết thúc:</small>
+                                <span><i class="fas fa-calendar-alt me-1"></i> {{ $examPeriod->end_time->format('d/m/Y') }}</span>
+                            </div>
+                            @if($examPeriod->description)
+                            <div class="mb-3">
+                                <small class="text-muted d-block">Mô tả:</small>
+                                <span>{{ $examPeriod->description }}</span>
+                            </div>
+                            @endif
+                        </div>
+                        <div class="card-footer bg-transparent">
+                            <div class="d-flex justify-content-between">
+                                <!-- Dropdown cho các chức năng quản lý -->
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-primary dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i class="fas fa-cog"></i> Quản lý
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-shifts.index', $examPeriod) }}">
+                                                <i class="fas fa-clock me-2"></i> Ca thi
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-period-rooms.index', $examPeriod) }}">
+                                                <i class="fas fa-door-open me-2"></i> Phòng thi
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-period-subjects.index', $examPeriod) }}">
+                                                <i class="fas fa-book me-2"></i> Môn thi
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-period-proctors.index', $examPeriod) }}">
+                                                <i class="fas fa-user-tie me-2"></i> Cán bộ coi thi
+                                            </a>
+                                        </li>
+                                    </ul>
+                                </div>
+
+                                <!-- Dropdown cho các thao tác chỉnh sửa -->
+                                <div class="btn-group">
+                                    <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end">
+                                        @if($examPeriod->is_active)
+                                        <li>
+                                            <form action="{{ route('exam-periods.toggle-status', $examPeriod) }}" 
+                                                  method="POST">
+                                                @csrf
+                                                @method('PUT')
+                                                <button type="submit" class="dropdown-item text-warning">
+                                                    <i class="fas fa-lock me-2"></i> Khóa kỳ thi
+                                                </button>
+                                            </form>
+                                        </li>
+                                        @else
+                                        <li>
+                                            <form action="{{ route('exam-periods.toggle-status', $examPeriod) }}" 
+                                                  method="POST">
+                                                @csrf
+                                                @method('PUT')
+                                                <button type="submit" class="dropdown-item text-success">
+                                                    <i class="fas fa-lock-open me-2"></i> Mở khóa kỳ thi
+                                                </button>
+                                            </form>
+                                        </li>
                                         @endif
-                                    </td>
-                                    <td>{{ $examPeriod->start_time->format('d/m/Y H:i') }}</td>
-                                    <td>{{ $examPeriod->end_time->format('d/m/Y H:i') }}</td>
-                                    <td>
-                                        <form action="{{ route('exam-periods.toggle-status', $examPeriod) }}" 
-                                              method="POST" class="d-inline">
-                                            @csrf
-                                            @method('PUT')
-                                            <button type="submit" class="btn btn-sm status-btn 
-                                                {{ $examPeriod->is_active ? 'btn-success' : 'btn-danger' }}">
-                                                {{ $examPeriod->is_active ? 'Hoạt động' : 'Khóa' }}
-                                            </button>
-                                        </form>
-                                    </td>
-                                    <td>
-                                        <a href="{{ route('exam-period-proctors.index', $examPeriod) }}" 
-                                           class="btn btn-sm btn-info" 
-                                           title="Quản lý cán bộ coi thi">
-                                            <i class="fas fa-user-tie"></i>
-                                        </a>
-                                        <a href="{{ route('exam-period-subjects.index', $examPeriod) }}" 
-                                           class="btn btn-sm btn-info" 
-                                           title="Quản lý môn thi">
-                                            <i class="fas fa-book"></i>
-                                        </a>
-                                        <a href="{{ route('exam-shifts.index', $examPeriod) }}" 
-                                           class="btn btn-sm btn-info" 
-                                           title="Quản lý ca thi">
-                                            <i class="fas fa-clock"></i>
-                                        </a>
-                                        <a href="{{ route('exam-periods.edit', $examPeriod) }}" 
-                                           class="btn btn-sm btn-primary">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                        <form action="{{ route('exam-periods.destroy', $examPeriod) }}" 
-                                              method="POST" class="d-inline delete-form">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                @empty
-                                <tr>
-                                    <td colspan="6" class="text-center">Không có dữ liệu</td>
-                                </tr>
-                                @endforelse
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Pagination -->
-                    <div class="d-flex justify-content-end mt-3">
-                        {{ $examPeriods->links() }}
+                                        <li>
+                                            <a class="dropdown-item" href="{{ route('exam-periods.edit', $examPeriod) }}">
+                                                <i class="fas fa-edit me-2"></i> Chỉnh sửa
+                                            </a>
+                                        </li>
+                                        <li>
+                                            <form action="{{ route('exam-periods.destroy', $examPeriod) }}" 
+                                                  method="POST" class="delete-form">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="dropdown-item text-danger">
+                                                    <i class="fas fa-trash-alt me-2"></i> Xóa
+                                                </button>
+                                            </form>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+                @empty
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                            <p class="mb-0">Không có dữ liệu</p>
+                        </div>
+                    </div>
+                </div>
+                @endforelse
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-end mt-4">
+                {{ $examPeriods->links() }}
             </div>
         </div>
     </div>
@@ -143,7 +230,7 @@ $(document).ready(function() {
     // Xác nhận xóa
     $('.delete-form').on('submit', function(e) {
         e.preventDefault();
-        if (confirm('Bạn có chắc chắn muốn xóa?')) {
+        if (confirm('Bạn có chắc chắn muốn xóa kỳ thi này? Tất cả dữ liệu liên quan sẽ bị xóa và không thể khôi phục.')) {
             this.submit();
         }
     });
@@ -151,5 +238,9 @@ $(document).ready(function() {
     // Enable tooltips
     $('[data-bs-toggle="tooltip"]').tooltip();
 });
+
+function clearFilters() {
+    window.location.href = "{{ route('exam-periods.index') }}";
+}
 </script>
 @endpush 

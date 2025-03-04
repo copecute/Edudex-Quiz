@@ -8,6 +8,7 @@ use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ExamPeriodsExport;
 use App\Imports\ExamPeriodsImport;
 use App\Exports\ExamPeriodsTemplateExport;
+use Carbon\Carbon;
 
 class ExamPeriodController extends Controller
 {
@@ -15,11 +16,15 @@ class ExamPeriodController extends Controller
     {
         $search = $request->search;
         $status = $request->status;
+        $startDate = $request->start_date;
+        $endDate = $request->end_date;
 
         $examPeriods = ExamPeriod::search($search)
-            ->active($status)
+            ->filterByStatus($status)
+            ->filterByDateRange($startDate, $endDate)
             ->orderBy('start_time', 'desc')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
 
         return view('exam_periods.index', compact('examPeriods'));
     }
@@ -33,15 +38,18 @@ class ExamPeriodController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
             'start_time' => 'required|date',
-            'end_time' => 'required|date|after:start_time',
+            'end_time' => 'required|date|after_or_equal:start_time',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean'
         ]);
 
-        ExamPeriod::create($validated);
+        // Set giờ mặc định
+        $validated['start_time'] = Carbon::parse($validated['start_time'])->startOfDay();
+        $validated['end_time'] = Carbon::parse($validated['end_time'])->endOfDay();
 
-        return redirect()->route('exam-periods.index')
-            ->with('success', 'Thêm kỳ thi thành công!');
+        ExamPeriod::create($validated);
+        return redirect()->route('exam-periods.index')->with('success', 'Thêm kỳ thi thành công!');
     }
 
     public function edit(ExamPeriod $examPeriod)
@@ -53,15 +61,18 @@ class ExamPeriodController extends Controller
     {
         $validated = $request->validate([
             'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
             'start_time' => 'required|date',
-            'end_time' => 'required|date|after:start_time',
+            'end_time' => 'required|date|after_or_equal:start_time',
+            'description' => 'nullable|string',
+            'is_active' => 'boolean'
         ]);
 
-        $examPeriod->update($validated);
+        // Set giờ mặc định
+        $validated['start_time'] = Carbon::parse($validated['start_time'])->startOfDay();
+        $validated['end_time'] = Carbon::parse($validated['end_time'])->endOfDay();
 
-        return redirect()->route('exam-periods.index')
-            ->with('success', 'Cập nhật kỳ thi thành công!');
+        $examPeriod->update($validated);
+        return redirect()->route('exam-periods.index')->with('success', 'Cập nhật kỳ thi thành công!');
     }
 
     public function destroy(ExamPeriod $examPeriod)

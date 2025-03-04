@@ -44,22 +44,16 @@
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="start_time" class="form-label">Thời gian bắt đầu <span class="text-danger">*</span></label>
-                                    <input type="datetime-local" class="form-control @error('start_time') is-invalid @enderror" 
-                                           id="start_time" name="start_time" value="{{ old('start_time') }}" required>
-                                    @error('start_time')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <label for="start_time" class="form-label">Thời gian bắt đầu</label>
+                                    <input type="date" class="form-control" id="start_time" name="start_time" 
+                                           value="{{ old('start_time') }}" required>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="end_time" class="form-label">Thời gian kết thúc <span class="text-danger">*</span></label>
-                                    <input type="datetime-local" class="form-control @error('end_time') is-invalid @enderror" 
-                                           id="end_time" name="end_time" value="{{ old('end_time') }}" required>
-                                    @error('end_time')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <label for="end_time" class="form-label">Thời gian kết thúc</label>
+                                    <input type="date" class="form-control" id="end_time" name="end_time" 
+                                           value="{{ old('end_time') }}" required>
                                 </div>
                             </div>
                         </div>

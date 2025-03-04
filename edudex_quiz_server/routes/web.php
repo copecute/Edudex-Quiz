@@ -21,6 +21,7 @@ use App\Http\Controllers\ExamShiftController;
 use App\Http\Controllers\ExamPeriodSubjectController;
 use App\Http\Controllers\ExamPeriodSubjectStudentController;
 use App\Http\Controllers\ExamPeriodProctorController;
+use App\Http\Controllers\ExamPeriodRoomController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -196,6 +197,19 @@ Route::middleware('auth')->group(function () {
             ->name('exam-period-proctors.export');
         Route::get('/template', [ExamPeriodProctorController::class, 'downloadTemplate'])
             ->name('exam-period-proctors.template');
+    });
+
+    // Routes cho phòng thi trong kỳ thi
+    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->group(function () {
+        Route::get('/', [ExamPeriodRoomController::class, 'index'])->name('index');
+        Route::get('/assign', [ExamPeriodRoomController::class, 'assign'])->name('assign');
+        Route::post('/', [ExamPeriodRoomController::class, 'store'])->name('store');
+        Route::delete('/', [ExamPeriodRoomController::class, 'destroy'])->name('destroy');
+        Route::delete('/multiple', [ExamPeriodRoomController::class, 'destroyMultiple'])->name('destroy-multiple');
+        Route::get('/tools', [ExamPeriodRoomController::class, 'importExportTools'])->name('tools');
+        Route::get('/template', [ExamPeriodRoomController::class, 'downloadTemplate'])->name('template');
+        Route::post('/import', [ExamPeriodRoomController::class, 'import'])->name('import');
+        Route::get('/export', [ExamPeriodRoomController::class, 'export'])->name('export');
     });
 });
 
