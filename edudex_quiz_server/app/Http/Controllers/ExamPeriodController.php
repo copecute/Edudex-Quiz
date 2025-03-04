@@ -119,4 +119,32 @@ class ExamPeriodController extends Controller
     {
         return view('exam_periods.tools');
     }
+
+    public function dashboard(ExamPeriod $examPeriod)
+    {
+        // Load các thông tin cần thiết
+        $examPeriod->load([
+            'examShifts' => function($query) {
+                $query->withCount(['subjects', 'rooms']);
+            },
+            'examPeriodSubjects.subject',
+            'rooms.room',
+            'proctors.account.accountInfo'
+        ]);
+
+        // Tính toán các thống kê
+        $stats = [
+            'total_shifts' => $examPeriod->examShifts->count(),
+            'total_subjects' => $examPeriod->examPeriodSubjects->count(),
+            'total_rooms' => $examPeriod->rooms->count(),
+            'total_proctors' => $examPeriod->proctors->count(),
+        ];
+
+        return view('exam_periods.dashboard', compact('examPeriod', 'stats'));
+    }
+
+    public function show(ExamPeriod $examPeriod)
+    {
+        return redirect()->route('exam-periods.dashboard', $examPeriod);
+    }
 } 

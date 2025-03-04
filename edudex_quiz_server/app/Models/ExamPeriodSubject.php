@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ExamPeriodSubject extends Model
 {
@@ -13,27 +16,34 @@ class ExamPeriodSubject extends Model
     ];
 
     // Relationship với kỳ thi
-    public function examPeriod()
+    public function examPeriod(): BelongsTo
     {
         return $this->belongsTo(ExamPeriod::class);
     }
 
     // Relationship với môn học
-    public function subject()
+    public function subject(): BelongsTo
     {
-        return $this->belongsTo(Subject::class);
+        return $this->belongsTo(Subject::class, 'subject_id');
     }
 
     // Relationship với đề thi
-    public function exam()
+    public function exam(): BelongsTo
     {
         return $this->belongsTo(Exam::class);
     }
 
     // Relationship với thí sinh
-    public function students()
+    public function students(): HasMany
     {
         return $this->hasMany(ExamPeriodSubjectStudent::class);
+    }
+
+    // Relationship với ca thi
+    public function examShifts(): BelongsToMany
+    {
+        return $this->belongsToMany(ExamShift::class, 'exam_period_subject_shifts')
+                    ->withTimestamps();
     }
 
     // Scope để tìm kiếm

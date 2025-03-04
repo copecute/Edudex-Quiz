@@ -14,10 +14,10 @@ class ExamPeriodsTemplateExport implements FromArray, WithHeadings, ShouldAutoSi
     {
         return [
             [
-                'Kỳ thi học kỳ 1 năm 2024',
-                'Kỳ thi kết thúc học kỳ 1 năm học 2023-2024',
-                '01/06/2024 07:00',
-                '30/06/2024 17:00',
+                'Kỳ thi học kỳ 1 năm 2025',
+                'Kỳ thi kết thúc học kỳ 1 năm học 2023-2025',
+                '01/06/2025 07:00',
+                '30/06/2025 17:00',
                 'Hoạt động'
             ]
         ];

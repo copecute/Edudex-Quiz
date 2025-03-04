@@ -1,4 +1,4 @@
-<header>
+<header class="fixed-top">
     <!-- Top Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
@@ -255,28 +255,44 @@
                     <a href="#adminSubmenu" data-bs-toggle="collapse" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <i class="fas fa-cog me-2"></i> Quản trị
+                                <i class="fas fa-cog me-2"></i> Tài khoản
                             </div>
                             <i class="fas fa-chevron-down"></i>
                         </div>
                     </a>
-                    <div class="collapse {{ request()->is('accounts*', 'facilities*', 'rooms*') ? 'show' : '' }}" id="adminSubmenu">
+                    <div class="collapse {{ request()->is('accounts*') ? 'show' : '' }}" id="adminSubmenu">
                         <a href="{{ route('accounts.index') }}" 
                            class="list-group-item list-group-item-action ps-5 {{ request()->is('accounts') ? 'active' : '' }}">
                             <i class="fas fa-users me-2"></i> Danh sách tài khoản
                         </a>
+                        <a href="{{ route('accounts.index') }}" 
+                        class="list-group-item list-group-item-action ps-5 {{ request()->is('accounts') ? 'active' : '' }}">
+                         <i class="fas fa-user-plus me-2"></i> Thêm tài khoản
+                     </a>
                         <a href="{{ route('accounts.tools') }}" 
                            class="list-group-item list-group-item-action ps-5 {{ request()->is('accounts/tools*') ? 'active' : '' }}">
                             <i class="fas fa-file-excel me-2"></i> Import/Export
                         </a>
+                    </div>
+                </div>
+                <div class="sidebar-item">
+                    <a href="#adminSubmenu" data-bs-toggle="collapse" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <i class="fas fa-cog me-2"></i> Cơ sở vật chất
+                            </div>
+                            <i class="fas fa-chevron-down"></i>
+                        </div>
+                    </a>
+                    <div class="collapse {{ request()->is('facilities*', 'rooms*') ? 'show' : '' }}" id="adminSubmenu">
                         <div class="border-top my-2"></div>
                         <a href="{{ route('facilities.index') }}" 
                            class="list-group-item list-group-item-action ps-5 {{ request()->is('facilities*') ? 'active' : '' }}">
-                            <i class="fas fa-building me-2"></i> Quản lý cơ sở thi
+                            <i class="fas fa-building me-2"></i> Quản lý cơ sở
                         </a>
                         <a href="{{ route('rooms.index') }}" 
                            class="list-group-item list-group-item-action ps-5 {{ request()->is('rooms*') ? 'active' : '' }}">
-                            <i class="fas fa-door-open me-2"></i> Quản lý phòng thi
+                            <i class="fas fa-door-open me-2"></i> Quản lý phòng
                         </a>
                     </div>
                 </div>

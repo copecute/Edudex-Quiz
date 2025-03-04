@@ -12,9 +12,9 @@ return new class extends Migration
     {
         Schema::create('exam_period_subjects', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('exam_period_id')->constrained('exam_periods')->onDelete('cascade');
-            $table->foreignId('subject_id')->constrained('subjects')->onDelete('cascade');
-            $table->foreignId('exam_id')->constrained('exams')->onDelete('cascade');
+            $table->foreignId('exam_period_id')->constrained()->onDelete('cascade');
+            $table->foreignId('subject_id')->constrained()->onDelete('cascade');
+            $table->foreignId('exam_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
 
             // Thêm unique để tránh trùng lặp môn thi trong cùng một kỳ thi

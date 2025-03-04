@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ExamShift extends Model
 {
@@ -22,9 +24,22 @@ class ExamShift extends Model
     ];
 
     // Relationship với kỳ thi
-    public function examPeriod()
+    public function examPeriod(): BelongsTo
     {
         return $this->belongsTo(ExamPeriod::class);
+    }
+
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(ExamPeriodSubject::class, 'exam_period_subject_shifts')
+                    ->withTimestamps();
+    }
+
+    public function rooms(): BelongsToMany
+    {
+        return $this->belongsToMany(ExamPeriodRoom::class, 'exam_shift_rooms')
+                    ->withPivot('id')
+                    ->withTimestamps();
     }
 
     // Scope để tìm kiếm

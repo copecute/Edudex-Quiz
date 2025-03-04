@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ExamPeriodProctor extends Model
 {
@@ -11,14 +13,20 @@ class ExamPeriodProctor extends Model
         'account_id'
     ];
 
-    public function examPeriod()
+    public function examPeriod(): BelongsTo
     {
         return $this->belongsTo(ExamPeriod::class);
     }
 
     public function account()
     {
-        return $this->belongsTo(Account::class);
+        return $this->belongsTo(Account::class, 'account_id');
+    }
+
+    public function rooms(): BelongsToMany
+    {
+        return $this->belongsToMany(ExamPeriodRoom::class, 'exam_shift_room_proctors', 'exam_period_proctor_id', 'exam_shift_room_id')
+                    ->withTimestamps();
     }
 
     // Scope để tìm kiếm

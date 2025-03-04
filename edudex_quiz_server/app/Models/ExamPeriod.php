@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 class ExamPeriod extends Model
 {
@@ -66,25 +68,35 @@ class ExamPeriod extends Model
         return $query;
     }
 
-    public function examShifts()
-    {
-        return $this->hasMany(ExamShift::class);
-    }
-
-    public function examPeriodSubjects()
+    // Relationship với môn thi (qua bảng exam_period_subjects)
+    public function examPeriodSubjects(): HasMany
     {
         return $this->hasMany(ExamPeriodSubject::class);
     }
 
-    public function subjects()
+    // Relationship với môn học
+    public function subjects(): BelongsToMany
     {
         return $this->belongsToMany(Subject::class, 'exam_period_subjects')
                     ->withPivot('exam_id')
                     ->withTimestamps();
     }
 
-    public function proctors()
+    // Relationship với ca thi
+    public function examShifts(): HasMany
+    {
+        return $this->hasMany(ExamShift::class);
+    }
+
+    // Relationship với cán bộ coi thi
+    public function proctors(): HasMany
     {
         return $this->hasMany(ExamPeriodProctor::class);
+    }
+
+    // Relationship với phòng thi
+    public function rooms(): HasMany
+    {
+        return $this->hasMany(ExamPeriodRoom::class);
     }
 } 
