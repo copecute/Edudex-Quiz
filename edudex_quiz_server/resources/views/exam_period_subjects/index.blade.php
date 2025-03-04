@@ -56,7 +56,7 @@
                                     <td>{{ $subject->subject->name }}</td>
                                     <td>{{ $subject->exam->name }}</td>
                                     <td>
-                                        <a href="{{ route('exam-period-subject-students.index', ['examPeriod' => $examPeriod->id, 'examPeriodSubject' => $subject->id]) }}" 
+                                        <a href="{{ route('students.index', ['examPeriod' => $examPeriod, 'subject_id' => $subject->id]) }}" 
                                            class="btn btn-sm btn-info" title="Quản lý thí sinh">
                                             <i class="fas fa-users"></i>
                                         </a>

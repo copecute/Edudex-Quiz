@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use App\Models\Account;
+use App\Models\ExamPeriodSubjectStudent;
 
 class ExamPeriod extends Model
 {
@@ -98,5 +100,17 @@ class ExamPeriod extends Model
     public function rooms(): HasMany
     {
         return $this->hasMany(ExamPeriodRoom::class);
+    }
+
+    /**
+     * Lấy tất cả thí sinh trong kỳ thi (qua bảng pivot exam_period_subject_student)
+     */
+    public function students()
+    {
+        return ExamPeriodSubjectStudent::query()
+            ->join('exam_period_subjects', 'exam_period_subject_students.exam_period_subject_id', '=', 'exam_period_subjects.id')
+            ->where('exam_period_subjects.exam_period_id', $this->id)
+            ->select('exam_period_subject_students.*')
+            ->distinct();
     }
 } 

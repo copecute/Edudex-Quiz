@@ -7,7 +7,9 @@ use Illuminate\Database\Eloquent\Model;
 class ExamPeriodSubjectStudent extends Model
 {
     protected $fillable = [
+        'exam_period_id',
         'exam_period_subject_id',
+        'account_id',
         'exam_code',
         'student_code',
         'full_name',
@@ -27,6 +29,12 @@ class ExamPeriodSubjectStudent extends Model
     public function examPeriodSubject()
     {
         return $this->belongsTo(ExamPeriodSubject::class);
+    }
+
+    // Relationship với kỳ thi
+    public function examPeriod()
+    {
+        return $this->belongsTo(ExamPeriod::class);
     }
 
     // Scope để tìm kiếm

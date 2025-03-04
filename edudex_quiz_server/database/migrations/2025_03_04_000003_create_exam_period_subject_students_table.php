@@ -12,6 +12,7 @@ return new class extends Migration
     {
         Schema::create('exam_period_subject_students', function (Blueprint $table) {
             $table->id();
+            $table->foreignId('exam_period_id')->constrained('exam_periods')->onDelete('cascade');
             $table->foreignId('exam_period_subject_id')->constrained('exam_period_subjects')->onDelete('cascade');
             $table->string('exam_code')->unique()->comment('Số báo danh');
             $table->string('student_code')->comment('Mã sinh viên');
@@ -20,13 +21,13 @@ return new class extends Migration
             $table->text('address')->nullable();
             $table->date('birthday')->nullable();
             $table->boolean('gender')->default(true)->comment('true: Nam, false: Nữ');
-            $table->string('avatar')->nullable();
             $table->timestamps();
 
             // Index để tăng tốc tìm kiếm
             $table->index('exam_code');
             $table->index('student_code');
             $table->index('full_name');
+            $table->index('exam_period_id');
         });
     }
 

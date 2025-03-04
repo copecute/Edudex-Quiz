@@ -15,7 +15,8 @@ class StudentsImport implements ToModel, WithStartRow, WithValidation, SkipsOnEr
 {
     use SkipsErrors;
 
-    protected $examPeriodSubjectId;
+    private $examPeriodId;
+    private $subjectId;
     private $row = [
         'Mã sinh viên (*)',
         'Họ và tên (*)',
@@ -25,22 +26,26 @@ class StudentsImport implements ToModel, WithStartRow, WithValidation, SkipsOnEr
         'Giới tính (1: Nam, 0: Nữ) (*)',
     ];
 
-    public function __construct($examPeriodSubjectId)
+    public function __construct($examPeriodId, $subjectId)
     {
-        $this->examPeriodSubjectId = $examPeriodSubjectId;
+        $this->examPeriodId = $examPeriodId;
+        $this->subjectId = $subjectId;
     }
 
     public function model(array $row)
     {
+        $examCode = ExamPeriodSubjectStudent::generateExamCode($this->subjectId);
+
         return new ExamPeriodSubjectStudent([
-            'exam_period_subject_id' => $this->examPeriodSubjectId,
-            'student_code' => $row[0],
-            'full_name' => $row[1],
-            'phone' => $row[2] ?? null,
-            'address' => $row[3] ?? null,
-            'birthday' => $this->transformDate($row[4]),
-            'gender' => $row[5],
-            'exam_code' => ExamPeriodSubjectStudent::generateExamCode($this->examPeriodSubjectId)
+            'exam_period_id' => $this->examPeriodId,
+            'exam_period_subject_id' => $this->subjectId,
+            'exam_code' => $examCode,
+            'student_code' => trim($row[0]),
+            'full_name' => trim($row[1]),
+            'phone' => trim($row[2] ?? ''),
+            'address' => trim($row[3] ?? ''),
+            'birthday' => trim($row[4] ?? null),
+            'gender' => (bool)trim($row[5])
         ]);
     }
 
@@ -52,33 +57,25 @@ class StudentsImport implements ToModel, WithStartRow, WithValidation, SkipsOnEr
     public function rules(): array
     {
         return [
-            '0' => [
-                'required',
-                'string',
-                'max:50',
-                // Thêm validation unique cho mã sinh viên
-                Rule::unique('exam_period_subject_students', 'student_code')
-                    ->where('exam_period_subject_id', $this->examPeriodSubjectId)
-            ],
-            '1' => 'required|string|max:255',
-            '2' => 'nullable|string|max:20',
-            '3' => 'nullable|string',
-            '4' => 'nullable',
-            '5' => 'required|in:0,1',
+            '0' => 'required',
+            '1' => 'required',
+            '2' => 'nullable',
+            '3' => 'nullable',
+            '4' => 'nullable|date',
+            '5' => 'required|boolean',
         ];
     }
 
     public function customValidationMessages()
     {
         return [
-            '0.required' => 'Mã sinh viên là bắt buộc',
-            '0.max' => 'Mã sinh viên không được vượt quá 50 ký tự',
-            '0.unique' => 'Mã sinh viên đã tồn tại trong môn thi này',
-            '1.required' => 'Họ và tên là bắt buộc',
-            '1.max' => 'Họ và tên không được vượt quá 255 ký tự',
+            '0.required' => 'Mã sinh viên không được để trống',
+            '1.required' => 'Họ tên không được để trống',
             '2.max' => 'Số điện thoại không được vượt quá 20 ký tự',
-            '5.required' => 'Giới tính là bắt buộc',
-            '5.in' => 'Giới tính phải là 0 (Nữ) hoặc 1 (Nam)',
+            '3.max' => 'Địa chỉ không được vượt quá 255 ký tự',
+            '4.date' => 'Ngày sinh không hợp lệ',
+            '5.required' => 'Giới tính không được để trống',
+            '5.boolean' => 'Giới tính phải là 0 hoặc 1',
         ];
     }
 

@@ -23,6 +23,7 @@ use App\Http\Controllers\ExamPeriodSubjectStudentController;
 use App\Http\Controllers\ExamPeriodProctorController;
 use App\Http\Controllers\ExamPeriodRoomController;
 use App\Http\Controllers\ExamPeriodAssignmentController;
+use App\Http\Controllers\ExamPeriodStudentController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -152,31 +153,22 @@ Route::middleware('auth')->group(function () {
     Route::get('/exams/by-subject/{subject}', [ExamController::class, 'getBySubject'])
         ->name('exams.by-subject');
 
-    // Thay thế routes quản lý thí sinh cũ
-    Route::prefix('exam-periods/{examPeriod}/subjects/{examPeriodSubject}/students')->group(function () {
-        Route::get('/', [ExamPeriodSubjectStudentController::class, 'index'])
-            ->name('exam-period-subject-students.index');
-        Route::get('/create', [ExamPeriodSubjectStudentController::class, 'create'])
-            ->name('exam-period-subject-students.create');
-        Route::post('/', [ExamPeriodSubjectStudentController::class, 'store'])
-            ->name('exam-period-subject-students.store');
-        Route::get('/{student}/edit', [ExamPeriodSubjectStudentController::class, 'edit'])
-            ->name('exam-period-subject-students.edit');
-        Route::put('/{student}', [ExamPeriodSubjectStudentController::class, 'update'])
-            ->name('exam-period-subject-students.update');
-        Route::delete('/{student}', [ExamPeriodSubjectStudentController::class, 'destroy'])
-            ->name('exam-period-subject-students.destroy');
-
-        // Import/Export routes
-        Route::get('/tools', [ExamPeriodSubjectStudentController::class, 'importExportTools'])
-            ->name('exam-period-subject-students.tools');
-        Route::get('/template', [ExamPeriodSubjectStudentController::class, 'downloadTemplate'])
-            ->name('exam-period-subject-students.template');
-        Route::post('/import', [ExamPeriodSubjectStudentController::class, 'import'])
-            ->name('exam-period-subject-students.import');
-        Route::get('/export', [ExamPeriodSubjectStudentController::class, 'export'])
-            ->name('exam-period-subject-students.export');
-    });
+    // Routes cho thí sinh trong kỳ thi
+    Route::prefix('exam-periods/{examPeriod}/students')
+        ->name('students.')
+        ->group(function () {
+            Route::get('/', [ExamPeriodStudentController::class, 'index'])->name('index');
+            Route::get('/create', [ExamPeriodStudentController::class, 'create'])->name('create');
+            Route::get('/{student}/edit', [ExamPeriodStudentController::class, 'edit'])->name('edit');
+            Route::put('/{student}', [ExamPeriodStudentController::class, 'update'])->name('update');
+            Route::post('/', [ExamPeriodStudentController::class, 'store'])->name('store');
+            Route::delete('/', [ExamPeriodStudentController::class, 'destroy'])->name('destroy');
+            Route::delete('/multiple', [ExamPeriodStudentController::class, 'destroyMultiple'])->name('destroy-multiple');
+            Route::get('/tools', [ExamPeriodStudentController::class, 'importExportTools'])->name('tools');
+            Route::get('/template', [ExamPeriodStudentController::class, 'downloadTemplate'])->name('template');
+            Route::post('/import', [ExamPeriodStudentController::class, 'import'])->name('import');
+            Route::get('/export', [ExamPeriodStudentController::class, 'export'])->name('export');
+        });
 
     // Exam Period Proctors
     Route::prefix('exam-periods/{examPeriod}/proctors')->group(function () {
