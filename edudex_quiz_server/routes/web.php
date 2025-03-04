@@ -222,10 +222,6 @@ Route::middleware('auth')->group(function () {
         // Phân công phòng thi cho ca thi
         Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
         Route::post('/rooms', [ExamPeriodAssignmentController::class, 'assignRooms'])->name('rooms.store');
-        
-        // Phân công CBCT cho phòng thi
-        Route::get('/proctors', [ExamPeriodAssignmentController::class, 'proctors'])->name('proctors');
-        Route::post('/proctors', [ExamPeriodAssignmentController::class, 'assignProctors'])->name('proctors.store');
     });
 });
 
@@ -236,6 +232,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::post('/exam-periods/import', [ExamPeriodController::class, 'import'])->name('exam-periods.import');
     Route::get('/exam-periods/export', [ExamPeriodController::class, 'export'])->name('exam-periods.export');
     Route::put('/exam-periods/{examPeriod}/toggle-status', [ExamPeriodController::class, 'toggleStatus'])->name('exam-periods.toggle-status');
+    Route::get('/exam-periods/{examPeriod}/dashboard', [ExamPeriodController::class, 'dashboard'])->name('exam-periods.dashboard');
     Route::resource('exam-periods', ExamPeriodController::class);
 
     // Thay thế route exam-shifts cũ bằng nested route

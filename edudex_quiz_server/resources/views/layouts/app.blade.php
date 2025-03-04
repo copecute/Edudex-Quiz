@@ -17,7 +17,7 @@
 <body>
     @include('layouts.header')
     
-    <main class="py-4">
+    <main class="py-4" style="margin-top: 60px;">
         @yield('content')
     </main>
 

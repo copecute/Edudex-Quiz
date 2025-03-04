@@ -18,9 +18,9 @@ class ExamPeriodProctor extends Model
         return $this->belongsTo(ExamPeriod::class);
     }
 
-    public function account(): BelongsTo
+    public function account()
     {
-        return $this->belongsTo(Account::class);
+        return $this->belongsTo(Account::class, 'account_id');
     }
 
     public function rooms(): BelongsToMany

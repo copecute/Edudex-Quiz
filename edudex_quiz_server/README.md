@@ -140,9 +140,9 @@ edudex-server/
 
 ### Liên hệ
 - Email: admin@minhgiang.pro
-- Hotline: 088-888-9530
+- Hotline: 033-333-2444
 - Website: https://minhgiang.pro
 
 ## License
 
-© 2024 EduDex. All rights reserved.
+© 2025 EduDex. All rights reserved.

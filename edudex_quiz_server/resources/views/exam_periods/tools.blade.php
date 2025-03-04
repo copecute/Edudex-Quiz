@@ -73,7 +73,7 @@
                             <li>File import phải đúng định dạng Excel (.xlsx, .xls)</li>
                             <li>Dữ liệu trong file phải theo đúng template</li>
                             <li>Các trường đánh dấu (*) là bắt buộc</li>
-                            <li>Định dạng thời gian: dd/mm/yyyy hh:mm (VD: 01/06/2024 07:00)</li>
+                            <li>Định dạng thời gian: dd/mm/yyyy hh:mm (VD: 01/06/2025 07:00)</li>
                             <li>Trạng thái chỉ nhận một trong hai giá trị: Hoạt động hoặc Khóa</li>
                         </ul>
                     </div>

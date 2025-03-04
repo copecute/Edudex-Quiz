@@ -12,10 +12,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('exam_shift_id')->constrained()->onDelete('cascade');
             $table->foreignId('exam_period_room_id')->constrained()->onDelete('cascade');
+            $table->foreignId('exam_period_subject_id')->nullable()->constrained()->onDelete('set null');
+            $table->foreignId('exam_period_proctor_id')->nullable()
+                  ->constrained()
+                  ->onDelete('set null');
             $table->timestamps();
 
-            // Một phòng thi chỉ được phân công một lần trong một ca thi
+            // một phòng thi chỉ được phân công một lần trong một ca thi
             $table->unique(['exam_shift_id', 'exam_period_room_id'], 'unique_shift_room');
+            
+            // unique constraint để CBCT không thể coi nhiều phòng trong cùng ca thi
+            $table->unique(['exam_shift_id', 'exam_period_proctor_id'], 'unique_proctor_per_shift');
         });
     }
 
