@@ -219,6 +219,19 @@
                     </a>
                 </div>
                 <div class="col-md-3">
+                    <a href="{{ route('exam-periods.assignment.auto', $examPeriod) }}" class="card h-100 text-decoration-none">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-laptop-code"></i>
+                                Tự động phân công
+                            </h5>
+                            <p class="card-text text-muted">
+                                Tự động phân công
+                            </p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
                     <a href="{{ route('exam-periods.results', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">

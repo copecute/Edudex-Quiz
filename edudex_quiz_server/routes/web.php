@@ -212,6 +212,10 @@ Route::middleware('auth')->group(function () {
         Route::get('/subjects', [ExamPeriodAssignmentController::class, 'subjects'])->name('subjects');
         Route::post('/subjects', [ExamPeriodAssignmentController::class, 'assignSubjects'])->name('subjects.store');
         
+        // Tự động phân công
+        Route::get('/auto', [ExamPeriodAssignmentController::class, 'autoAssignmentForm'])->name('auto');
+        Route::post('/auto', [ExamPeriodAssignmentController::class, 'autoAssign'])->name('auto.store');
+
         // phân công phòng thi cho ca thi
         Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
         Route::post('/rooms', [ExamPeriodAssignmentController::class, 'assignRooms'])->name('rooms.store');

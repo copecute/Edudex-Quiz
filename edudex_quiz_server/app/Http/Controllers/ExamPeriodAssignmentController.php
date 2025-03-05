@@ -583,4 +583,239 @@ class ExamPeriodAssignmentController extends Controller
         $writer->save('php://output');
         exit;
     }
+
+    // Hiển thị form tự động phân công
+    public function autoAssignmentForm(ExamPeriod $examPeriod)
+    {
+        $data = [
+            'examPeriod' => $examPeriod,
+            'shifts' => $examPeriod->examShifts,
+            'subjects' => $examPeriod->examPeriodSubjects()->with('subject', 'students')->get(),
+            'rooms' => $examPeriod->examPeriodRooms()->with('room')->get(),
+            'proctors' => ExamPeriodProctor::where('exam_period_id', $examPeriod->id)
+                ->with('account.accountInfo')
+                ->get()
+        ];
+
+        // Tính toán thống kê
+        $stats = [
+            'total_shifts' => $data['shifts']->count(),
+            'total_subjects' => $data['subjects']->count(),
+            'total_rooms' => $data['rooms']->count(),
+            'total_room_capacity' => $data['rooms']->sum(function($room) {
+                return $room->room->capacity;
+            }),
+            'total_proctors' => $data['proctors']->count(),
+            'total_students' => $data['subjects']->sum(function($subject) {
+                return $subject->students->count();
+            })
+        ];
+
+        return view('exam_periods.assignment.auto', compact('data', 'stats'));
+    }
+
+    // Xử lý tự động phân công
+    public function autoAssign(Request $request, ExamPeriod $examPeriod)
+    {
+        try {
+            DB::beginTransaction();
+
+            // 1. Thu thập dữ liệu
+            $shifts = $examPeriod->examShifts;
+            $subjects = $examPeriod->examPeriodSubjects()->with('subject', 'students')->get();
+            $rooms = $examPeriod->examPeriodRooms()->with('room')->get();
+            $proctors = ExamPeriodProctor::where('exam_period_id', $examPeriod->id)->get();
+
+            // 2. Tính toán số ca thi cần thiết cho mỗi môn
+            $subjectShiftNeeds = $this->calculateShiftNeeds($subjects, $rooms);
+
+            // 3. Phân bổ môn thi vào ca thi
+            $shiftAssignments = $this->distributeSubjectsToShifts($subjects, $shifts, $subjectShiftNeeds);
+
+            // Xóa phân công môn thi cũ
+            DB::table('exam_period_subject_shifts')->whereIn('exam_shift_id', $shifts->pluck('id'))->delete();
+            
+            // Lưu phân công môn thi mới
+            foreach ($shiftAssignments as $shiftId => $shiftSubjects) {
+                foreach ($shiftSubjects as $subject) {
+                    DB::table('exam_period_subject_shifts')->insert([
+                        'exam_shift_id' => $shiftId,
+                        'exam_period_subject_id' => $subject->id,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
+                }
+            }
+
+            // 4. Phân bổ phòng thi và CBCT cho từng ca
+            foreach ($shifts as $shift) {
+                $shiftSubjects = $shiftAssignments[$shift->id] ?? [];
+                if (empty($shiftSubjects)) continue;
+
+                // Phân bổ phòng thi cho các môn trong ca
+                $roomAssignments = $this->assignRoomsForShift($shift, $shiftSubjects, $rooms);
+
+                // Phân bổ CBCT cho các phòng
+                $this->assignProctorsForShift($shift, $roomAssignments, $proctors);
+
+                // Phân bổ thí sinh vào phòng
+                $this->assignStudentsToRoomsAuto($shift, $roomAssignments);
+            }
+
+            DB::commit();
+            return redirect()->route('exam-periods.assignment.subjects', $examPeriod)
+                ->with('success', 'Đã hoàn thành tự động phân công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
+        }
+    }
+
+    private function calculateShiftNeeds($subjects, $rooms)
+    {
+        $totalCapacity = $rooms->sum(function($room) {
+            return $room->room->capacity;
+        });
+
+        $needs = [];
+        foreach ($subjects as $subject) {
+            $studentCount = $subject->students->count();
+            // Đảm bảo mỗi môn được phân vào ít nhất 1 ca thi
+            $shiftsNeeded = max(1, ceil($studentCount / $totalCapacity));
+            $needs[$subject->id] = $shiftsNeeded;
+        }
+
+        return $needs;
+    }
+
+    private function distributeSubjectsToShifts($subjects, $shifts, $shiftNeeds)
+    {
+        $assignments = [];
+        $currentShiftIndex = 0;
+        $shiftsCount = $shifts->count();
+
+        if ($shiftsCount == 0) {
+            throw new \Exception('Không có ca thi nào được tạo');
+        }
+
+        // Sắp xếp môn thi theo số lượng thí sinh giảm dần
+        $subjects = $subjects->sortByDesc(function($subject) {
+            return $subject->students->count();
+        });
+
+        foreach ($subjects as $subject) {
+            $neededShifts = $shiftNeeds[$subject->id];
+            
+            for ($i = 0; $i < $neededShifts; $i++) {
+                $shiftId = $shifts[$currentShiftIndex]->id;
+               
+                // Kiểm tra xem môn này đã được phân vào ca thi này chưa
+                if (!isset($assignments[$shiftId])) {
+                    $assignments[$shiftId] = [];
+                }
+                if (!in_array($subject, $assignments[$shiftId])) {
+                    $assignments[$shiftId][] = $subject;
+                }
+                
+                // Chuyển sang ca thi tiếp theo
+                $currentShiftIndex = ($currentShiftIndex + 1) % $shiftsCount;
+            }
+        }
+
+        return $assignments;
+    }
+
+    private function assignRoomsForShift($shift, $subjects, $availableRooms)
+    {
+        $assignments = [];
+        $currentRoomIndex = 0;
+        $roomsCount = $availableRooms->count();
+
+        foreach ($subjects as $subject) {
+            $studentCount = $subject->students->count();
+            $assignedCount = 0;
+
+            while ($assignedCount < $studentCount && $currentRoomIndex < $roomsCount) {
+                $room = $availableRooms[$currentRoomIndex];
+                $assignments[] = [
+                    'room' => $room,
+                    'subject' => $subject
+                ];
+                
+                $assignedCount += $room->room->capacity;
+                $currentRoomIndex++;
+            }
+        }
+
+        // Lưu phân công phòng thi
+        foreach ($assignments as $assignment) {
+            DB::table('exam_shift_rooms')->updateOrInsert(
+                [
+                    'exam_shift_id' => $shift->id,
+                    'exam_period_room_id' => $assignment['room']->id,
+                ],
+                [
+                    'exam_period_subject_id' => $assignment['subject']->id,
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]
+            );
+        }
+
+        return $assignments;
+    }
+
+    private function assignProctorsForShift($shift, $roomAssignments, $proctors)
+    {
+        // Lọc CBCT chưa được phân công trong ca này
+        $availableProctors = $proctors->filter(function($proctor) use ($shift) {
+            return !DB::table('exam_shift_rooms')
+                ->where('exam_shift_id', $shift->id)
+                ->where('exam_period_proctor_id', $proctor->id)
+                ->exists();
+        });
+
+        $proctorIndex = 0;
+        $proctorCount = $availableProctors->count();
+
+        foreach ($roomAssignments as $assignment) {
+            if ($proctorIndex >= $proctorCount) break;
+
+            $proctor = $availableProctors->values()[$proctorIndex];
+            
+            DB::table('exam_shift_rooms')
+                ->where('exam_shift_id', $shift->id)
+                ->where('exam_period_room_id', $assignment['room']->id)
+                ->update(['exam_period_proctor_id' => $proctor->id]);
+
+            $proctorIndex++;
+        }
+    }
+
+    private function assignStudentsToRoomsAuto($shift, $roomAssignments)
+    {
+        foreach ($roomAssignments as $assignment) {
+            $students = $assignment['subject']->students()
+                ->whereNotIn('id', function($query) use ($shift) {
+                    $query->select('exam_period_subject_student_id')
+                        ->from('exam_period_room_students')
+                        ->where('exam_shift_id', $shift->id);
+                })
+                ->orderBy('exam_code')
+                ->take($assignment['room']->room->capacity)
+                ->get();
+
+            $seatNumber = 1;
+            foreach ($students as $student) {
+                ExamPeriodRoomStudent::create([
+                    'exam_period_id' => $shift->examPeriod->id,
+                    'exam_shift_id' => $shift->id,
+                    'exam_period_room_id' => $assignment['room']->id,
+                    'exam_period_subject_id' => $assignment['subject']->id,
+                    'exam_period_subject_student_id' => $student->id,
+                    'seat_number' => $seatNumber++
+                ]);
+            }
+        }
+    }
 } 

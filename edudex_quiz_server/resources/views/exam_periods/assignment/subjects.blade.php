@@ -15,8 +15,14 @@
             </nav>
 
             <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Phân công môn thi vào ca thi</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Phân công môn thi</h5>
+                    <div>
+                        <a href="{{ route('exam-periods.assignment.auto', $examPeriod) }}" class="btn btn-sm btn-primary">
+                            <i class="fa-solid fa-laptop-code"></i>
+                            Tự động
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
                     @if ($errors->any())

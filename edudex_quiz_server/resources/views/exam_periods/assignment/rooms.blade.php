@@ -70,6 +70,10 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="mb-0">Phân công phòng thi</h5>
                         <div>
+                            <a href="{{ route('exam-periods.assignment.auto', $examPeriod) }}" class="btn btn-sm btn-primary">
+                                <i class="fa-solid fa-laptop-code"></i>
+                                Tự động
+                            </a>
                             <a href="{{ route('exam-periods.assignment.rooms.export', $examPeriod) }}"
                                 class="btn btn-sm btn-outline-primary me-2">
                                 <i class="fas fa-file-excel me-1"></i>
