@@ -30,7 +30,7 @@ return new class extends Migration
             $table->decimal('score', 5, 2)->comment('Điểm số');
             $table->decimal('score_after_review', 5, 2)->nullable()->comment('Điểm sau phúc khảo');
             $table->text('note')->nullable()->comment('Ghi chú');
-            $table->string('log_file')->comment('File log .edudex');
+            $table->longText('log_file')->comment('File log .edudex base64');
             $table->timestamps();
 
             // Index để tăng tốc tìm kiếm
@@ -38,6 +38,13 @@ return new class extends Migration
             $table->index('exam_period_subject_student_id');
             $table->index('exam_period_code');
             $table->index('student_code');
+
+            // unique constraint mỗi thí sinh chỉ nộp 1 lần cho 1 môn trong 1 kỳ thi
+            $table->unique([
+                'exam_period_id',
+                'exam_period_subject_id',
+                'exam_period_subject_student_id'
+            ], 'unique_student_subject_result');
         });
     }
 
@@ -45,4 +52,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('exam_results');
     }
-}; 
+};

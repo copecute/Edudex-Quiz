@@ -154,7 +154,7 @@
                     </a>
                 </div>
                 <div class="col-md-3">
-                    <a href="{{ route('exam-period-subjects.index', $examPeriod) }}" class="card h-100 text-decoration-none">
+                    <a href="{{ route('students.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
                                 <i class="fas fa-user me-2"></i>
