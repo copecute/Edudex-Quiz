@@ -57,6 +57,40 @@ class ExamResultController extends Controller
         ], $messages, $attributes);
 
         try {
+            // Kiểm tra trạng thái và thời gian của kỳ thi
+            $now = now();
+            if (!$examPeriod->is_active) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kỳ thi đã bị khóa',
+                    'errors' => [
+                        'exam_period' => ['Kỳ thi ' . $examPeriod->name . ' đã bị khóa']
+                    ]
+                ], 422);
+            }
+
+            if ($now->lt($examPeriod->start_time)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kỳ thi chưa bắt đầu',
+                    'errors' => [
+                        'exam_period' => ['Kỳ thi ' . $examPeriod->name . ' sẽ bắt đầu lúc ' . 
+                            $examPeriod->start_time->format('H:i d/m/Y')]
+                    ]
+                ], 422);
+            }
+
+            if ($now->gt($examPeriod->end_time)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Kỳ thi đã kết thúc',
+                    'errors' => [
+                        'exam_period' => ['Kỳ thi ' . $examPeriod->name . ' đã kết thúc lúc ' . 
+                            $examPeriod->end_time->format('H:i d/m/Y')]
+                    ]
+                ], 422);
+            }
+
             // Kiểm tra ca thi có tồn tại không
             if (!$examPeriod->examShifts()->where('id', $validated['shift_id'])->exists()) {
                 return response()->json([
