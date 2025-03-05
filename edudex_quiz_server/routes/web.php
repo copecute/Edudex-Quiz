@@ -215,6 +215,7 @@ Route::middleware('auth')->group(function () {
         // phân công phòng thi cho ca thi
         Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
         Route::post('/rooms', [ExamPeriodAssignmentController::class, 'assignRooms'])->name('rooms.store');
+        Route::get('/rooms/export', [ExamPeriodAssignmentController::class, 'exportRoomAssignments'])->name('rooms.export');
         Route::post('/students', [ExamPeriodAssignmentController::class, 'assignStudents'])->name('students');
     });
 

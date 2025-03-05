@@ -123,4 +123,10 @@ class ExamPeriod extends Model
     {
         return $this->hasMany(ExamPeriodRoom::class);
     }
+
+    // Relationship với kết quả thi
+    public function examResults()
+    {
+        return $this->hasMany(ExamResult::class);
+    }
 } 

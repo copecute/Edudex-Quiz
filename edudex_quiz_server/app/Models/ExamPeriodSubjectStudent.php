@@ -37,6 +37,12 @@ class ExamPeriodSubjectStudent extends Model
         return $this->belongsTo(ExamPeriod::class);
     }
 
+    // Relationship với kỳ thi
+    public function exam()
+    {
+        return $this->belongsTo(Exam::class);
+    }
+
     // Scope để tìm kiếm
     public function scopeSearch($query, $search)
     {

@@ -13,6 +13,7 @@ return new class extends Migration
             $table->foreignId('exam_period_id')->constrained('exam_periods')->onDelete('cascade');
             $table->foreignId('exam_shift_id')->constrained('exam_shifts')->onDelete('cascade');
             $table->foreignId('exam_period_room_id')->constrained('exam_period_rooms')->onDelete('cascade');
+            $table->foreignId('exam_period_subject_id')->constrained('exam_period_subjects')->onDelete('cascade');
             $table->foreignId('exam_period_subject_student_id')->constrained('exam_period_subject_students')->onDelete('cascade');
             $table->integer('seat_number')->comment('Số ghế trong phòng');
             $table->timestamps();

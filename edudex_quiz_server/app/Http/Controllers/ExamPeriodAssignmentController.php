@@ -11,6 +11,11 @@ use App\Models\ExamPeriodSubjectStudent;
 use App\Models\ExamPeriodRoomStudent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class ExamPeriodAssignmentController extends Controller
 {
@@ -221,16 +226,34 @@ class ExamPeriodAssignmentController extends Controller
                     $shift = ExamShift::with(['subjects', 'rooms'])->findOrFail($assignment['shift_id']);
                     
                     // Lấy danh sách thí sinh của các môn trong ca thi
-                    $students = ExamPeriodSubjectStudent::whereIn(
-                        'exam_period_subject_id', 
-                        $shift->subjects->pluck('id')
-                    )->get();
+                    $students = ExamPeriodSubjectStudent::whereHas('examPeriodSubject', function($query) use ($shift) {
+                        $query->whereHas('examShifts', function($q) use ($shift) {
+                            $q->where('exam_shifts.id', $shift->id);
+                        });
+                    })
+                    ->select('exam_period_subject_students.*', 'exam_period_subjects.id as exam_period_subject_id')
+                    ->join('exam_period_subjects', 'exam_period_subject_students.exam_period_subject_id', '=', 'exam_period_subjects.id')
+                    ->whereNotIn('exam_period_subject_students.id', function($query) use ($shift) {
+                        $query->select('exam_period_room_students.exam_period_subject_student_id')
+                            ->from('exam_period_room_students')
+                            ->where('exam_shift_id', $shift->id);
+                    })
+                    ->get();
 
                     if ($assignment['assignment_type'] == 'random') {
                         $students = $students->shuffle();
                     } else {
                         $students = $students->sortBy('exam_code');
                     }
+
+                    // Lấy danh sách phòng thi và sức chứa
+                    $rooms = $shift->rooms->map(function($room) {
+                        return [
+                            'room_id' => $room->id,
+                            'capacity' => $room->room->capacity,
+                            'current_count' => 0
+                        ];
+                    })->toArray();
 
                     // Xóa phân công cũ
                     ExamPeriodRoomStudent::where([
@@ -239,6 +262,7 @@ class ExamPeriodAssignmentController extends Controller
                     ])->delete();
 
                     // Phân công thí sinh vào phòng
+                    $assignedStudents = []; // Theo dõi thí sinh đã được phân công
                     $this->assignStudentsToRooms($examPeriod, $shift, $students);
                 }
             }
@@ -262,6 +286,7 @@ class ExamPeriodAssignmentController extends Controller
 
         // Nhóm thí sinh theo môn thi
         $studentsBySubject = $students->groupBy('exam_period_subject_id');
+        $assignedStudents = []; // Theo dõi thí sinh đã được phân công
 
         // Phân công thí sinh vào phòng theo môn thi
         foreach ($roomSubjects as $roomId => $subjectId) {
@@ -274,6 +299,11 @@ class ExamPeriodAssignmentController extends Controller
             $seatNumber = 1;
 
             foreach ($studentsForSubject as $student) {
+                // Kiểm tra xem thí sinh đã được phân công trong ca thi này chưa
+                if (isset($assignedStudents[$student->id])) {
+                    continue;
+                }
+
                 // Kiểm tra sức chứa phòng thi
                 if ($seatNumber > $room->room->capacity) {
                     break;
@@ -283,9 +313,13 @@ class ExamPeriodAssignmentController extends Controller
                     'exam_period_id' => $examPeriod->id,
                     'exam_shift_id' => $shift->id,
                     'exam_period_room_id' => $roomId,
+                    'exam_period_subject_id' => $student->exam_period_subject_id,
                     'exam_period_subject_student_id' => $student->id,
                     'seat_number' => $seatNumber++
                 ]);
+
+                // Đánh dấu thí sinh đã được phân công
+                $assignedStudents[$student->id] = true;
             }
         }
     }
@@ -303,10 +337,19 @@ class ExamPeriodAssignmentController extends Controller
             $shift = ExamShift::with(['subjects', 'rooms'])->findOrFail($request->shift_id);
             
             // Lấy danh sách thí sinh của các môn trong ca thi
-            $students = ExamPeriodSubjectStudent::whereIn(
-                'exam_period_subject_id', 
-                $shift->subjects->pluck('id')
-            )->get();
+            $students = ExamPeriodSubjectStudent::whereHas('examPeriodSubject', function($query) use ($shift) {
+                $query->whereHas('examShifts', function($q) use ($shift) {
+                    $q->where('exam_shifts.id', $shift->id);
+                });
+            })
+            ->select('exam_period_subject_students.*', 'exam_period_subjects.id as exam_period_subject_id')
+            ->join('exam_period_subjects', 'exam_period_subject_students.exam_period_subject_id', '=', 'exam_period_subjects.id')
+            ->whereNotIn('exam_period_subject_students.id', function($query) use ($shift) {
+                $query->select('exam_period_room_students.exam_period_subject_student_id')
+                    ->from('exam_period_room_students')
+                    ->where('exam_shift_id', $shift->id);
+            })
+            ->get();
 
             if ($request->assignment_type == 'random') {
                 $students = $students->shuffle();
@@ -331,7 +374,13 @@ class ExamPeriodAssignmentController extends Controller
             ])->delete();
 
             // Phân công thí sinh vào phòng
+            $assignedStudents = []; // Theo dõi thí sinh đã được phân công
             foreach ($students as $student) {
+                // Kiểm tra xem thí sinh đã được phân công trong ca thi này chưa
+                if (isset($assignedStudents[$student->id])) {
+                    continue;
+                }
+
                 // Tìm phòng còn chỗ
                 foreach ($rooms as &$room) {
                     if ($room['current_count'] < $room['capacity']) {
@@ -339,10 +388,12 @@ class ExamPeriodAssignmentController extends Controller
                             'exam_period_id' => $examPeriod->id,
                             'exam_shift_id' => $shift->id,
                             'exam_period_room_id' => $room['room_id'],
+                            'exam_period_subject_id' => $student->exam_period_subject_id,
                             'exam_period_subject_student_id' => $student->id,
                             'seat_number' => $room['current_count'] + 1
                         ]);
                         $room['current_count']++;
+                        $assignedStudents[$student->id] = true;
                         break;
                     }
                 }
@@ -354,5 +405,182 @@ class ExamPeriodAssignmentController extends Controller
             DB::rollBack();
             return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
         }
+    }
+
+    public function exportRoomAssignments(ExamPeriod $examPeriod, Request $request)
+    {
+        $spreadsheet = new Spreadsheet();
+        
+        // Lấy tất cả môn thi của kỳ thi
+        $subjects = $examPeriod->examPeriodSubjects()
+            ->with(['subject', 'examShifts.rooms' => function($query) {
+                $query->join('rooms', 'exam_period_rooms.room_id', '=', 'rooms.id')
+                    ->orderBy('rooms.name')
+                    ->select('exam_period_rooms.*');
+            }])
+            ->get();
+
+        foreach ($subjects as $examPeriodSubject) {
+            // Tạo worksheet mới cho mỗi môn
+            $sheet = $spreadsheet->createSheet();
+            // Giới hạn tên sheet tối đa 31 ký tự theo quy định của Excel
+            $sheetTitle = mb_substr($examPeriodSubject->subject->name, 0, 31);
+            $sheet->setTitle($sheetTitle);
+            
+            // Thiết lập tiêu đề
+            $sheet->mergeCells('A1:I1');
+            $sheet->setCellValue('A1', 'DANH SÁCH PHÂN CÔNG PHÒNG THI');
+            $sheet->mergeCells('A2:I2');
+            $sheet->setCellValue('A2', 'Môn thi: ' . $examPeriodSubject->subject->name . ' (' . $examPeriodSubject->subject->code . ')');
+            
+            $row = 3;
+            
+            // Lặp qua từng ca thi của môn này
+            foreach ($examPeriodSubject->examShifts as $shift) {
+                $row++;
+                // Tiêu đề ca thi
+                $sheet->mergeCells("A{$row}:I{$row}");
+                $sheet->setCellValue("A{$row}", $shift->name . ' - ' . $shift->start_time->format('H:i d/m/Y'));
+                $sheet->getStyle("A{$row}")->getFont()->setBold(true);
+                
+                // Lấy danh sách phòng thi được phân công cho môn này trong ca này
+                $roomAssignments = $shift->rooms()
+                    ->whereHas('examPeriodRoomStudents', function($query) use ($examPeriodSubject) {
+                        $query->where('exam_period_subject_id', $examPeriodSubject->id);
+                    })
+                    ->with([
+                        'room',
+                        'examPeriodRoomStudents' => function($query) use ($examPeriodSubject) {
+                            $query->where('exam_period_subject_id', $examPeriodSubject->id)
+                                ->with('student');
+                        }
+                    ])
+                    ->join('rooms', 'exam_period_rooms.room_id', '=', 'rooms.id')
+                    ->leftJoin('exam_period_proctors', 'exam_shift_rooms.exam_period_proctor_id', '=', 'exam_period_proctors.id')
+                    ->leftJoin('accounts', 'exam_period_proctors.account_id', '=', 'accounts.id')
+                    ->leftJoin('account_infos', 'accounts.id', '=', 'account_infos.account_id')
+                    ->orderBy('rooms.name')
+                    ->select('exam_period_rooms.*', 'account_infos.fullName as proctor_name')
+                    ->get();
+                
+                // Debug log
+                \Log::info('Room Assignments:', [
+                    'shift_id' => $shift->id,
+                    'rooms' => $roomAssignments->map(function($room) {
+                        return [
+                            'room_id' => $room->id,
+                            'room_name' => $room->room->name,
+                            'pivot' => $room->pivot,
+                            'proctor_id' => $room->pivot->exam_period_proctor_id ?? null,
+                            'proctor' => $room->proctor ? [
+                                'id' => $room->proctor->id,
+                                'account' => $room->proctor->account ? [
+                                    'id' => $room->proctor->account->id,
+                                    'info' => $room->proctor->account->accountInfo ? [
+                                        'id' => $room->proctor->account->accountInfo->id,
+                                        'full_name' => $room->proctor->account->accountInfo->fullName
+                                    ] : null
+                                ] : null
+                            ] : null
+                        ];
+                    })->toArray()
+                ]);
+
+                foreach ($roomAssignments as $roomAssignment) {
+                    if ($roomAssignment->examPeriodRoomStudents->isEmpty()) continue;
+                    
+                    $row++;
+                    
+                    // Thông tin phòng
+                    $sheet->mergeCells("A{$row}:I{$row}");
+                    // Debug log
+                    \Log::info('Processing room:', [
+                        'room_id' => $roomAssignment->id,
+                        'room_name' => $roomAssignment->room->name,
+                        'pivot' => $roomAssignment->pivot,
+                        'proctor_id' => $roomAssignment->pivot->exam_period_proctor_id ?? null,
+                        'proctor' => $roomAssignment->proctor
+                    ]);
+
+                    $proctorName = $roomAssignment->proctor_name ?? 'Chưa phân công';
+                    $sheet->setCellValue("A{$row}", 'Phòng ' . $roomAssignment->room->name . ' - CBCT: ' . $proctorName);
+                    $sheet->getStyle("A{$row}")->getFont()->setBold(true);
+                    $row++;
+                    
+                    // Header của bảng
+                    $headers = [
+                        'STT', 
+                        'SBD', 
+                        'Mã SV', 
+                        'Họ và tên', 
+                        'Ngày sinh',
+                        'Giới tính',
+                        'Số điện thoại',
+                        'Địa chỉ',
+                        'Số chỗ ngồi'
+                    ];
+                    
+                    $col = 'A';
+                    foreach ($headers as $header) {
+                        $sheet->setCellValue($col . $row, $header);
+                        $sheet->getStyle($col . $row)->applyFromArray([
+                            'font' => ['bold' => true],
+                            'fill' => [
+                                'fillType' => Fill::FILL_SOLID,
+                                'startColor' => ['rgb' => 'D3D3D3']
+                            ]
+                        ]);
+                        $col++;
+                    }
+                    
+                    // Dữ liệu thí sinh
+                    foreach ($roomAssignment->examPeriodRoomStudents as $i => $roomStudent) {
+                        $student = $roomStudent->student;
+                        if (!$student) continue;
+                        $row++;
+                        
+                        $sheet->setCellValue('A' . $row, $i + 1);
+                        $sheet->setCellValue('B' . $row, $student->exam_code);
+                        $sheet->setCellValue('C' . $row, $student->student_code);
+                        $sheet->setCellValue('D' . $row, $student->full_name);
+                        $sheet->setCellValue('E' . $row, $student->birthday ? date('d/m/Y', strtotime($student->birthday)) : '');
+                        $sheet->setCellValue('F' . $row, $student->gender ? 'Nam' : 'Nữ');
+                        $sheet->setCellValue('G' . $row, $student->phone);
+                        $sheet->setCellValue('H' . $row, $student->address);
+                        $sheet->setCellValue('I' . $row, $roomStudent->seat_number);
+                    }
+                    
+                    // Thêm border cho bảng
+                    $sheet->getStyle('A' . ($row - count($roomAssignment->examPeriodRoomStudents) + 1) . ':I' . $row)
+                          ->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+                    
+                    $row += 1; // Khoảng cách giữa các phòng
+                }
+                
+                $row += 1; // Khoảng cách giữa các ca thi
+            }
+            
+            // Auto-fit columns
+            foreach(range('A','I') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+            
+            // Style cho tiêu đề
+            $sheet->getStyle('A1:A2')->getFont()->setBold(true);
+            $sheet->getStyle('A1:A2')->getAlignment()->setHorizontal(Alignment::HORIZONTAL_CENTER);
+        }
+        
+        // Xóa sheet mặc định
+        $spreadsheet->removeSheetByIndex(0);
+        
+        // Xuất file
+        $filename = 'phan_cong_phong_thi_' . str_replace(' ', '_', $examPeriod->name) . '.xlsx';
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment;filename="' . $filename . '"');
+        header('Cache-Control: max-age=0');
+        
+        $writer = new Xlsx($spreadsheet);
+        $writer->save('php://output');
+        exit;
     }
 } 

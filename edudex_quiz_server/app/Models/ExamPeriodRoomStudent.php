@@ -10,6 +10,7 @@ class ExamPeriodRoomStudent extends Model
         'exam_period_id',
         'exam_shift_id', 
         'exam_period_room_id',
+        'exam_period_subject_id',
         'exam_period_subject_student_id',
         'seat_number'
     ];
@@ -32,5 +33,10 @@ class ExamPeriodRoomStudent extends Model
     public function student()
     {
         return $this->belongsTo(ExamPeriodSubjectStudent::class, 'exam_period_subject_student_id');
+    }
+
+    public function examPeriodSubject()
+    {
+        return $this->belongsTo(ExamPeriodSubject::class);
     }
 } 

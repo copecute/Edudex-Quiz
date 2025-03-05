@@ -37,14 +37,145 @@
         </div>
     </div>
 
+    <!-- Exam Periods Section -->
+    <div class="row mb-4">
+        <!-- Ongoing Exams -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0 bg-success rounded-3 p-3">
+                            <i class="fas fa-clock text-white fa-2x"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="text-muted mb-1">Kỳ thi đang diễn ra</h6>
+                            <h3 class="mb-0">{{ \App\Models\ExamPeriod::where('is_active', true)
+                                ->where('start_time', '<=', now())
+                                ->where('end_time', '>=', now())
+                                ->count() }}</h3>
+                        </div>
+                    </div>
+                    <div class="list-group">
+                        @foreach(\App\Models\ExamPeriod::where('is_active', true)
+                            ->where('start_time', '<=', now())
+                            ->where('end_time', '>=', now())
+                            ->with([
+                                'examPeriodSubjects',
+                                'examResults',
+                                'examShifts',
+                                'examPeriodSubjectStudents'
+                            ])
+                            ->get() as $examPeriod)
+                            <a href="{{ route('exam-periods.dashboard', $examPeriod) }}" 
+                               class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ $examPeriod->name }}</h6>
+                                    <small>Còn 
+                                        @php
+                                            $diff = \Carbon\Carbon::now()->diff($examPeriod->end_time);
+                                        @endphp
+                                        @if ($diff->days > 0)
+                                            {{ $diff->days }} ngày
+                                        @elseif ($diff->h > 0)
+                                            {{ $diff->h }} giờ {{ $diff->i }} phút
+                                        @else
+                                            {{ $diff->i }} phút
+                                        @endif
+                                    </small>
+                                </div>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Exams -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0 bg-primary rounded-3 p-3">
+                            <i class="fas fa-calendar-alt text-white fa-2x"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="text-muted mb-1">Kỳ thi sắp diễn ra</h6>
+                            <h3 class="mb-0">{{ \App\Models\ExamPeriod::where('is_active', true)
+                                ->where('start_time', '>', now())
+                                ->where('start_time', '<=', now()->addDays(30))
+                                ->count() }}</h3>
+                        </div>
+                    </div>
+                    <div class="list-group">
+                        @foreach(\App\Models\ExamPeriod::where('is_active', true)
+                            ->where('start_time', '>', now())
+                            ->where('start_time', '<=', now()->addDays(30))
+                            ->with(['examPeriodSubjects', 'examResults'])
+                            ->get() as $examPeriod)
+                            <a href="{{ route('exam-periods.dashboard', $examPeriod) }}" 
+                               class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ $examPeriod->name }}</h6>
+                                    <small>{{ $examPeriod->start_time->diffForHumans() }}</small>
+                                </div>
+                                <small class="text-muted">
+                                    {{ $examPeriod->examPeriodSubjects->count() }} môn thi
+                                </small>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recently Completed Exams -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="flex-shrink-0 bg-secondary rounded-3 p-3">
+                            <i class="fas fa-check-circle text-white fa-2x"></i>
+                        </div>
+                        <div class="ms-3">
+                            <h6 class="text-muted mb-1">Kỳ thi vừa kết thúc</h6>
+                            <h3 class="mb-0">{{ \App\Models\ExamPeriod::where('is_active', true)
+                                ->where('end_time', '<=', now())
+                                ->where('end_time', '>=', now()->subDays(5))
+                                ->count() }}</h3>
+                        </div>
+                    </div>
+                    <div class="list-group">
+                        @foreach(\App\Models\ExamPeriod::where('is_active', true)
+                            ->where('end_time', '<=', now())
+                            ->where('end_time', '>=', now()->subDays(5))
+                            ->with(['examPeriodSubjects', 'examResults'])
+                            ->get() as $examPeriod)
+                            <a href="{{ route('exam-periods.dashboard', $examPeriod) }}" 
+                               class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ $examPeriod->name }}</h6>
+                                    <small>{{ $examPeriod->end_time->diffForHumans() }}</small>
+                                </div>
+                                <small class="text-muted">
+                                    {{ $examPeriod->examResults->count() }} bài thi,
+                                    {{ $examPeriod->examPeriodSubjects->count() }} môn thi
+                                </small>
+                            </a>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Quick Stats -->
     @if(Auth::user()->role == 2)
-    <div class="row mb-4">
+    <div class="row">
         <div class="col-md-4 mb-4">
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="flex-shrink-0 icon-bg-primary rounded-3 p-3">
+                        <div class="flex-shrink-0 bg-primary rounded-3 p-3">
                             <i class="fas fa-users text-white fa-2x"></i>
                         </div>
                         <div class="ms-3">
@@ -62,7 +193,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="flex-shrink-0 icon-bg-success rounded-3 p-3">
+                        <div class="flex-shrink-0 bg-success rounded-3 p-3">
                             <i class="fas fa-building text-white fa-2x"></i>
                         </div>
                         <div class="ms-3">
@@ -80,7 +211,7 @@
             <div class="card border-0 shadow-sm h-100">
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <div class="flex-shrink-0 icon-bg-info rounded-3 p-3">
+                        <div class="flex-shrink-0 bg-info rounded-3 p-3">
                             <i class="fas fa-door-open text-white fa-2x"></i>
                         </div>
                         <div class="ms-3">
@@ -273,54 +404,10 @@
                                 </div>
                             </div>
                         </div>
-
-                        @if(Auth::user()->role === 2)
-                        <!-- Quản lý kỳ thi -->
-                        <div class="col-xl-3 col-md-6 mb-4">
-                            <div class="card border-left-primary h-100 py-2">
-                                <div class="card-body">
-                                    <div class="row no-gutters align-items-center">
-                                        <div class="col mr-2">
-                                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
-                                                Kỳ thi</div>
-                                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ App\Models\ExamPeriod::count() }}</div>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="{{ route('exam-periods.index') }}" class="text-decoration-none">
-                                                <i class="fas fa-calendar-alt fa-2x text-gray-300"></i>
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Quản lý ca thi -->
-                        <div class="col-xl-3 col-md-6 mb-4">
-                            <div class="card border-left-info h-100 py-2">
-                                <div class="card-body">
-                                    <div class="row no-gutters align-items-center">
-                                        <div class="col mr-2">
-                                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                                Ca thi</div>
-                                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ App\Models\ExamShift::count() }}</div>
-                                        </div>
-                                        <div class="col-auto">
-                                            @if(isset($examPeriod))
-                                                <a href="{{ route('exam-shifts.index', ['examPeriod' => $examPeriod->id]) }}" class="text-decoration-none">
-                                                    <i class="fas fa-clock fa-2x text-gray-300"></i>
-                                                </a>
-                                            @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        @endif
                     </div>
                 </div>
             </div>
         </div>
     </div>
 </div>
-@endsection 
+@endsection

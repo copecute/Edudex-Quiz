@@ -12,14 +12,14 @@ return new class extends Migration
     {
         Schema::create('exam_period_subject_students', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('exam_period_id')->constrained('exam_periods')->onDelete('cascade');
-            $table->foreignId('exam_period_subject_id')->constrained('exam_period_subjects')->onDelete('cascade');
+            $table->foreignId('exam_period_id')->constrained('exam_periods')->onDelete('cascade')->comment('ID kỳ thi');
+            $table->foreignId('exam_period_subject_id')->constrained('exam_period_subjects')->onDelete('cascade')->comment('ID môn thi trong kỳ thi');
             $table->string('exam_code')->unique()->comment('Số báo danh');
             $table->string('student_code')->comment('Mã sinh viên');
-            $table->string('full_name');
-            $table->string('phone')->nullable();
-            $table->text('address')->nullable();
-            $table->date('birthday')->nullable();
+            $table->string('full_name')->comment('Họ và tên thí sinh');
+            $table->string('phone')->nullable()->comment('Số điện thoại');
+            $table->text('address')->nullable()->comment('Địa chỉ');
+            $table->date('birthday')->nullable()->comment('Ngày sinh');
             $table->boolean('gender')->default(true)->comment('true: Nam, false: Nữ');
             $table->timestamps();
 
@@ -35,4 +35,4 @@ return new class extends Migration
     {
         Schema::dropIfExists('exam_period_subject_students');
     }
-}; 
+};
