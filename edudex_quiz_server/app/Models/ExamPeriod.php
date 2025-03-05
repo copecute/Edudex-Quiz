@@ -113,4 +113,14 @@ class ExamPeriod extends Model
             ->select('exam_period_subject_students.*')
             ->distinct();
     }
+
+    public function examPeriodSubjectStudents()
+    {
+        return $this->hasMany(ExamPeriodSubjectStudent::class);
+    }
+
+    public function examPeriodRooms()
+    {
+        return $this->hasMany(ExamPeriodRoom::class);
+    }
 } 

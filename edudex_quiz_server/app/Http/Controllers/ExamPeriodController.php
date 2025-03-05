@@ -134,8 +134,9 @@ class ExamPeriodController extends Controller
 
         // Tính toán các thống kê
         $stats = [
-            'total_shifts' => $examPeriod->examShifts->count(),
-            'total_subjects' => $examPeriod->examPeriodSubjects->count(),
+            'total_shifts' => $examPeriod->examShifts()->count(),
+            'total_subjects' => $examPeriod->examPeriodSubjects()->count(),
+            'total_students' => $examPeriod->examPeriodSubjectStudents()->count(),
             'total_rooms' => $examPeriod->rooms->count(),
             'total_proctors' => $examPeriod->proctors->count(),
         ];

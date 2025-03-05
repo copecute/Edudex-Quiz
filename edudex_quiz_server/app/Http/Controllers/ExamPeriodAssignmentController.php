@@ -7,6 +7,8 @@ use App\Models\ExamPeriodSubject;
 use App\Models\ExamShift;
 use App\Models\ExamPeriodRoom;
 use App\Models\ExamPeriodProctor;
+use App\Models\ExamPeriodSubjectStudent;
+use App\Models\ExamPeriodRoomStudent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -101,9 +103,9 @@ class ExamPeriodAssignmentController extends Controller
     // Xử lý phân công phòng thi cho ca thi
     public function assignRooms(Request $request, ExamPeriod $examPeriod)
     {
-        \Log::info('Request data:', $request->all());
-
         try {
+            DB::beginTransaction();
+
             $validated = $request->validate([
                 'assignments' => 'required|array',
                 'assignments.*.shift_id' => 'required|exists:exam_shifts,id',
@@ -118,80 +120,239 @@ class ExamPeriodAssignmentController extends Controller
                 'assignments.*.rooms.*.room_id.required' => 'Thiếu thông tin phòng thi',
             ]);
 
-            DB::beginTransaction();
-            try {
-                // Lấy tất cả shift_id từ request
-                $shiftIds = collect($validated['assignments'])->pluck('shift_id')->toArray();
-                
-                // Lấy tất cả room_id được gửi lên theo từng shift
-                $assignedRooms = [];
-                foreach ($validated['assignments'] as $assignment) {
-                    $assignedRooms[$assignment['shift_id']] = collect($assignment['rooms'])
-                        ->pluck('room_id')
-                        ->toArray();
-                }
-
-                // Xử lý từng ca thi
-                foreach ($shiftIds as $shiftId) {
-                    $shift = ExamShift::findOrFail($shiftId);
-                    
-                    // Tìm các phòng không còn được chọn để xóa
-                    $currentRooms = $shift->rooms()->pluck('exam_period_rooms.id')->toArray();
-                    $roomsToDelete = array_diff($currentRooms, $assignedRooms[$shiftId] ?? []);
-                    
-                    if (!empty($roomsToDelete)) {
-                        DB::table('exam_shift_rooms')
-                            ->where('exam_shift_id', $shiftId)
-                            ->whereIn('exam_period_room_id', $roomsToDelete)
-                            ->delete();
-                    }
-                }
-
-                // Kiểm tra trùng CBCT trong cùng ca thi
-                foreach ($validated['assignments'] as $assignment) {
-                    $shiftId = $assignment['shift_id'];
-                    $proctorIds = collect($assignment['rooms'])
-                        ->pluck('proctor_id')
-                        ->filter()
-                        ->toArray();
-                    
-                    if (count($proctorIds) !== count(array_unique($proctorIds))) {
-                        throw new \Exception('Một cán bộ coi thi không thể coi nhiều phòng trong cùng một ca thi');
-                    }
-                }
-
-                // Thêm hoặc cập nhật phân công mới
-                foreach ($validated['assignments'] as $assignment) {
-                    foreach ($assignment['rooms'] as $room) {
-                        DB::table('exam_shift_rooms')->updateOrInsert(
-                            [
-                                'exam_shift_id' => $assignment['shift_id'],
-                                'exam_period_room_id' => $room['room_id']
-                            ],
-                            [
-                                'exam_period_subject_id' => $room['subject_id'],
-                                'exam_period_proctor_id' => $room['proctor_id'],
-                                'updated_at' => now()
-                            ]
-                        );
-                    }
-                }
-
-                DB::commit();
-                return redirect()->back()->with('success', 'Phân công phòng thi thành công');
-            } catch (\Exception $e) {
-                DB::rollBack();
-                \Log::error('Error in transaction:', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString()
-                ]);
-                return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
+            // Lấy tất cả shift_id từ request
+            $shiftIds = collect($validated['assignments'])->pluck('shift_id')->toArray();
+            
+            // Lấy tất cả room_id được gửi lên theo từng shift
+            $assignedRooms = [];
+            foreach ($validated['assignments'] as $assignment) {
+                $assignedRooms[$assignment['shift_id']] = collect($assignment['rooms'])
+                    ->pluck('room_id')
+                    ->toArray();
             }
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            \Log::error('Validation error:', [
-                'errors' => $e->errors()
-            ]);
-            return back()->with('error', 'Có lỗi xảy ra: ' . collect($e->errors())->first()[0]);
+
+            // Xử lý từng ca thi
+            foreach ($shiftIds as $shiftId) {
+                $shift = ExamShift::findOrFail($shiftId);
+                
+                // Tìm các phòng không còn được chọn để xóa
+                $currentRooms = $shift->rooms()->pluck('exam_period_rooms.id')->toArray();
+                $roomsToDelete = array_diff($currentRooms, $assignedRooms[$shiftId] ?? []);
+                
+                if (!empty($roomsToDelete)) {
+                    DB::table('exam_shift_rooms')
+                        ->where('exam_shift_id', $shiftId)
+                        ->whereIn('exam_period_room_id', $roomsToDelete)
+                        ->delete();
+                }
+            }
+
+            // Kiểm tra trùng CBCT trong cùng ca thi
+            foreach ($validated['assignments'] as $assignment) {
+                $shiftId = $assignment['shift_id'];
+                $proctorIds = collect($assignment['rooms'])
+                    ->pluck('proctor_id')
+                    ->filter()
+                    ->toArray();
+                
+                if (count($proctorIds) !== count(array_unique($proctorIds))) {
+                    throw new \Exception('Một cán bộ coi thi không thể coi nhiều phòng trong cùng một ca thi');
+                }
+            }
+
+            // Thêm hoặc cập nhật phân công mới
+            foreach ($validated['assignments'] as $assignment) {
+                foreach ($assignment['rooms'] as $room) {
+                    DB::table('exam_shift_rooms')->updateOrInsert(
+                        [
+                            'exam_shift_id' => $assignment['shift_id'],
+                            'exam_period_room_id' => $room['room_id']
+                        ],
+                        [
+                            'exam_period_subject_id' => $room['subject_id'],
+                            'exam_period_proctor_id' => $room['proctor_id'],
+                            'updated_at' => now()
+                        ]
+                    );
+                }
+            }
+
+            // Xử lý chuyển thí sinh khi chuyển môn thi của phòng
+            foreach ($validated['assignments'] as $assignment) {
+                foreach ($assignment['rooms'] as $room) {
+                    // Kiểm tra xem phòng có thay đổi môn thi không
+                    $currentSubject = DB::table('exam_shift_rooms')
+                        ->where([
+                            'exam_shift_id' => $assignment['shift_id'],
+                            'exam_period_room_id' => $room['room_id']
+                        ])
+                        ->value('exam_period_subject_id');
+
+                    if ($currentSubject && $currentSubject != $room['subject_id']) {
+                        // Lấy danh sách thí sinh trong phòng
+                        $students = ExamPeriodRoomStudent::where([
+                            'exam_shift_id' => $assignment['shift_id'],
+                            'exam_period_room_id' => $room['room_id']
+                        ])->get();
+
+                        // Xóa phân công cũ
+                        ExamPeriodRoomStudent::where([
+                            'exam_shift_id' => $assignment['shift_id'],
+                            'exam_period_room_id' => $room['room_id']
+                        ])->delete();
+
+                        // Tạo phân công mới với môn thi mới
+                        foreach ($students as $index => $student) {
+                            ExamPeriodRoomStudent::create([
+                                'exam_period_id' => $examPeriod->id,
+                                'exam_shift_id' => $assignment['shift_id'],
+                                'exam_period_room_id' => $room['room_id'],
+                                'exam_period_subject_student_id' => $student->exam_period_subject_student_id,
+                                'seat_number' => $index + 1
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            // Xử lý phân công thí sinh
+            if ($request->has('student_assignments')) {
+                foreach ($request->student_assignments as $assignment) {
+                    $shift = ExamShift::with(['subjects', 'rooms'])->findOrFail($assignment['shift_id']);
+                    
+                    // Lấy danh sách thí sinh của các môn trong ca thi
+                    $students = ExamPeriodSubjectStudent::whereIn(
+                        'exam_period_subject_id', 
+                        $shift->subjects->pluck('id')
+                    )->get();
+
+                    if ($assignment['assignment_type'] == 'random') {
+                        $students = $students->shuffle();
+                    } else {
+                        $students = $students->sortBy('exam_code');
+                    }
+
+                    // Xóa phân công cũ
+                    ExamPeriodRoomStudent::where([
+                        'exam_period_id' => $examPeriod->id,
+                        'exam_shift_id' => $shift->id
+                    ])->delete();
+
+                    // Phân công thí sinh vào phòng
+                    $this->assignStudentsToRooms($examPeriod, $shift, $students);
+                }
+            }
+
+            DB::commit();
+            return redirect()->back()->with('success', 'Phân công phòng thi và thí sinh thành công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
+        }
+    }
+
+    private function assignStudentsToRooms($examPeriod, $shift, $students)
+    {
+        // Lấy thông tin phân công phòng thi - môn thi
+        $roomSubjects = DB::table('exam_shift_rooms')
+            ->where('exam_shift_id', $shift->id)
+            ->get()
+            ->pluck('exam_period_subject_id', 'exam_period_room_id')
+            ->toArray();
+
+        // Nhóm thí sinh theo môn thi
+        $studentsBySubject = $students->groupBy('exam_period_subject_id');
+
+        // Phân công thí sinh vào phòng theo môn thi
+        foreach ($roomSubjects as $roomId => $subjectId) {
+            if (!isset($studentsBySubject[$subjectId])) {
+                continue;
+            }
+
+            $room = ExamPeriodRoom::with('room')->find($roomId);
+            $studentsForSubject = $studentsBySubject[$subjectId];
+            $seatNumber = 1;
+
+            foreach ($studentsForSubject as $student) {
+                // Kiểm tra sức chứa phòng thi
+                if ($seatNumber > $room->room->capacity) {
+                    break;
+                }
+
+                ExamPeriodRoomStudent::create([
+                    'exam_period_id' => $examPeriod->id,
+                    'exam_shift_id' => $shift->id,
+                    'exam_period_room_id' => $roomId,
+                    'exam_period_subject_student_id' => $student->id,
+                    'seat_number' => $seatNumber++
+                ]);
+            }
+        }
+    }
+
+    public function assignStudents(Request $request, ExamPeriod $examPeriod)
+    {
+        $request->validate([
+            'assignment_type' => 'required|in:sequential,random',
+            'shift_id' => 'required|exists:exam_shifts,id'
+        ]);
+
+        try {
+            DB::beginTransaction();
+
+            $shift = ExamShift::with(['subjects', 'rooms'])->findOrFail($request->shift_id);
+            
+            // Lấy danh sách thí sinh của các môn trong ca thi
+            $students = ExamPeriodSubjectStudent::whereIn(
+                'exam_period_subject_id', 
+                $shift->subjects->pluck('id')
+            )->get();
+
+            if ($request->assignment_type == 'random') {
+                $students = $students->shuffle();
+            } else {
+                // Sắp xếp theo số báo danh
+                $students = $students->sortBy('exam_code');
+            }
+
+            // Lấy danh sách phòng thi và sức chứa
+            $rooms = $shift->rooms->map(function($room) {
+                return [
+                    'room_id' => $room->id,
+                    'capacity' => $room->room->capacity,
+                    'current_count' => 0
+                ];
+            })->toArray();
+
+            // Xóa phân công cũ
+            ExamPeriodRoomStudent::where([
+                'exam_period_id' => $examPeriod->id,
+                'exam_shift_id' => $shift->id
+            ])->delete();
+
+            // Phân công thí sinh vào phòng
+            foreach ($students as $student) {
+                // Tìm phòng còn chỗ
+                foreach ($rooms as &$room) {
+                    if ($room['current_count'] < $room['capacity']) {
+                        ExamPeriodRoomStudent::create([
+                            'exam_period_id' => $examPeriod->id,
+                            'exam_shift_id' => $shift->id,
+                            'exam_period_room_id' => $room['room_id'],
+                            'exam_period_subject_student_id' => $student->id,
+                            'seat_number' => $room['current_count'] + 1
+                        ]);
+                        $room['current_count']++;
+                        break;
+                    }
+                }
+            }
+
+            DB::commit();
+            return back()->with('success', 'Phân công thí sinh thành công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
         }
     }
 } 

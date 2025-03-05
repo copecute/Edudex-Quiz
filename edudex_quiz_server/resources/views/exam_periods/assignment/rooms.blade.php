@@ -9,7 +9,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.index') }}">Kỳ thi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.dashboard', $examPeriod) }}">Kỳ thi</a></li>
                     <li class="breadcrumb-item active">Phân công phòng thi</li>
                 </ol>
             </nav>
@@ -115,6 +115,14 @@
                                             @endforeach
                                         </small>
                                     </div>
+                                    <div>
+                                        <select class="form-select form-select-sm assignment-type" 
+                                                data-shift-id="{{ $shift->id }}"
+                                                style="width: 200px;">
+                                            <option value="sequential">Theo thứ tự SBD</option>
+                                            <option value="random">Ngẫu nhiên</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-body">
@@ -194,6 +202,7 @@
         </div>
     </div>
 </div>
+
 @endsection
 
 @push('scripts')
@@ -444,6 +453,27 @@ $(document).ready(function() {
             alert('Vui lòng chọn ít nhất một phòng thi');
             return false;
         }
+
+        // Kiểm tra và thu thập thông tin phân công thí sinh
+        const studentAssignments = [];
+        $('.assignment-type').each(function() {
+            const type = $(this).val();
+            const shiftId = $(this).data('shift-id');
+            if (type) {
+                studentAssignments.push({
+                    shift_id: shiftId,
+                    assignment_type: type
+                });
+            }
+        });
+
+        // Thêm hidden inputs cho phân công thí sinh
+        studentAssignments.forEach((assignment, index) => {
+            $('#hiddenInputsContainer').append(`
+                <input type="hidden" name="student_assignments[${index}][shift_id]" value="${assignment.shift_id}">
+                <input type="hidden" name="student_assignments[${index}][assignment_type]" value="${assignment.assignment_type}">
+            `);
+        });
         
         console.log('Form data:', $(this).serialize());
         this.submit();

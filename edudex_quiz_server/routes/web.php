@@ -24,6 +24,7 @@ use App\Http\Controllers\ExamPeriodProctorController;
 use App\Http\Controllers\ExamPeriodRoomController;
 use App\Http\Controllers\ExamPeriodAssignmentController;
 use App\Http\Controllers\ExamPeriodStudentController;
+use App\Http\Controllers\ExamResultController;
 
 // Chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -214,7 +215,11 @@ Route::middleware('auth')->group(function () {
         // Phân công phòng thi cho ca thi
         Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
         Route::post('/rooms', [ExamPeriodAssignmentController::class, 'assignRooms'])->name('rooms.store');
+        Route::post('/students', [ExamPeriodAssignmentController::class, 'assignStudents'])->name('students');
     });
+
+    Route::get('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'index'])
+        ->name('exam-periods.results');
 });
 
 // Quản lý kỳ thi

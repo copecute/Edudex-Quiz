@@ -9,7 +9,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.index') }}">Kỳ thi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.dashboard', $examPeriod) }}">Kỳ thi</a></li>
                     <li class="breadcrumb-item"><a href="{{ route('exam-period-subjects.index', $examPeriod) }}">Môn thi - {{ $examPeriod->name }}</a></li>
                     <li class="breadcrumb-item active">Thêm mới</li>
                 </ol>
