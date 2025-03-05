@@ -220,6 +220,12 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'index'])
         ->name('exam-periods.results');
+    // Thêm route cho phúc khảo
+    Route::post('/exam-periods/{examPeriod}/results/{result}/review', [ExamResultController::class, 'review'])
+        ->name('exam-periods.results.review');
+    // Thêm route xuất kết quả
+    Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
+        ->name('exam-periods.results.export');
 });
 
 // quản lý kỳ thi

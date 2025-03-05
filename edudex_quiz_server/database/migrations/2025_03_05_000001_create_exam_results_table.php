@@ -30,6 +30,9 @@ return new class extends Migration
             $table->decimal('score', 5, 2)->comment('Điểm số');
             $table->decimal('score_after_review', 5, 2)->nullable()->comment('Điểm sau phúc khảo');
             $table->text('note')->nullable()->comment('Ghi chú');
+            $table->text('review_note')->nullable();
+            $table->timestamp('reviewed_at')->nullable();
+            $table->foreignId('reviewed_by')->nullable()->constrained('accounts');
             $table->longText('log_file')->comment('File log .edudex base64');
             $table->timestamps();
 
