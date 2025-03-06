@@ -28,6 +28,9 @@
                     <form action="{{ route('exam-period-rooms.store', $examPeriod) }}" method="POST">
                         @csrf
                         
+                        <!-- Hidden inputs để lưu các phòng đã chọn -->
+                        <div id="selectedRoomInputs"></div>
+                        
                         <!-- Tabs -->
                         <ul class="nav nav-tabs mb-3" role="tablist">
                             <li class="nav-item">
@@ -60,7 +63,7 @@
                                         <select id="facilityFilter" class="form-select">
                                             <option value="">Tất cả cơ sở</option>
                                             @foreach($facilities as $facility)
-                                            <option value="{{ $facility->name }}">{{ $facility->name }}</option>
+                                            <option value="{{ $facility->id }}">{{ $facility->name }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -81,26 +84,18 @@
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            @foreach($rooms as $room)
-                                            <tr class="searchable-row">
-                                                <td>
-                                                    <input type="checkbox" name="room_ids[]" 
-                                                           value="{{ $room->id }}" 
-                                                           class="form-check-input room-checkbox"
-                                                           data-code="{{ $room->code }}"
-                                                           data-name="{{ $room->name }}"
-                                                           data-facility="{{ $room->facility->name }}"
-                                                           data-capacity="{{ $room->capacity }}"
-                                                           {{ in_array($room->id, $assignedRoomIds) ? 'checked' : '' }}>
+                                            <tr>
+                                                <td colspan="5" class="text-center">
+                                                    <div class="spinner-border text-primary" role="status">
+                                                        <span class="visually-hidden">Đang tải...</span>
+                                                    </div>
                                                 </td>
-                                                <td>{{ $room->code }}</td>
-                                                <td>{{ $room->name }}</td>
-                                                <td>{{ $room->facility->name }}</td>
-                                                <td>{{ $room->capacity }}</td>
                                             </tr>
-                                            @endforeach
                                         </tbody>
                                     </table>
+                                </div>
+                                <div class="pagination-container mt-3">
+                                    {{ $rooms->links() }}
                                 </div>
                             </div>
 
@@ -150,9 +145,91 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
+    // Lưu trữ thông tin phòng đã chọn
+    let selectedRooms = new Map();
+    
+    // Khởi tạo với các phòng đã được phân công trước đó
+    @foreach($assignedRooms as $room)
+        selectedRooms.set('{{ $room['id'] }}', {
+            id: '{{ $room['id'] }}',
+            code: '{{ $room['code'] }}',
+            name: '{{ $room['name'] }}',
+            facility: '{{ $room['facility'] }}',
+            capacity: {{ $room['capacity'] }}
+        });
+    @endforeach
+
+    function loadRooms(page = 1) {
+        let search = $('#searchInput').val();
+        let facility = $('#facilityFilter').val();
+        
+        $.ajax({
+            url: '{{ route('exam-period-rooms.assign', $examPeriod) }}',
+            data: {
+                search: search,
+                facility_id: facility,
+                page: page
+            },
+            success: function(response) {
+                $('#all table tbody').html(response.html);
+                $('.pagination-container').html(response.pagination);
+               
+                // Khôi phục trạng thái checkbox đã chọn
+                $('.room-checkbox').each(function() {
+                    $(this).prop('checked', selectedRooms.has($(this).val()));
+                });
+               
+                updateSelectedTab();
+                $('#selectAll').prop('checked', $('.room-checkbox:not(:checked)').length === 0);
+            }
+        });
+    }
+
+    // Load dữ liệu ban đầu và cập nhật tab đã chọn
+    loadRooms();
+    updateSelectedTab();
+
+    // Xử lý tìm kiếm với debounce
+    let searchTimer;
+    $('#searchInput').on('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function() {
+            loadRooms(1); // Reset về trang 1 khi tìm kiếm
+        }, 300);
+    });
+
+    // Xử lý lọc theo cơ sở
+    $('#facilityFilter').change(function() {
+        loadRooms(1); // Reset về trang 1 khi lọc
+    });
+
+    // Xử lý phân trang
+    $(document).on('click', '.pagination a', function(e) {
+        e.preventDefault();
+        let page = $(this).attr('href').split('page=')[1];
+        loadRooms(page);
+        $('.table-responsive').scrollTop(0);
+    });
+
     // Xử lý chọn tất cả trong tab tất cả
     $('#selectAll').change(function() {
-        $('.room-checkbox').prop('checked', $(this).prop('checked'));
+        let isChecked = $(this).prop('checked');
+        $('.room-checkbox').prop('checked', isChecked);
+        // Cập nhật Map khi chọn/bỏ chọn tất cả
+        $('.room-checkbox').each(function() {
+            let $checkbox = $(this);
+            if (isChecked) {
+                selectedRooms.set($checkbox.val(), {
+                    id: $checkbox.val(),
+                    code: $checkbox.data('code'),
+                    name: $checkbox.data('name'),
+                    facility: $checkbox.data('facility'),
+                    capacity: $checkbox.data('capacity')
+                });
+            } else {
+                selectedRooms.delete($checkbox.val());
+            }
+        });
         updateSelectedTab();
     });
 
@@ -164,6 +241,19 @@ $(document).ready(function() {
 
     // Cập nhật khi thay đổi checkbox
     $(document).on('change', '.room-checkbox', function() {
+        let $checkbox = $(this);
+        // Cập nhật Map khi checkbox thay đổi
+        if ($checkbox.prop('checked')) {
+            selectedRooms.set($checkbox.val(), {
+                id: $checkbox.val(),
+                code: $checkbox.data('code'),
+                name: $checkbox.data('name'),
+                facility: $checkbox.data('facility'),
+                capacity: $checkbox.data('capacity')
+            });
+        } else {
+            selectedRooms.delete($checkbox.val());
+        }
         updateSelectedTab();
     });
 
@@ -172,6 +262,7 @@ $(document).ready(function() {
         $('.selected-checkbox:checked').each(function() {
             var roomId = $(this).val();
             $('.room-checkbox[value="' + roomId + '"]').prop('checked', false);
+            selectedRooms.delete(roomId);
         });
         updateSelectedTab();
     });
@@ -180,40 +271,42 @@ $(document).ready(function() {
     function updateSelectedTab() {
         var selectedRows = [];
         
-        $('.room-checkbox:checked').each(function() {
-            var $checkbox = $(this);
+        // Lấy thông tin tất cả các phòng đã chọn từ Map
+        selectedRooms.forEach(function(room) {
             selectedRows.push(`
                 <tr>
                     <td>
                         <input type="checkbox" class="form-check-input selected-checkbox" 
-                               value="${$checkbox.val()}">
+                               value="${room.id}">
                     </td>
-                    <td>${$checkbox.data('code')}</td>
-                    <td>${$checkbox.data('name')}</td>
-                    <td>${$checkbox.data('facility')}</td>
-                    <td>${$checkbox.data('capacity')}</td>
+                    <td>${room.code}</td>
+                    <td>${room.name}</td>
+                    <td>${room.facility}</td>
+                    <td>${room.capacity}</td>
                 </tr>
             `);
         });
 
         $('#selectedTable tbody').html(selectedRows.join(''));
-        updateSelectedCount();
+        $('#selectedCount').text(selectedRooms.size);
+        $('#removeSelected').toggle(selectedRooms.size > 0);
+
+        // Cập nhật hidden inputs cho form submit
+        let hiddenInputs = '';
+        selectedRooms.forEach(function(room) {
+            hiddenInputs += `<input type="hidden" name="room_ids[]" value="${room.id}">`;
+        });
+        $('#selectedRoomInputs').html(hiddenInputs);
     }
 
-    // Hàm cập nhật số lượng đã chọn
-    function updateSelectedCount() {
-        var count = $('.room-checkbox:checked').length;
-        $('#selectedCount').text(count);
-        
-        if (count > 0) {
-            $('#removeSelected').show();
-        } else {
-            $('#removeSelected').hide();
+    // Xử lý submit form
+    $('form').on('submit', function(e) {
+        if (selectedRooms.size === 0) {
+            e.preventDefault();
+            alert('Vui lòng chọn ít nhất một phòng thi');
+            return false;
         }
-    }
-
-    // Khởi tạo ban đầu
-    updateSelectedTab();
+    });
 });
 </script>
 @endpush 

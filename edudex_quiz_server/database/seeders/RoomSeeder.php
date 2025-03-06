@@ -3,55 +3,34 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
+use App\Models\Room;
+use App\Models\Facility;
 
 class RoomSeeder extends Seeder
 {
-    public function run(): void
+    public function run()
     {
-        $rooms = [
-            [
-                'code' => 'A101',
-                'name' => 'Phòng A101',
-                'facility_id' => 1,
-                'capacity' => 30,
-                'description' => 'Phòng học lý thuyết tầng 1 tòa A',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'A102',
-                'name' => 'Phòng A102',
-                'facility_id' => 1,
-                'capacity' => 40,
-                'description' => 'Phòng học lý thuyết tầng 1 tòa A',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'B201',
-                'name' => 'Phòng B201',
-                'facility_id' => 2,
-                'capacity' => 35,
-                'description' => 'Phòng học lý thuyết tầng 2 tòa B',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-            [
-                'code' => 'C301',
-                'name' => 'Phòng C301',
-                'facility_id' => 3,
-                'capacity' => 45,
-                'description' => 'Phòng học lý thuyết tầng 3 tòa C',
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ],
-        ];
-
-        DB::table('rooms')->insert($rooms);
+        $facilities = Facility::all();
+        
+        foreach ($facilities as $facility) {
+            // Tạo 10 phòng cho mỗi cơ sở (2 tầng x 5 phòng)
+            for ($floor = 1; $floor <= 2; $floor++) {
+                for ($room = 1; $room <= 5; $room++) {
+                    // Format: {mã cơ sở}{tầng}{số thứ tự 2 chữ số}
+                    // Ví dụ: MĐ101 - Phòng 01 tầng 1 cơ sở MĐ
+                    $roomNumber = sprintf("%d%02d", $floor, $room); // 101, 102,...
+                    $roomCode = $facility->code . $roomNumber;
+                    
+                    Room::create([
+                        'code' => $roomCode,
+                        'name' => $roomCode, // Tên phòng giống mã phòng
+                        'facility_id' => $facility->id,
+                        'capacity' => rand(15, 20),
+                        'description' => "Phòng {$roomNumber} - Tầng {$floor} - {$facility->name}",
+                        'is_active' => true
+                    ]);
+                }
+            }
+        }
     }
 } 

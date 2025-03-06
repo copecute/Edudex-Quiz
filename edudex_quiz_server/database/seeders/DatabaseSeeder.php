@@ -22,7 +22,6 @@ class DatabaseSeeder extends Seeder
             QuestionSeeder::class,
             ExamSeeder::class,
             ExamPeriodSeeder::class,
-            ExamShiftSeeder::class,
         ]);
     }
 }

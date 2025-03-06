@@ -37,34 +37,76 @@ class ExamPeriodRoomController extends Controller
     public function assign(ExamPeriod $examPeriod)
     {
         $facilities = Facility::orderBy('name')->get();
-        $search = request('search');
-        $facilityId = request('facility_id');
+        
+        // Lấy thông tin đầy đủ của các phòng đã được phân công
+        $assignedRooms = ExamPeriodRoom::with(['room.facility'])
+            ->where('exam_period_id', $examPeriod->id)
+            ->get()
+            ->map(function($examPeriodRoom) {
+                return [
+                    'id' => $examPeriodRoom->room_id,
+                    'code' => $examPeriodRoom->room->code,
+                    'name' => $examPeriodRoom->room->name,
+                    'facility' => $examPeriodRoom->room->facility->name,
+                    'capacity' => $examPeriodRoom->room->capacity
+                ];
+            });
 
-        // Lấy tất cả phòng thi đang hoạt động
+        if (request()->ajax()) {
+            $search = request('search');
+            $facilityId = request('facility_id');
+            $page = request('page', 1);
+
+            $rooms = Room::with('facility')
+                ->where('is_active', true)
+                ->when($search, function($q) use ($search) {
+                    $q->where(function($q) use ($search) {
+                        $q->where('code', 'like', "%{$search}%")
+                          ->orWhere('name', 'like', "%{$search}%")
+                          ->orWhereHas('facility', function($q) use ($search) {
+                            $q->where('name', 'like', "%{$search}%");
+                          });
+                    });
+                })
+                ->when($facilityId, function($q) use ($facilityId) {
+                    $q->whereHas('facility', function($q) use ($facilityId) {
+                        $q->where('id', $facilityId);
+                    });
+                })
+                ->orderBy('code')
+                ->paginate(10);
+
+            $assignedRoomIds = ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
+                ->pluck('room_id')
+                ->toArray();
+
+            return response()->json([
+                'html' => view('exam_period_rooms.partials.room_list', compact(
+                    'rooms',
+                    'assignedRoomIds'
+                ))->render(),
+                'pagination' => $rooms->links()->toHtml()
+            ]);
+        }
+
+        // Initial load
         $rooms = Room::with('facility')
             ->where('is_active', true)
-            ->when($search, function($q) use ($search) {
-                $q->where(function($q) use ($search) {
-                    $q->where('code', 'like', "%{$search}%")
-                      ->orWhere('name', 'like', "%{$search}%")
-                      ->orWhereHas('facility', function($q) use ($search) {
-                          $q->where('name', 'like', "%{$search}%");
-                      });
-                });
-            })
-            ->when($facilityId, function($q) use ($facilityId) {
-                $q->where('facility_id', $facilityId);
-            })
             ->orderBy('code')
-            ->paginate(10)
-            ->withQueryString();
+            ->paginate(10);
 
         // Lấy danh sách ID phòng đã được phân công
         $assignedRoomIds = ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
             ->pluck('room_id')
             ->toArray();
 
-        return view('exam_period_rooms.assign', compact('examPeriod', 'rooms', 'facilities', 'assignedRoomIds'));
+        return view('exam_period_rooms.assign', compact(
+            'examPeriod', 
+            'rooms', 
+            'facilities', 
+            'assignedRoomIds',
+            'assignedRooms'
+        ));
     }
 
     public function store(Request $request, ExamPeriod $examPeriod)

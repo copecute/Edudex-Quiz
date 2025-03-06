@@ -663,7 +663,7 @@ class ExamPeriodAssignmentController extends Controller
             }
 
             DB::commit();
-            return redirect()->route('exam-periods.assignment.subjects', $examPeriod)
+            return redirect()->route('exam-periods.assignment.rooms', $examPeriod)
                 ->with('success', 'Đã hoàn thành tự động phân công');
         } catch (\Exception $e) {
             DB::rollBack();

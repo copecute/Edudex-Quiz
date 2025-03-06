@@ -53,8 +53,8 @@
                                 @forelse ($subjects as $subject)
                                 <tr>
                                     <td>{{ $subject->id }}</td>
-                                    <td>{{ $subject->subject->name }}</td>
-                                    <td>{{ $subject->exam->name }}</td>
+                                    <td>{{ $subject->subject ? $subject->subject->name : 'Chưa có môn thi' }}</td>
+                                    <td>{{ $subject->exam ? $subject->exam->name : 'Chưa có đề thi' }}</td>
                                     <td>
                                         <a href="{{ route('students.index', ['examPeriod' => $examPeriod, 'subject_id' => $subject->id]) }}" 
                                            class="btn btn-sm btn-info" title="Quản lý thí sinh">
