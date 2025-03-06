@@ -126,6 +126,19 @@
                         </div>
                     @endif
 
+                    <!-- Nút xóa dữ liệu -->
+                    <form action="{{ route('exam-periods.assignment.clear', $data['examPeriod']) }}" 
+                          method="POST" 
+                          class="mb-3"
+                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu phân công?\nHành động này không thể hoàn tác.')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-1"></i>
+                            Xóa dữ liệu phân công
+                        </button>
+                    </form>
+
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
                         Hệ thống sẽ tự động phân công:

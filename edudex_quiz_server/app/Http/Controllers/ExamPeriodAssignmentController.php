@@ -818,4 +818,40 @@ class ExamPeriodAssignmentController extends Controller
             }
         }
     }
+
+    public function clear(ExamPeriod $examPeriod)
+    {
+        try {
+            DB::beginTransaction();
+            
+            // Xóa phân công thí sinh vào phòng thi của kỳ thi này
+            DB::table('exam_period_room_students')
+                ->where('exam_period_id', $examPeriod->id)
+                ->delete();
+                
+            // Xóa phân công môn thi vào ca thi của kỳ thi này
+            DB::table('exam_period_subject_shifts')
+                ->whereIn('exam_period_subject_id', function($query) use ($examPeriod) {
+                    $query->select('id')
+                        ->from('exam_period_subjects')
+                        ->where('exam_period_id', $examPeriod->id);
+                })
+                ->delete();
+                
+            // Xóa phân công phòng thi và CBCT cho ca thi của kỳ thi này
+            DB::table('exam_shift_rooms')
+                ->whereIn('exam_shift_id', function($query) use ($examPeriod) {
+                    $query->select('id')
+                        ->from('exam_shifts')
+                        ->where('exam_period_id', $examPeriod->id);
+                })
+                ->delete();
+
+            DB::commit();
+            return back()->with('success', 'Đã xóa toàn bộ dữ liệu phân công');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Có lỗi xảy ra khi xóa dữ liệu phân công');
+        }
+    }
 } 
