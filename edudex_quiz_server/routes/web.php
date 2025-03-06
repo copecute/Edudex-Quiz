@@ -231,6 +231,9 @@ Route::middleware('auth')->group(function () {
     // Thêm route xuất kết quả
     Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
         ->name('exam-periods.results.export');
+
+    Route::delete('/exam-periods/{examPeriod}/assignment/clear', [ExamPeriodAssignmentController::class, 'clear'])
+        ->name('exam-periods.assignment.clear');
 });
 
 // quản lý kỳ thi

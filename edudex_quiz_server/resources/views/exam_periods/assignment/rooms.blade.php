@@ -20,7 +20,7 @@
         <div class="row">
             <!-- Cột trái: Tổng quan môn thi -->
             <div class="col-md-4">
-                <div class="card sticky-top" style="top: 70px; z-index: 100;">
+                <div class="card">
                     <div class="card-header">
                         <h5 class="mb-0">Tổng quan môn thi</h5>
                     </div>
@@ -310,12 +310,20 @@
                 Object.entries(subjectStudents).forEach(([subjectId, students]) => {
                     const capacity = subjectCapacity[subjectId] || 0;
                     if (capacity < students) {
-                        const subject = $(`option[value="${subjectId}"]`).first().text().split('(')[0]
-                        .trim();
+                        // Lấy tên môn từ select box môn thi
+                        const subject = $('.subject-select option[value="' + subjectId + '"]')
+                            .first()
+                            .text()
+                            .split('(')[0]
+                            .trim();
                         subjectWarnings.push(`${subject}: thiếu ${students - capacity} chỗ`);
                     } else if (capacity > students) {
-                        const subject = $(`option[value="${subjectId}"]`).first().text().split('(')[0]
-                        .trim();
+                        // Lấy tên môn từ select box môn thi
+                        const subject = $('.subject-select option[value="' + subjectId + '"]')
+                            .first()
+                            .text()
+                            .split('(')[0]
+                            .trim();
                         excessWarnings.push(`${subject}: thừa ${capacity - students} chỗ`);
                     }
                 });

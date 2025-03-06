@@ -26,27 +26,39 @@
                     <ul class="list-group">
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Số ca thi
-                            <span class="badge bg-primary">{{ $stats['total_shifts'] }}</span>
+                            <span class="badge {{ $stats['total_shifts'] == 0 ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_shifts'] }}
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Số môn thi
-                            <span class="badge bg-primary">{{ $stats['total_subjects'] }}</span>
+                            <span class="badge {{ $stats['total_subjects'] == 0 ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_subjects'] }}
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Số phòng thi
-                            <span class="badge bg-primary">{{ $stats['total_rooms'] }}</span>
+                            <span class="badge {{ $stats['total_rooms'] == 0 ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_rooms'] }}
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Tổng sức chứa
-                            <span class="badge bg-primary">{{ $stats['total_room_capacity'] }}</span>
+                            <span class="badge {{ $stats['total_room_capacity'] < $stats['total_students'] ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_room_capacity'] }}
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Số CBCT
-                            <span class="badge bg-primary">{{ $stats['total_proctors'] }}</span>
+                            <span class="badge {{ ($stats['total_proctors'] == 0 || $stats['total_proctors'] < $stats['total_rooms']) ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_proctors'] }}
+                            </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Tổng số thí sinh
-                            <span class="badge bg-primary">{{ $stats['total_students'] }}</span>
+                            <span class="badge {{ $stats['total_students'] == 0 ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_students'] }}
+                            </span>
                         </li>
                     </ul>
                 </div>
@@ -59,31 +71,89 @@
                     <h5 class="mb-0">Tự động phân công</h5>
                 </div>
                 <div class="card-body">
-                    @if($errors->any())
+                    @php
+                        $canAutoAssign = true;
+                        $errors = [];
+                        
+                        if ($stats['total_shifts'] == 0) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Chưa có ca thi nào được tạo';
+                        }
+                        
+                        if ($stats['total_subjects'] == 0) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Chưa có môn thi nào được thêm vào';
+                        }
+                        
+                        if ($stats['total_rooms'] == 0) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Chưa có phòng thi nào được thêm vào';
+                        }
+                        
+                        if ($stats['total_proctors'] == 0) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Chưa có cán bộ coi thi nào được phân công';
+                        }
+                        
+                        if ($stats['total_proctors'] < $stats['total_rooms']) {
+                            $canAutoAssign = false;
+                            $errors[] = sprintf(
+                                'Số cán bộ coi thi (%d) không đủ cho số phòng thi (%d) (cần ít nhất 1 CBCT/phòng)', 
+                                $stats['total_proctors'], 
+                                $stats['total_rooms']
+                            );
+                        }
+                        
+                        if ($stats['total_students'] == 0) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Chưa có thí sinh nào được thêm vào';
+                        }
+                        
+                        if ($stats['total_room_capacity'] < $stats['total_students']) {
+                            $canAutoAssign = false;
+                            $errors[] = 'Tổng sức chứa phòng thi (' . $stats['total_room_capacity'] . ') không đủ cho số thí sinh (' . $stats['total_students'] . ')';
+                        }
+                    @endphp
+
+                    @if(!$canAutoAssign)
                         <div class="alert alert-danger">
+                            <h6 class="alert-heading">Không thể thực hiện phân công tự động</h6>
                             <ul class="mb-0">
-                                @foreach($errors->all() as $error)
+                                @foreach($errors as $error)
                                     <li>{{ $error }}</li>
                                 @endforeach
                             </ul>
                         </div>
                     @endif
 
+                    <!-- Nút xóa dữ liệu -->
+                    <form action="{{ route('exam-periods.assignment.clear', $data['examPeriod']) }}" 
+                          method="POST" 
+                          class="mb-3"
+                          onsubmit="return confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu phân công?\nHành động này không thể hoàn tác.')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-trash-alt me-1"></i>
+                            Xóa dữ liệu phân công
+                        </button>
+                    </form>
+
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Hệ thống sẽ tự động phân công:
+                        <ul class="mb-0">
+                            <li>Phân bổ môn thi vào các ca thi</li>
+                            <li>Phân bổ phòng thi cho từng môn</li>
+                            <li>Phân công CBCT cho các phòng</li>
+                            <li>Sắp xếp thí sinh vào phòng thi</li>
+                        </ul>
+                    </div>
+
                     <form action="{{ route('exam-periods.assignment.auto.store', $data['examPeriod']) }}" method="POST">
                         @csrf
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle me-2"></i>
-                            Hệ thống sẽ tự động phân công:
-                            <ul class="mb-0">
-                                <li>Phân bổ môn thi vào các ca thi</li>
-                                <li>Phân bổ phòng thi cho từng môn</li>
-                                <li>Phân công CBCT cho các phòng</li>
-                                <li>Sắp xếp thí sinh vào phòng thi</li>
-                            </ul>
-                        </div>
-
                         <div class="text-end">
-                            <button type="submit" class="btn btn-primary">
+                            <button type="submit" class="btn btn-primary" {{ !$canAutoAssign ? 'disabled' : '' }}>
                                 <i class="fas fa-magic me-1"></i>
                                 Bắt đầu tự động phân công
                             </button>
