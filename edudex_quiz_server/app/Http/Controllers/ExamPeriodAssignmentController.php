@@ -94,7 +94,8 @@ class ExamPeriodAssignmentController extends Controller
             ->join('accounts', 'exam_period_proctors.account_id', '=', 'accounts.id')
             ->join('account_infos', 'accounts.id', '=', 'account_infos.account_id')
             ->select(
-                'exam_period_proctors.id as proctor_id',
+                'exam_period_proctors.id as id',
+                'accounts.id as account_id',
                 'accounts.username',
                 'account_infos.fullName'
             )
@@ -111,216 +112,45 @@ class ExamPeriodAssignmentController extends Controller
         try {
             DB::beginTransaction();
 
-            $validated = $request->validate([
-                'assignments' => 'required|array',
-                'assignments.*.shift_id' => 'required|exists:exam_shifts,id',
-                'assignments.*.rooms' => 'required|array',
-                'assignments.*.rooms.*.room_id' => 'required|exists:exam_period_rooms,id',
-                'assignments.*.rooms.*.subject_id' => 'required|exists:exam_period_subjects,id',
-                'assignments.*.rooms.*.proctor_id' => 'nullable|exists:exam_period_proctors,id'
-            ], [
-                'assignments.*.rooms.*.subject_id.required' => 'Vui lòng chọn môn thi cho tất cả các phòng được chọn',
-                'assignments.*.shift_id.required' => 'Thiếu thông tin ca thi',
-                'assignments.*.rooms.required' => 'Vui lòng chọn ít nhất một phòng thi',
-                'assignments.*.rooms.*.room_id.required' => 'Thiếu thông tin phòng thi',
+            \Log::info('Assignments:', [
+                'data' => $request->input('assignments', [])
             ]);
 
-            // Lấy tất cả shift_id từ request
-            $shiftIds = collect($validated['assignments'])->pluck('shift_id')->toArray();
-            
-            // Lấy tất cả room_id được gửi lên theo từng shift
-            $assignedRooms = [];
-            foreach ($validated['assignments'] as $assignment) {
-                $assignedRooms[$assignment['shift_id']] = collect($assignment['rooms'])
-                    ->pluck('room_id')
-                    ->toArray();
-            }
+            // Xóa phân công cũ
+            DB::table('exam_shift_rooms')
+                ->whereIn('exam_shift_id', function($query) use ($examPeriod) {
+                    $query->select('id')
+                        ->from('exam_shifts')
+                        ->where('exam_period_id', $examPeriod->id);
+                })
+                ->delete();
 
-            // Xử lý từng ca thi
-            foreach ($shiftIds as $shiftId) {
-                $shift = ExamShift::findOrFail($shiftId);
-                
-                // Tìm các phòng không còn được chọn để xóa
-                $currentRooms = $shift->rooms()->pluck('exam_period_rooms.id')->toArray();
-                $roomsToDelete = array_diff($currentRooms, $assignedRooms[$shiftId] ?? []);
-                
-                if (!empty($roomsToDelete)) {
-                    DB::table('exam_shift_rooms')
-                        ->where('exam_shift_id', $shiftId)
-                        ->whereIn('exam_period_room_id', $roomsToDelete)
-                        ->delete();
-                }
-            }
-
-            // Kiểm tra trùng CBCT trong cùng ca thi
-            foreach ($validated['assignments'] as $assignment) {
+            // Thêm phân công mới
+            $assignments = $request->input('assignments', []);
+            foreach ($assignments as $assignment) {
                 $shiftId = $assignment['shift_id'];
-                $proctorIds = collect($assignment['rooms'])
-                    ->pluck('proctor_id')
-                    ->filter()
-                    ->toArray();
                 
-                if (count($proctorIds) !== count(array_unique($proctorIds))) {
-                    throw new \Exception('Một cán bộ coi thi không thể coi nhiều phòng trong cùng một ca thi');
-                }
-            }
-
-            // Thêm hoặc cập nhật phân công mới
-            foreach ($validated['assignments'] as $assignment) {
                 foreach ($assignment['rooms'] as $room) {
-                    DB::table('exam_shift_rooms')->updateOrInsert(
-                        [
-                            'exam_shift_id' => $assignment['shift_id'],
-                            'exam_period_room_id' => $room['room_id']
-                        ],
-                        [
-                            'exam_period_subject_id' => $room['subject_id'],
-                            'exam_period_proctor_id' => $room['proctor_id'],
-                            'updated_at' => now()
-                        ]
-                    );
-                }
-            }
-
-            // Xử lý chuyển thí sinh khi chuyển môn thi của phòng
-            foreach ($validated['assignments'] as $assignment) {
-                foreach ($assignment['rooms'] as $room) {
-                    // Kiểm tra xem phòng có thay đổi môn thi không
-                    $currentSubject = DB::table('exam_shift_rooms')
-                        ->where([
-                            'exam_shift_id' => $assignment['shift_id'],
-                            'exam_period_room_id' => $room['room_id']
-                        ])
-                        ->value('exam_period_subject_id');
-
-                    if ($currentSubject && $currentSubject != $room['subject_id']) {
-                        // Lấy danh sách thí sinh trong phòng
-                        $students = ExamPeriodRoomStudent::where([
-                            'exam_shift_id' => $assignment['shift_id'],
-                            'exam_period_room_id' => $room['room_id']
-                        ])->get();
-
-                        // Xóa phân công cũ
-                        ExamPeriodRoomStudent::where([
-                            'exam_shift_id' => $assignment['shift_id'],
-                            'exam_period_room_id' => $room['room_id']
-                        ])->delete();
-
-                        // Tạo phân công mới với môn thi mới
-                        foreach ($students as $index => $student) {
-                            ExamPeriodRoomStudent::create([
-                                'exam_period_id' => $examPeriod->id,
-                                'exam_shift_id' => $assignment['shift_id'],
-                                'exam_period_room_id' => $room['room_id'],
-                                'exam_period_subject_student_id' => $student->exam_period_subject_student_id,
-                                'seat_number' => $index + 1
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            // Xử lý phân công thí sinh
-            if ($request->has('student_assignments')) {
-                foreach ($request->student_assignments as $assignment) {
-                    $shift = ExamShift::with(['subjects', 'rooms'])->findOrFail($assignment['shift_id']);
-                    
-                    // Lấy danh sách thí sinh của các môn trong ca thi
-                    $students = ExamPeriodSubjectStudent::whereHas('examPeriodSubject', function($query) use ($shift) {
-                        $query->whereHas('examShifts', function($q) use ($shift) {
-                            $q->where('exam_shifts.id', $shift->id);
-                        });
-                    })
-                    ->select('exam_period_subject_students.*', 'exam_period_subjects.id as exam_period_subject_id')
-                    ->join('exam_period_subjects', 'exam_period_subject_students.exam_period_subject_id', '=', 'exam_period_subjects.id')
-                    ->whereNotIn('exam_period_subject_students.id', function($query) use ($shift) {
-                        $query->select('exam_period_room_students.exam_period_subject_student_id')
-                            ->from('exam_period_room_students')
-                            ->where('exam_shift_id', $shift->id);
-                    })
-                    ->get();
-
-                    if ($assignment['assignment_type'] == 'random') {
-                        $students = $students->shuffle();
-                    } else {
-                        $students = $students->sortBy('exam_code');
-                    }
-
-                    // Lấy danh sách phòng thi và sức chứa
-                    $rooms = $shift->rooms->map(function($room) {
-                        return [
-                            'room_id' => $room->id,
-                            'capacity' => $room->room->capacity,
-                            'current_count' => 0
-                        ];
-                    })->toArray();
-
-                    // Xóa phân công cũ
-                    ExamPeriodRoomStudent::where([
-                        'exam_period_id' => $examPeriod->id,
-                        'exam_shift_id' => $shift->id
-                    ])->delete();
-
-                    // Phân công thí sinh vào phòng
-                    $assignedStudents = []; // Theo dõi thí sinh đã được phân công
-                    $this->assignStudentsToRooms($examPeriod, $shift, $students);
+                    DB::table('exam_shift_rooms')->insert([
+                        'exam_shift_id' => $shiftId,
+                        'exam_period_room_id' => $room['room_id'],
+                        'exam_period_subject_id' => $room['subject_id'] ?: null,
+                        'exam_period_proctor_id' => $room['proctor_id'] ?: null,
+                        'created_at' => now(),
+                        'updated_at' => now()
+                    ]);
                 }
             }
 
             DB::commit();
-            return redirect()->back()->with('success', 'Phân công phòng thi và thí sinh thành công');
+            return back()->with('success', 'Cập nhật phân công phòng thi thành công!');
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Có lỗi xảy ra: ' . $e->getMessage());
-        }
-    }
-
-    private function assignStudentsToRooms($examPeriod, $shift, $students)
-    {
-        // Lấy thông tin phân công phòng thi - môn thi
-        $roomSubjects = DB::table('exam_shift_rooms')
-            ->where('exam_shift_id', $shift->id)
-            ->get()
-            ->pluck('exam_period_subject_id', 'exam_period_room_id')
-            ->toArray();
-
-        // Nhóm thí sinh theo môn thi
-        $studentsBySubject = $students->groupBy('exam_period_subject_id');
-        $assignedStudents = []; // Theo dõi thí sinh đã được phân công
-
-        // Phân công thí sinh vào phòng theo môn thi
-        foreach ($roomSubjects as $roomId => $subjectId) {
-            if (!isset($studentsBySubject[$subjectId])) {
-                continue;
-            }
-
-            $room = ExamPeriodRoom::with('room')->find($roomId);
-            $studentsForSubject = $studentsBySubject[$subjectId];
-            $seatNumber = 1;
-
-            foreach ($studentsForSubject as $student) {
-                // Kiểm tra xem thí sinh đã được phân công trong ca thi này chưa
-                if (isset($assignedStudents[$student->id])) {
-                    continue;
-                }
-
-                // Kiểm tra sức chứa phòng thi
-                if ($seatNumber > $room->room->capacity) {
-                    break;
-                }
-
-                ExamPeriodRoomStudent::create([
-                    'exam_period_id' => $examPeriod->id,
-                    'exam_shift_id' => $shift->id,
-                    'exam_period_room_id' => $roomId,
-                    'exam_period_subject_id' => $student->exam_period_subject_id,
-                    'exam_period_subject_student_id' => $student->id,
-                    'seat_number' => $seatNumber++
-                ]);
-
-                // Đánh dấu thí sinh đã được phân công
-                $assignedStudents[$student->id] = true;
-            }
+            \Log::error('Error assigning rooms: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+            return back()->with('error', 'Có lỗi xảy ra khi phân công phòng thi!');
         }
     }
 

@@ -73,4 +73,10 @@ class ExamPeriodRoom extends Model
         }
         return $query;
     }
+
+    // Thêm relationship mới
+    public function examShiftRooms()
+    {
+        return $this->hasMany(ExamShiftRoom::class);
+    }
 } 

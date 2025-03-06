@@ -2,6 +2,8 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../models/exam_schedule.dart';
+import '../../widgets/exam_period_selector.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -20,11 +22,28 @@ class _HomePageState extends State<HomePage> {
   bool _isCheckingConnection = false;
   String? _lastRequestTime;
   String? _lastResponse;
+  List<ExamPeriod> _examPeriods = [];
+  bool _isLoading = true;
+  String? _error;
+  ExamPeriod? _selectedPeriod;
+  ExamShift? _selectedShift;
+  ExamRoom? _selectedRoom;
+
+  // Thêm các key constants
+  static const String SELECTED_SHIFT_ID = 'selected_shift_id';
+  static const String SELECTED_ROOM_ID = 'selected_room_id';
+  static const String SELECTED_SUBJECT_ID = 'selected_subject_id';
+  static const String SELECTED_EXAM_ID = 'selected_exam_id';
+  static const String SELECTED_PERIOD_ID = 'selected_period_id';
+
+  bool _isExamSelected = false; // Biến để theo dõi trạng thái đã chọn
 
   @override
   void initState() {
     super.initState();
     _loadUserInfo();
+    _loadExamSchedule();
+    _checkSelectedExam(); // Kiểm tra xem đã chọn ca thi hay chưa
   }
 
   @override
@@ -92,6 +111,245 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _checkSelectedExam() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectedPeriodId = prefs.getInt(SELECTED_PERIOD_ID);
+    final selectedShiftId = prefs.getInt(SELECTED_SHIFT_ID);
+    final selectedRoomId = prefs.getInt(SELECTED_ROOM_ID);
+
+    if (selectedPeriodId != null &&
+        selectedShiftId != null &&
+        selectedRoomId != null) {
+      // Nếu đã có thông tin đã chọn, đánh dấu là đã chọn
+      setState(() {
+        _isExamSelected = true;
+        // Tìm kiếm thông tin đã chọn từ _examPeriods
+        _selectedPeriod =
+            _examPeriods.firstWhere((period) => period.id == selectedPeriodId);
+        _selectedShift = _selectedPeriod!.shifts
+            .firstWhere((shift) => shift.id == selectedShiftId);
+        _selectedRoom = _selectedShift!.rooms
+            .firstWhere((room) => room.id == selectedRoomId);
+      });
+    }
+  }
+
+  Future<void> _loadExamSchedule() async {
+    if (_examPeriods.isNotEmpty)
+      return; // Nếu đã có lịch thi, không gọi lại API
+
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('user_token');
+      final serverUrl = prefs.getString('server_url');
+
+      if (token == null || serverUrl == null) {
+        throw Exception('Không tìm thấy thông tin đăng nhập');
+      }
+
+      final response = await http.get(
+        Uri.parse('$serverUrl/api/exam-schedule'),
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'Authorization': 'copecute $token',
+        },
+      );
+
+      final data = json.decode(response.body);
+
+      if (data['success'] == true) {
+        if (data['data'].isEmpty) {
+          setState(() {
+            _examPeriods = [];
+            _error = data['message'];
+          });
+        } else {
+          setState(() {
+            _examPeriods = (data['data'] as List).map((periodData) {
+              final examPeriod = periodData['exam_period'];
+              return ExamPeriod(
+                id: examPeriod['id'],
+                name: examPeriod['name'],
+                startTime: DateTime.parse(examPeriod['start_time']),
+                endTime: DateTime.parse(examPeriod['end_time']),
+                shifts: (periodData['shifts'] as List)
+                    .map((shift) => ExamShift.fromJson(shift))
+                    .toList(),
+              );
+            }).toList();
+          });
+
+          // Chỉ hiển thị dialog nếu chưa chọn ca thi
+          if (mounted && _examPeriods.isNotEmpty && !_isExamSelected) {
+            showDialog(
+              context: context,
+              builder: (context) => ExamPeriodSelector(
+                examPeriods: _examPeriods,
+                onSelected: (period, shift, room) async {
+                  setState(() {
+                    _selectedPeriod = period;
+                    _selectedShift = shift;
+                    _selectedRoom = room;
+                    _isExamSelected = true; // Đánh dấu đã chọn
+                  });
+
+                  // Lưu các ID vào SharedPreferences
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setInt(SELECTED_PERIOD_ID, period.id ?? 0);
+                  await prefs.setInt(SELECTED_SHIFT_ID, shift.id ?? 0);
+                  await prefs.setInt(SELECTED_ROOM_ID, room.id ?? 0);
+                  await prefs.setInt(SELECTED_SUBJECT_ID, room.subject.id ?? 0);
+                  await prefs.setInt(
+                      SELECTED_EXAM_ID, room.subject.exam?.id ?? 0);
+
+                  print('📅 Đã chọn kỳ thi: ${period.name} (ID: ${period.id})');
+                  print('⏰ Đã chọn ca thi: ${shift.name} (ID: ${shift.id})');
+                  print('🏫 Đã chọn phòng: ${room.name} (ID: ${room.id})');
+                  print(
+                      '📚 Đã chọn môn: ${room.subject.name} (ID: ${room.subject.id})');
+                  if (room.subject.exam != null) {
+                    print(
+                        '📝 Đã chọn đề thi: ${room.subject.exam!.name} (ID: ${room.subject.exam!.id})');
+                  }
+                },
+              ),
+            );
+          }
+        }
+      } else {
+        throw Exception(data['message']);
+      }
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+      });
+      print('🔥 Lỗi load lịch thi: $e'); // Thêm log để debug
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _getRoleName(int role) {
+    switch (role) {
+      case 0:
+        return 'Cán bộ coi thi';
+      case 1:
+        return 'Giáo viên';
+      case 2:
+        return 'Quản trị hệ thống';
+      default:
+        return 'Không xác định';
+    }
+  }
+
+  Widget _buildSelectedExamInfo() {
+    if (_selectedPeriod == null || _selectedShift == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Thông tin ca thi đã chọn',
+            style: FluentTheme.of(context).typography.subtitle,
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                      icon: FluentIcons.calendar,
+                      label: 'Kỳ thi:',
+                      value: _selectedPeriod!.name,
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(
+                      icon: FluentIcons.clock,
+                      label: 'Ca thi:',
+                      value: '${_selectedShift!.name}\n'
+                          '${_formatDateTime(_selectedShift!.startTime)} - '
+                          '${_formatDateTime(_selectedShift!.endTime)}',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 32),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildInfoRow(
+                      icon: FluentIcons.room,
+                      label: 'Phòng thi:',
+                      value:
+                          '${_selectedRoom?.name} (${_selectedRoom?.facility})',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(
+                      icon: FluentIcons.custom_entity,
+                      label: 'Môn thi:',
+                      value: _selectedRoom?.subject.name ?? '',
+                    ),
+                    if (_selectedRoom?.subject.exam != null) ...[
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        icon: FluentIcons.diet_plan_notebook,
+                        label: 'Đề thi:',
+                        value: '${_selectedRoom?.subject.exam?.name}\n'
+                            'Thời gian: ${_selectedRoom?.subject.exam?.duration} phút\n'
+                            'Số câu hỏi: ${_selectedRoom?.subject.exam?.totalQuestions}',
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(value),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ScaffoldPage(
@@ -119,8 +377,15 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Vai trò: Giáo viên',
-                        style: FluentTheme.of(context).typography.body,
+                        'Vai trò: ${_getRoleName(_role)}',
+                        style:
+                            FluentTheme.of(context).typography.body?.copyWith(
+                                  color: _role == 2
+                                      ? Colors.successPrimaryColor
+                                      : _role == 1
+                                          ? Colors.warningPrimaryColor
+                                          : Colors.blue,
+                                ),
                       ),
                     ],
                   ),
@@ -189,6 +454,9 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 24),
 
+            // Thêm thông tin ca thi đã chọn
+            _buildSelectedExamInfo(),
+
             // Stats section
             Row(
               children: [
@@ -225,43 +493,60 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 24),
 
-            // Recent activities
             Text(
-              'Hoạt động gần đây',
+              'Lịch thi',
               style: FluentTheme.of(context).typography.subtitle,
             ),
             const SizedBox(height: 16),
-            Card(
-              padding: const EdgeInsets.all(16),
-              child: ListView(
-                shrinkWrap: true,
-                children: [
-                  _buildActivityItem(
-                    context,
-                    'Tạo đề thi mới',
-                    'Cấu trúc dữ liệu & Giải thuật',
-                    'Đề thi cuối kỳ',
-                    DateTime.now().subtract(const Duration(days: 2)),
+
+            if (_isLoading)
+              const Center(child: ProgressRing())
+            else if (_error != null)
+              InfoBar(
+                title: Text(_error!),
+                severity: InfoBarSeverity.warning,
+              )
+            else if (_examPeriods.isEmpty)
+              const Center(
+                child: Text('Không có lịch thi nào được phân công'),
+              )
+            else
+              for (var period in _examPeriods)
+                Card(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        period.name,
+                        style: FluentTheme.of(context).typography.subtitle,
+                      ),
+                      Text(
+                        'Thời gian: ${_formatDateTime(period.startTime)} - ${_formatDateTime(period.endTime)}',
+                      ),
+                      const SizedBox(height: 16),
+                      for (var shift in period.shifts) ...[
+                        ListTile(
+                          leading: const Icon(FluentIcons.calendar),
+                          title: Text(shift.name),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Thời gian: ${_formatDateTime(shift.startTime)} - ${_formatDateTime(shift.endTime)}',
+                              ),
+                              for (var room in shift.rooms)
+                                Text(
+                                  '${room.name} (${room.facility}) - ${room.subject.name}${room.subject.exam != null ? ' - ${room.subject.exam!.name}' : ''}',
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (shift != period.shifts.last) const Divider(),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  _buildActivityItem(
-                    context,
-                    'Cập nhật đề thi',
-                    'Lập trình Web',
-                    'Thêm 5 câu hỏi mới',
-                    DateTime.now().subtract(const Duration(days: 5)),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildActivityItem(
-                    context,
-                    'Xuất kết quả thi',
-                    'Cơ sở dữ liệu',
-                    '32 thí sinh',
-                    DateTime.now().subtract(const Duration(days: 7)),
-                  ),
-                ],
-              ),
-            ),
+                ),
           ],
         ),
       ),
@@ -338,5 +623,9 @@ class _HomePageState extends State<HomePage> {
         ),
       ],
     );
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 }

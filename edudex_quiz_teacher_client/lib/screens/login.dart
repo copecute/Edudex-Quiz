@@ -33,6 +33,13 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  // Define the constants for SharedPreferences keys
+  static const String SELECTED_PERIOD_ID = 'selected_period_id';
+  static const String SELECTED_SHIFT_ID = 'selected_shift_id';
+  static const String SELECTED_ROOM_ID = 'selected_room_id';
+  static const String SELECTED_SUBJECT_ID = 'selected_subject_id';
+  static const String SELECTED_EXAM_ID = 'selected_exam_id';
+
   @override
   void initState() {
     windowManager.addListener(this);
@@ -99,14 +106,15 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       print('👤 Username: ${_soBaoDanhController.text}');
 
       final response = await http.post(
-        Uri.parse(loginUrl).replace(queryParameters: {
-          'username': _soBaoDanhController.text,
-          'password': _maSinhVienController.text,
-        }),
+        Uri.parse(loginUrl),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        body: json.encode({
+          'username': _soBaoDanhController.text,
+          'password': _maSinhVienController.text,
+        }),
       );
 
       print('📥 Status code: ${response.statusCode}');
@@ -116,17 +124,24 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       final data = json.decode(response.body);
       print('✅ Parsed data: $data');
 
-      if (data['type'] == 'success') {
+      if (data['status'] == 'success') {
         print('✨ Đăng nhập thành công');
-        print('🔑 Token: ${data['token']}');
-        print('👤 User info: ${data['user']}');
+        print('🔑 Token: ${data['data']['token']}');
+        print('👤 User info: ${data['data']['user']}');
 
-        await prefs.setString(TOKEN_KEY, data['token']);
-        await prefs.setInt(USER_ID_KEY, data['user']['id']);
-        await prefs.setString(USERNAME_KEY, data['user']['username']);
-        await prefs.setString(EMAIL_KEY, data['user']['email']);
-        await prefs.setInt(ROLE_KEY, data['user']['role']);
+        await prefs.setString(TOKEN_KEY, data['data']['token']);
+        await prefs.setInt(USER_ID_KEY, data['data']['user']['id']);
+        await prefs.setString(USERNAME_KEY, data['data']['user']['username']);
+        await prefs.setString(EMAIL_KEY, data['data']['user']['email']);
+        await prefs.setInt(ROLE_KEY, data['data']['user']['role']);
         print('💾 Đã lưu thông tin người dùng');
+
+        // Xóa thông tin đã chọn khi đăng nhập lại
+        await prefs.remove(SELECTED_PERIOD_ID);
+        await prefs.remove(SELECTED_SHIFT_ID);
+        await prefs.remove(SELECTED_ROOM_ID);
+        await prefs.remove(SELECTED_SUBJECT_ID);
+        await prefs.remove(SELECTED_EXAM_ID);
 
         // ignore: use_build_context_synchronously
         Navigator.pushReplacement(
