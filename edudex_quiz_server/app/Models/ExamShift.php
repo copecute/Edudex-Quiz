@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class ExamShift extends Model
 {
@@ -40,6 +41,18 @@ class ExamShift extends Model
         return $this->belongsToMany(ExamPeriodRoom::class, 'exam_shift_rooms')
                     ->withPivot('id')
                     ->withTimestamps();
+    }
+
+    public function proctors()
+    {
+        return $this->hasManyThrough(
+            ExamPeriodProctor::class,
+            'exam_shift_rooms',
+            'exam_shift_id', // Foreign key on exam_shift_rooms
+            'id', // Local key on exam_period_proctors
+            'id', // Local key on exam_shifts
+            'exam_period_proctor_id' // Foreign key on exam_shift_rooms
+        );
     }
 
     // Scope để tìm kiếm

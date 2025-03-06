@@ -9,17 +9,9 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.index') }}">Kỳ thi</a></li>
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('exam-period-subjects.index', $examPeriod) }}">
-                            Môn thi - {{ $examPeriod->name }}
-                        </a>
-                    </li>
-                    <li class="breadcrumb-item">
-                        <a href="{{ route('exam-period-subject-students.index', ['examPeriod' => $examPeriod->id, 'examPeriodSubject' => $examPeriodSubject->id]) }}">
-                            Thí sinh - {{ $examPeriodSubject->subject->name }}
-                        </a>
-                    </li>
+                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.dashboard', $examPeriod) }}">Kỳ thi</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.dashboard', $examPeriod) }}">{{ $examPeriod->name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{{ route('students.index', $examPeriod) }}">Quản lý thí sinh</a></li>
                     <li class="breadcrumb-item active">Thêm mới</li>
                 </ol>
             </nav>
@@ -28,88 +20,58 @@
                 <div class="card-header">
                     <h5 class="mb-0">Thêm thí sinh mới</h5>
                 </div>
-
                 <div class="card-body">
-                    <form action="{{ route('exam-period-subject-students.store', ['examPeriod' => $examPeriod->id, 'examPeriodSubject' => $examPeriodSubject->id]) }}" 
-                          method="POST" enctype="multipart/form-data">
+                    <form action="{{ route('students.store', $examPeriod) }}" method="POST">
                         @csrf
-
                         <div class="row">
+                            <!-- Cột trái -->
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="student_code" class="form-label">Mã sinh viên <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('student_code') is-invalid @enderror" 
-                                           id="student_code" name="student_code" value="{{ old('student_code') }}" required>
-                                    @error('student_code')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="full_name" class="form-label">Họ tên <span class="text-danger">*</span></label>
-                                    <input type="text" class="form-control @error('full_name') is-invalid @enderror" 
-                                           id="full_name" name="full_name" value="{{ old('full_name') }}" required>
-                                    @error('full_name')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="birthday" class="form-label">Ngày sinh</label>
-                                    <input type="date" class="form-control @error('birthday') is-invalid @enderror" 
-                                           id="birthday" name="birthday" value="{{ old('birthday') }}">
-                                    @error('birthday')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="gender" class="form-label">Giới tính <span class="text-danger">*</span></label>
-                                    <select class="form-select @error('gender') is-invalid @enderror" 
-                                            id="gender" name="gender" required>
-                                        <option value="">Chọn giới tính</option>
-                                        <option value="1" {{ old('gender') === '1' ? 'selected' : '' }}>Nam</option>
-                                        <option value="0" {{ old('gender') === '0' ? 'selected' : '' }}>Nữ</option>
+                                    <label class="form-label">Chọn môn thi</label>
+                                    <select name="subject_ids[]" class="form-select" multiple required>
+                                        @foreach($subjects as $subject)
+                                            <option value="{{ $subject->id }}">
+                                                {{ $subject->subject->name }}
+                                                ({{ $subject->students->count() }} thí sinh)
+                                            </option>
+                                        @endforeach
                                     </select>
-                                    @error('gender')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <small class="text-muted">Giữ Ctrl để chọn nhiều môn thi</small>
                                 </div>
-
                                 <div class="mb-3">
-                                    <label for="phone" class="form-label">Số điện thoại</label>
-                                    <input type="text" class="form-control @error('phone') is-invalid @enderror" 
-                                           id="phone" name="phone" value="{{ old('phone') }}">
-                                    @error('phone')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <label class="form-label">Mã sinh viên</label>
+                                    <input type="text" name="student_code" class="form-control" required>
                                 </div>
-
                                 <div class="mb-3">
-                                    <label for="avatar" class="form-label">Ảnh đại diện</label>
-                                    <input type="file" class="form-control @error('avatar') is-invalid @enderror" 
-                                           id="avatar" name="avatar">
-                                    @error('avatar')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
+                                    <label class="form-label">Họ tên</label>
+                                    <input type="text" name="full_name" class="form-control" required>
+                                </div>
+                            </div>
+                            <!-- Cột phải -->
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Số điện thoại</label>
+                                    <input type="text" name="phone" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Địa chỉ</label>
+                                    <textarea name="address" class="form-control" rows="3"></textarea>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Ngày sinh</label>
+                                    <input type="date" name="birthday" class="form-control">
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Giới tính</label>
+                                    <select name="gender" class="form-select" required>
+                                        <option value="1">Nam</option>
+                                        <option value="0">Nữ</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="mb-3">
-                            <label for="address" class="form-label">Địa chỉ</label>
-                            <textarea class="form-control @error('address') is-invalid @enderror" 
-                                      id="address" name="address" rows="3">{{ old('address') }}</textarea>
-                            @error('address')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-
                         <div class="text-end">
-                            <a href="{{ route('exam-period-subject-students.index', ['examPeriod' => $examPeriod->id, 'examPeriodSubject' => $examPeriodSubject->id]) }}" 
-                               class="btn btn-secondary me-2">Hủy</a>
+                            <a href="{{ route('students.index', $examPeriod) }}" class="btn btn-secondary me-2">Hủy</a>
                             <button type="submit" class="btn btn-primary">Thêm mới</button>
                         </div>
                     </form>
@@ -118,24 +80,4 @@
         </div>
     </div>
 </div>
-@endsection
-
-@push('scripts')
-<script>
-$(document).ready(function() {
-    // Preview ảnh trước khi upload
-    $('#avatar').on('change', function() {
-        const file = this.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                $('#preview').html(`
-                    <img src="${e.target.result}" class="img-thumbnail" style="max-height: 200px">
-                `);
-            }
-            reader.readAsDataURL(file);
-        }
-    });
-});
-</script>
-@endpush 
+@endsection 

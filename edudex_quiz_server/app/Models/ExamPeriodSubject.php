@@ -46,6 +46,11 @@ class ExamPeriodSubject extends Model
                     ->withTimestamps();
     }
 
+    public function exams()
+    {
+        return $this->hasMany(Exam::class, 'exam_period_subject_id');
+    }
+
     // Scope để tìm kiếm
     public function scopeSearch($query, $search)
     {

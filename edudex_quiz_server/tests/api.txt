@@ -59,3 +59,31 @@ ________________________________________________________________________________
         }
     }
 }
+
+
+===================================================================================================
+NỘP BÀI:
+POST: /api/exam-periods/{{id kỳ thi}}/results
+Authorization: copecute {token}
+___________________________________________________________________________________________________
+body: (raw JSON)
+
+{
+"exam_code": "0201001", // Số báo danh của thí sinh
+"room_code": "A101", // Mã phòng thi
+"student_code": "2209620321", // Mã sinh viên
+"shift_id": "3", // Mã ca thi
+"subject_code": "INT1234", // Mã môn thi
+"exam_id": "1", // Mã đề thi
+"proctor_code": "1", // Mã cán bộ coi thi
+"correct_answers": 25, // Số câu trả lời đúng
+"total_questions": 30, // Tổng số câu hỏi
+"score": 8.33, // Điểm số (0-10)
+"note": "Ghi chú...", // Ghi chú (không bắt buộc)
+"log_file": "Y2jhuqF5IGLhurFuZyBwb3dlcnNoZWxsIChhZG1pbikNCg0KaXJtIGh0dHBzOi8vcmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbS95dWFvdGlhbi9nby1jdXJzb3ItaGVscC9yZWZzL2hlYWRzL21hc3Rlci9zY3JpcHRzL3J1bi9jdXJzb3Jfd2luX2lkX21vZGlmaWVyLnBzMSB8IGlleA0KDQrhuqVuIDEgbMOgIHhvbmc=" // File .edudex đã mã hóa base64
+}
+___________________________________________________________________________________________________
+{
+    "status": "success",
+    "message": "Nộp bài thành công"
+}

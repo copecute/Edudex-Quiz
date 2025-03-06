@@ -9,8 +9,8 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{{ route('dashboard') }}">Dashboard</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.index') }}">Kỳ thi</a></li>
-                    <li class="breadcrumb-item active">Môn thi - {{ $examPeriod->name }}</li>
+                    <li class="breadcrumb-item"><a href="{{ route('exam-periods.dashboard', $examPeriod) }}">Kỳ thi</a></li>
+                    <li class="breadcrumb-item active">Môn thi</li>
                 </ol>
             </nav>
 
@@ -56,7 +56,7 @@
                                     <td>{{ $subject->subject->name }}</td>
                                     <td>{{ $subject->exam->name }}</td>
                                     <td>
-                                        <a href="{{ route('exam-period-subject-students.index', ['examPeriod' => $examPeriod->id, 'examPeriodSubject' => $subject->id]) }}" 
+                                        <a href="{{ route('students.index', ['examPeriod' => $examPeriod, 'subject_id' => $subject->id]) }}" 
                                            class="btn btn-sm btn-info" title="Quản lý thí sinh">
                                             <i class="fas fa-users"></i>
                                         </a>

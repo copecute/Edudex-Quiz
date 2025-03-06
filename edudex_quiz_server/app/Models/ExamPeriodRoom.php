@@ -26,6 +26,7 @@ class ExamPeriodRoom extends Model
     public function examShifts(): BelongsToMany
     {
         return $this->belongsToMany(ExamShift::class, 'exam_shift_rooms')
+                    ->withPivot('exam_period_proctor_id')
                     ->withTimestamps();
     }
 
@@ -33,6 +34,18 @@ class ExamPeriodRoom extends Model
     {
         return $this->belongsToMany(ExamPeriodProctor::class, 'exam_shift_room_proctors', 'exam_shift_room_id')
                     ->withTimestamps();
+    }
+
+    // Relationship với thí sinh trong phòng thi
+    public function examPeriodRoomStudents()
+    {
+        return $this->hasMany(ExamPeriodRoomStudent::class);
+    }
+
+    // Relationship với cán bộ coi thi
+    public function proctor()
+    {
+        return $this->belongsTo(ExamPeriodProctor::class, 'exam_period_proctor_id');
     }
 
     // Scope để tìm kiếm

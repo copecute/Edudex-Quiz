@@ -46,7 +46,7 @@
 
             <!-- Thống kê tổng quan -->
             <div class="row mb-4">
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card bg-primary text-white">
                         <div class="card-body">
                             <h6 class="card-title">Ca thi</h6>
@@ -54,7 +54,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card bg-success text-white">
                         <div class="card-body">
                             <h6 class="card-title">Môn thi</h6>
@@ -62,7 +62,15 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
+                    <div class="card bg-secondary text-white">
+                        <div class="card-body">
+                            <h6 class="card-title">Thí sinh</h6>
+                            <h2 class="mb-0">{{ $stats['total_students'] }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2">
                     <div class="card bg-info text-white">
                         <div class="card-body">
                             <h6 class="card-title">Phòng thi</h6>
@@ -70,7 +78,7 @@
                         </div>
                     </div>
                 </div>
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <div class="card bg-warning text-white">
                         <div class="card-body">
                             <h6 class="card-title">Cán bộ coi thi</h6>
@@ -119,7 +127,7 @@
 
             <!-- Các nút thao tác nhanh -->
             <div class="row g-4">
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <a href="{{ route('exam-shifts.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -132,7 +140,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <a href="{{ route('exam-period-subjects.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -145,7 +153,20 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
+                    <a href="{{ route('students.index', $examPeriod) }}" class="card h-100 text-decoration-none">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-user me-2"></i>
+                                Quản lý thí sinh
+                            </h5>
+                            <p class="card-text text-muted">
+                                Thêm, sửa, xóa các thí sinh trong kỳ thi
+                            </p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
                     <a href="{{ route('exam-period-rooms.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -158,7 +179,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <a href="{{ route('exam-period-proctors.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -171,7 +192,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <a href="{{ route('exam-periods.assignment.subjects', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -184,7 +205,7 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <a href="{{ route('exam-periods.assignment.rooms', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
                             <h5 class="card-title">
@@ -193,6 +214,32 @@
                             </h5>
                             <p class="card-text text-muted">
                                 Phân công phòng thi và cán bộ coi thi cho các ca thi
+                            </p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ route('exam-periods.assignment.auto', $examPeriod) }}" class="card h-100 text-decoration-none">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fa-solid fa-laptop-code"></i>
+                                Tự động phân công
+                            </h5>
+                            <p class="card-text text-muted">
+                                Tự động phân công
+                            </p>
+                        </div>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{{ route('exam-periods.results', $examPeriod) }}" class="card h-100 text-decoration-none">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-poll me-2"></i>
+                                Kết quả thi
+                            </h5>
+                            <p class="card-text text-muted">
+                                Xem kết quả thi của thí sinh
                             </p>
                         </div>
                     </a>
