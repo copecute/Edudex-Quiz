@@ -112,41 +112,80 @@ class ExamPeriodRoomController extends Controller
     public function store(Request $request, ExamPeriod $examPeriod)
     {
         try {
+            // Loại bỏ ID trùng lặp từ request
+            $newRoomIds = array_values(array_unique($request->input('room_ids', [])));
+            
+            \Log::info('Start assigning rooms', [
+                'exam_period_id' => $examPeriod->id,
+                'room_ids' => $newRoomIds
+            ]);
+
             // Lấy danh sách phòng đã được phân công hiện tại
             $currentRoomIds = ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
                 ->pluck('room_id')
                 ->toArray();
 
-            // Lấy danh sách phòng mới được chọn
-            $newRoomIds = $request->input('room_ids', []);
+            \Log::info('Current assigned rooms', [
+                'current_room_ids' => $currentRoomIds
+            ]);
 
             // Xóa các phòng đã bỏ chọn
-            $roomsToDelete = array_diff($currentRoomIds, $newRoomIds);
+            $roomsToDelete = array_values(array_diff($currentRoomIds, $newRoomIds));
+            \Log::info('Rooms to delete', [
+                'rooms_to_delete' => $roomsToDelete
+            ]);
+
             if (!empty($roomsToDelete)) {
-                ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
-                    ->whereIn('room_id', $roomsToDelete)
-                    ->delete();
+                try {
+                    ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
+                        ->whereIn('room_id', $roomsToDelete)
+                        ->delete();
+                } catch (\Exception $e) {
+                    \Log::error('Error deleting rooms', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString()
+                    ]);
+                    throw $e;
+                }
             }
 
             // Thêm các phòng mới được chọn
-            $roomsToAdd = array_diff($newRoomIds, $currentRoomIds);
-            if (!empty($roomsToAdd)) {
-                $data = array_map(function($roomId) use ($examPeriod) {
-                    return [
-                        'exam_period_id' => $examPeriod->id,
-                        'room_id' => $roomId,
-                        'created_at' => now(),
-                        'updated_at' => now()
-                    ];
-                }, $roomsToAdd);
+            $roomsToAdd = array_values(array_diff($newRoomIds, $currentRoomIds));
+            \Log::info('Rooms to add', [
+                'rooms_to_add' => $roomsToAdd
+            ]);
 
-                ExamPeriodRoom::insert($data);
+            if (!empty($roomsToAdd)) {
+                try {
+                    $data = array_map(function($roomId) use ($examPeriod) {
+                        return [
+                            'exam_period_id' => $examPeriod->id,
+                            'room_id' => $roomId,
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ];
+                    }, $roomsToAdd);
+
+                    ExamPeriodRoom::insert($data);
+                } catch (\Exception $e) {
+                    \Log::error('Error inserting new rooms', [
+                        'error' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'data' => $data
+                    ]);
+                    throw $e;
+                }
             }
 
             return redirect()->route('exam-period-rooms.index', $examPeriod)
                 ->with('success', 'Cập nhật phân công phòng thi thành công!');
         } catch (\Exception $e) {
-            return back()->with('error', 'Có lỗi xảy ra khi phân công phòng thi!');
+            \Log::error('General error in store method', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'request_data' => $request->all()
+            ]);
+            return back()->with('error', 'Có lỗi xảy ra khi phân công phòng thi: ' . $e->getMessage());
         }
     }
 

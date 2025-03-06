@@ -214,20 +214,24 @@ $(document).ready(function() {
     // Xử lý chọn tất cả trong tab tất cả
     $('#selectAll').change(function() {
         let isChecked = $(this).prop('checked');
-        $('.room-checkbox').prop('checked', isChecked);
-        // Cập nhật Map khi chọn/bỏ chọn tất cả
         $('.room-checkbox').each(function() {
             let $checkbox = $(this);
+            let roomId = $checkbox.val();
+            
             if (isChecked) {
-                selectedRooms.set($checkbox.val(), {
-                    id: $checkbox.val(),
-                    code: $checkbox.data('code'),
-                    name: $checkbox.data('name'),
-                    facility: $checkbox.data('facility'),
-                    capacity: $checkbox.data('capacity')
-                });
+                if (!selectedRooms.has(roomId)) {
+                    $checkbox.prop('checked', true);
+                    selectedRooms.set(roomId, {
+                        id: roomId,
+                        code: $checkbox.data('code'),
+                        name: $checkbox.data('name'),
+                        facility: $checkbox.data('facility'),
+                        capacity: $checkbox.data('capacity')
+                    });
+                }
             } else {
-                selectedRooms.delete($checkbox.val());
+                $checkbox.prop('checked', false);
+                selectedRooms.delete(roomId);
             }
         });
         updateSelectedTab();
@@ -242,8 +246,16 @@ $(document).ready(function() {
     // Cập nhật khi thay đổi checkbox
     $(document).on('change', '.room-checkbox', function() {
         let $checkbox = $(this);
-        // Cập nhật Map khi checkbox thay đổi
-        if ($checkbox.prop('checked')) {
+        let roomId = $checkbox.val();
+        
+        // Nếu phòng đã được chọn trước đó, bỏ chọn checkbox hiện tại
+        if ($checkbox.prop('checked') && selectedRooms.has(roomId)) {
+            $checkbox.prop('checked', false);
+            alert('Phòng này đã được chọn!');
+            return;
+        }
+        
+        if ($checkbox.prop('checked') && !selectedRooms.has(roomId)) {
             selectedRooms.set($checkbox.val(), {
                 id: $checkbox.val(),
                 code: $checkbox.data('code'),
@@ -290,22 +302,41 @@ $(document).ready(function() {
         $('#selectedTable tbody').html(selectedRows.join(''));
         $('#selectedCount').text(selectedRooms.size);
         $('#removeSelected').toggle(selectedRooms.size > 0);
-
-        // Cập nhật hidden inputs cho form submit
-        let hiddenInputs = '';
-        selectedRooms.forEach(function(room) {
-            hiddenInputs += `<input type="hidden" name="room_ids[]" value="${room.id}">`;
-        });
-        $('#selectedRoomInputs').html(hiddenInputs);
     }
 
     // Xử lý submit form
     $('form').on('submit', function(e) {
-        if (selectedRooms.size === 0) {
-            e.preventDefault();
+        e.preventDefault();
+        
+        // Lấy danh sách phòng từ tab đã chọn
+        let selectedRoomIds = new Set();
+        $('#selectedTable tbody tr').each(function() {
+            let roomId = $(this).find('.selected-checkbox').val();
+            if (roomId) {
+                selectedRoomIds.add(roomId);
+            }
+        });
+        
+        if (selectedRoomIds.size === 0) {
             alert('Vui lòng chọn ít nhất một phòng thi');
             return false;
         }
+
+        // Xóa tất cả hidden inputs cũ
+        $('#selectedRoomInputs').empty();
+        
+        // Thêm hidden inputs từ Set để đảm bảo không trùng lặp
+        selectedRoomIds.forEach(roomId => {
+            $('#selectedRoomInputs').append(
+                `<input type="hidden" name="room_ids[]" value="${roomId}">`
+            );
+        });
+        
+        // Log để debug
+        console.log('Submitting room IDs:', Array.from(selectedRoomIds));
+        
+        // Submit form
+        this.submit();
     });
 });
 </script>
