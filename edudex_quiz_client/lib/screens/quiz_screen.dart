@@ -11,16 +11,15 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
-import 'package:edudex_quiz_client/utils/cover_date_time.dart';
 import 'package:edudex_quiz_client/utils/crypto.dart';
 import 'package:intl/intl.dart';
 
 class QuizScreen extends StatefulWidget {
-  final int testSessionSubjectId;
+  final Map<String, dynamic> examInfo;
 
   const QuizScreen({
     super.key,
-    required this.testSessionSubjectId,
+    required this.examInfo,
   });
 
   @override
@@ -94,9 +93,13 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
     _loadTestPaper();
     _setupFullScreen();
+
+    // Lấy thời gian từ examInfo
+    _totalSeconds = widget.examInfo['exam']['duration'] * 60;
+    _remainingSeconds = _totalSeconds;
+
     _startTimer();
     windowManager.addListener(this);
     _initializeWindow();
@@ -111,52 +114,17 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     });
   }
 
-  Future<void> _loadUserData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final studentDataStr = prefs.getString('student_data');
-      final examsDataStr = prefs.getString('exams_data');
-      final serverUrl = prefs.getString('server_url');
-
-      if (studentDataStr != null && examsDataStr != null && serverUrl != null) {
-        setState(() {
-          _studentData = json.decode(studentDataStr);
-          _examsData = json.decode(examsDataStr);
-
-          // Cập nhật URL avatar
-          if (_studentData!['avatar_url'] != null) {
-            String avatarUrl = _studentData!['avatar_url'];
-            if (avatarUrl.startsWith('/')) {
-              avatarUrl = avatarUrl.substring(1);
-            }
-            _studentData!['avatar_url'] = '$serverUrl/$avatarUrl';
-          }
-        });
-      }
-    } catch (e) {
-      print('Lỗi khi tải dữ liệu: $e');
-    }
-  }
-
   Future<void> _loadTestPaper() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
-      final serverUrl = prefs.getString('server_url');
+      final teacherIp = prefs.getString('teacher_ip');
 
-      if (token == null || serverUrl == null) {
+      if (token == null || teacherIp == null) {
         throw Exception('Không tìm thấy thông tin cần thiết');
       }
 
-      final url =
-          '$serverUrl/api/student/test-papers/${widget.testSessionSubjectId}/questions';
-
-      print('📤 Load test paper request:');
-      print('URL: $url');
-      print('Headers: ${json.encode({
-            'Authorization': 'copecute $token',
-            'Accept': 'application/json',
-          })}');
+      final url = 'http://$teacherIp:8689/exam-questions';
 
       final response = await http.get(
         Uri.parse(url),
@@ -166,23 +134,21 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         },
       );
 
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
-        setState(() {
-          _testPaperDetails = data['test_paper'];
-          _questions =
-              List<Map<String, dynamic>>.from(_testPaperDetails!['questions']);
-          _totalSeconds = _testPaperDetails!['duration'] * 60;
-          _remainingSeconds = _totalSeconds;
-          _isLoading = false;
-        });
+        if (data['status'] == 'success') {
+          setState(() {
+            // Parse questions từ response mới
+            _questions =
+                List<Map<String, dynamic>>.from(data['data']['questions']);
+            _isLoading = false;
+          });
+        } else {
+          throw Exception(data['message']);
+        }
       } else {
-        throw Exception(
-            'Không thể tải câu hỏi: ${response.statusCode} - ${response.body}');
+        throw Exception('Không thể tải câu hỏi: ${response.statusCode}');
       }
     } catch (e) {
       print('❌ Load test paper error: $e');
@@ -304,10 +270,10 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
-      final serverUrl = prefs.getString('server_url');
+      final teacherIp = prefs.getString('teacher_ip');
 
-      if (token == null || serverUrl == null) {
-        throw Exception('Không tìm thấy thông tin đăng nhập');
+      if (token == null || teacherIp == null) {
+        throw Exception('Không tìm thấy thông tin cần thiết');
       }
 
       // Chuẩn bị dữ liệu answers cho API
@@ -345,11 +311,11 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
         buffer.writeln('Kỳ thi: ${testSession['name']}');
         buffer.writeln(
-            'Thời gian kỳ thi: ${DateTimeHelper.formatDateTime(testSession['start_date'])} - ${DateTimeHelper.formatDateTime(testSession['end_date'])}');
+            'Thời gian kỳ thi: ${testSession['start_date']} - ${testSession['end_date']}');
         buffer.writeln('Môn thi: ${subject['name']} (${subject['code']})');
         buffer.writeln('Ca thi: ${shift['name']}');
         buffer.writeln(
-            'Thời gian ca thi: ${DateTimeHelper.formatDateTime(shift['start_time'])} - ${DateTimeHelper.formatDateTime(shift['end_time'])}');
+            'Thời gian ca thi: ${shift['start_time']} - ${shift['end_time']}');
         buffer.writeln('Phòng thi: ${room['name']} - ${room['location']}');
         buffer.writeln();
 
@@ -382,8 +348,8 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       buffer.writeln('Chi tiết bài làm:');
       final testDetails = {
         'test_session_subject_id': _examsData![0]['test_session_subject_id'],
-        'started_at': DateTimeHelper.formatDateTimeForAPI(_startedAt),
-        'submitted_at': DateTimeHelper.formatDateTimeForAPI(DateTime.now()),
+        'started_at': _startedAt.toIso8601String(),
+        'submitted_at': DateTime.now().toIso8601String(),
         'answers': answers,
       };
       final prettyJson =
@@ -407,11 +373,12 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         'test_session_subject_id': _examsData![0]['test_session_subject_id'],
         'answers': answers,
         'submission_file': encryptedData.base64,
-        'started_at': DateTimeHelper.formatDateTimeForAPI(_startedAt),
+        'started_at': _startedAt.toIso8601String(),
       };
 
+      print('===============================================');
       print('📤 Submit request:');
-      print('URL: $serverUrl/api/student/submit-test');
+      print('URL: http://$teacherIp:8689/exam-submissions');
       print('Headers: ${json.encode({
             'Authorization': 'copecute $token',
             'Content-Type': 'application/json',
@@ -420,7 +387,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       print('Body: ${json.encode(requestBody)}');
 
       final response = await http.post(
-        Uri.parse('$serverUrl/api/student/submit-test'),
+        Uri.parse('http://$teacherIp:8689/exam-submissions'),
         headers: {
           'Authorization': 'copecute $token',
           'Content-Type': 'application/json',
@@ -648,81 +615,39 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                 ),
                 child: Row(
                   children: [
-                    // Ảnh và thông tin thí sinh
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(4),
-                      child: _studentData?['avatar_url'] != null
-                          ? Image.network(
-                              _studentData!['avatar_url'],
-                              width: 100,
-                              height: 120,
-                              fit: BoxFit.cover,
-                              headers: {
-                                'Accept': 'image/*',
-                              },
-                              loadingBuilder:
-                                  (context, child, loadingProgress) {
-                                if (loadingProgress == null) return child;
-                                return Container(
-                                  width: 100,
-                                  height: 120,
-                                  color: Colors.grey[40],
-                                  child: const Center(
-                                    child: ProgressRing(),
-                                  ),
-                                );
-                              },
-                              errorBuilder: (context, error, stackTrace) {
-                                // print('❌ Lỗi tải ảnh: $error');
-                                // print(
-                                //     '🔍 URL ảnh: ${_studentData!['avatar_url']}');
-                                return Container(
-                                  width: 100,
-                                  height: 120,
-                                  color: Colors.grey[40],
-                                  child:
-                                      const Icon(FluentIcons.contact, size: 48),
-                                );
-                              },
-                            )
-                          : Container(
-                              width: 100,
-                              height: 120,
-                              color: Colors.grey[40],
-                              child: const Icon(FluentIcons.contact, size: 48),
-                            ),
-                    ),
-                    const SizedBox(width: 16),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text('Thông tin thí sinh',
                             style: TextStyle(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text('Mã sinh viên: ${_studentData?['code'] ?? ''}'),
-                        Text('Họ và tên: ${_studentData?['name'] ?? ''}'),
                         Text(
-                            'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name'] ?? ''}'),
+                            'Mã sinh viên: ${_studentData?['student_code'] ?? ''}'),
+                        Text('Họ và tên: ${_studentData?['full_name'] ?? ''}'),
+                        Text(
+                            'Số báo danh: ${_studentData?['exam_code'] ?? ''}'),
                       ],
                     ),
-                    const Spacer(),
-                    // Thông tin bài thi
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Thông tin bài thi',
-                            style: TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        if (_examsData != null && _examsData!.isNotEmpty) ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Thông tin bài thi',
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
                           Text(
-                              'Kỳ thi: ${_examsData![0]['test_session']['name']}'),
-                          Text('Môn thi: ${_examsData![0]['subject']['name']}'),
+                              'Môn thi: ${widget.examInfo['subject']['name']} (${widget.examInfo['subject']['code']})'),
                           Text(
-                              'Phòng thi: ${_examsData![0]['room']['name']} - ${_examsData![0]['room']['location']}'),
+                              'Tên đề thi: ${widget.examInfo['exam']['name']}'),
                           Text(
-                              'Ca thi: ${_examsData![0]['room']['shift']['name']}'),
+                              'Thời gian: ${widget.examInfo['exam']['duration']} phút'),
+                          Text(
+                              'Số câu hỏi: ${widget.examInfo['exam']['total_questions']} câu'),
+                          Text(
+                              'Phòng thi: ${widget.examInfo['room']['name']} - ${widget.examInfo['room']['facility']}'),
+                          Text('Ca thi: ${widget.examInfo['shift']['name']}'),
                         ],
-                      ],
+                      ),
                     ),
                   ],
                 ),

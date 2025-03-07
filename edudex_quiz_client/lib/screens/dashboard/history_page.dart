@@ -6,7 +6,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:developer';
 import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
-import 'package:edudex_quiz_client/utils/cover_date_time.dart';
 
 class HistoryPage extends StatefulWidget {
   final String? initialFile;
@@ -246,7 +245,7 @@ class _HistoryPageState extends State<HistoryPage> {
                     'Số câu trả lời đúng: ${data['result']['correct_answers']}'),
                 SelectableText('Điểm số: ${data['result']['score']}'),
                 SelectableText(
-                    'Thời gian nộp bài: ${DateTimeHelper.formatDateTime(data['result']['submitted_at'])}'),
+                    'Thời gian nộp bài: ${data['result']['submitted_at']}'),
                 SelectableText(
                   'Kết quả: ${double.parse(data['result']['score'].toString()) >= 5.0 ? "Đạt" : "Không đạt"}',
                   style: TextStyle(

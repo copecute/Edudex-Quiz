@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'dart:async';
 import 'dart:convert';
+import 'package:shelf/shelf.dart' as shelf;
+import 'package:shelf/shelf_io.dart' as shelf_io;
+import 'package:http/http.dart' as http;
 
 class ConnectionService {
   static final ConnectionService _instance = ConnectionService._internal();
@@ -10,120 +13,87 @@ class ConnectionService {
   static const int STUDENT_PORT = 8688;
   static const int TEACHER_PORT = 8689;
 
-  ServerSocket? _server;
-  Socket? _teacherSocket;
+  HttpServer? _server;
   String? _teacherIP;
-  final Map<String, Socket> _connectedClients = {};
-
-  late StreamController<Map<String, dynamic>> _messageController =
-      StreamController<Map<String, dynamic>>.broadcast();
+  final _messageController = StreamController<Map<String, dynamic>>.broadcast();
   Stream<Map<String, dynamic>> get messageStream => _messageController.stream;
 
-  bool get isConnected =>
-      _teacherSocket != null && _teacherSocket!.address.address == _teacherIP;
+  bool get isConnected => _teacherIP != null;
 
   Future<void> startServer({int port = STUDENT_PORT}) async {
     try {
-      _server =
-          await ServerSocket.bind(InternetAddress.anyIPv4, port, shared: true);
-      print('TCP Server listening on port $port');
+      // Tạo handler cho HTTP server
+      final handler = const shelf.Pipeline()
+          .addMiddleware(shelf.logRequests())
+          .addHandler(_handleRequest);
 
+      // Khởi tạo HTTP server
+      _server = await shelf_io.serve(
+        handler,
+        InternetAddress.anyIPv4,
+        port,
+        shared: true,
+      );
+
+      print('HTTP Server listening on port $port');
+
+      // Log địa chỉ IP của student
       final interfaces = await NetworkInterface.list();
       final ip = interfaces
           .expand((interface) => interface.addresses)
           .firstWhere((addr) => addr.type == InternetAddressType.IPv4)
           .address;
       print('Student IP: $ip');
-
-      _server!.listen((Socket client) {
-        final clientIp = client.remoteAddress.address;
-        final clientId = '$clientIp:${client.remotePort}';
-
-        print('📥 Nhận kết nối từ: $clientId');
-
-        String buffer = '';
-        client.listen(
-          (List<int> data) {
-            try {
-              buffer += utf8.decode(data);
-              while (buffer.contains('\n')) {
-                final parts = buffer.split('\n');
-                final message = parts[0];
-                buffer = parts.sublist(1).join('\n');
-
-                if (message.isNotEmpty) {
-                  try {
-                    final jsonData = json.decode(message);
-                    print('📥 Nhận tin nhắn: $jsonData');
-
-                    switch (jsonData['type']) {
-                      case 'HEARTBEAT':
-                        print('💓 Nhận heartbeat từ teacher');
-                        client.write(json.encode({
-                              'type': 'HEARTBEAT_RESPONSE',
-                              'timestamp': DateTime.now().toIso8601String(),
-                            }) +
-                            '\n');
-                        print('💓 Đã gửi phản hồi heartbeat');
-                        break;
-
-                      default:
-                        _messageController.add(jsonData);
-                        break;
-                    }
-                  } catch (e) {
-                    print('❌ Lỗi parse JSON: $e');
-                  }
-                }
-              }
-            } catch (e) {
-              print('❌ Lỗi xử lý dữ liệu: $e');
-            }
-          },
-          onError: (error) {
-            print('❌ Lỗi kết nối: $error');
-          },
-          onDone: () {
-            print('Client ${client.remoteAddress.address} ngắt kết nối');
-          },
-          cancelOnError: false,
-        );
-      });
     } catch (e) {
       print('Error starting server: $e');
       rethrow;
     }
   }
 
+  Future<shelf.Response> _handleRequest(shelf.Request request) async {
+    try {
+      // Xử lý GET request cho heartbeat
+      if (request.method == 'GET' && request.url.path == 'heart-beat') {
+        return shelf.Response.ok(
+          json.encode({
+            'status': 'success',
+            'message': 'còn sống',
+          }),
+          headers: {'Content-Type': 'application/json'},
+        );
+      }
+
+      return shelf.Response.notFound('Not found');
+    } catch (e) {
+      print('Error handling request: $e');
+      return shelf.Response.internalServerError(
+        body: json.encode({'error': e.toString()}),
+        headers: {'Content-Type': 'application/json'},
+      );
+    }
+  }
+
   Future<void> connectToTeacher(String ip) async {
     try {
       _teacherIP = ip;
-      _teacherSocket = await Socket.connect(ip, TEACHER_PORT,
-          timeout: const Duration(seconds: 5));
 
-      // Thiết lập listener trước
-      _setupSocketListener();
+      // Kiểm tra kết nối bằng HTTP request
+      final response = await _checkTeacherConnection(ip);
+      if (response.statusCode != 200) {
+        throw Exception('Không thể kết nối tới teacher');
+      }
 
-      // Gửi CHECK_TEACHER
-      _sendJson({
-        'type': 'CHECK_TEACHER',
-        'timestamp': DateTime.now().toIso8601String()
-      });
-
-      // Đợi TEACHER_OK và giữ kết nối
-      await _messageController.stream
-          .firstWhere((msg) => msg['type'] == 'TEACHER_OK')
-          .timeout(const Duration(seconds: 5));
+      final data = json.decode(response.body);
+      if (data['type'] != 'TEACHER_OK') {
+        throw Exception('Không phải máy giáo viên');
+      }
 
       print('✅ Đã kết nối thành công với teacher');
 
       // Gửi heartbeat định kỳ
       Timer.periodic(const Duration(seconds: 30), (timer) {
         if (isConnected) {
-          _sendJson({
-            'type': 'HEARTBEAT',
-            'timestamp': DateTime.now().toIso8601String()
-          });
+          _sendHeartbeat();
         } else {
           timer.cancel();
         }
@@ -134,49 +104,52 @@ class ConnectionService {
     }
   }
 
-  void _setupSocketListener() {
-    String buffer = '';
-    _teacherSocket!.listen(
-      (data) {
-        buffer += utf8.decode(data);
-        while (buffer.contains('\n')) {
-          final parts = buffer.split('\n');
-          final message = parts[0];
-          buffer = parts.sublist(1).join('\n');
-
-          if (message.isNotEmpty) {
-            try {
-              final jsonData = json.decode(message);
-              print('📥 Nhận tin nhắn từ teacher: $jsonData');
-              _messageController.add(jsonData);
-            } catch (e) {
-              print('❌ Lỗi parse JSON: $e');
-            }
-          }
-        }
-      },
-      onError: (error) {
-        print('❌ Lỗi kết nối: $error');
-      },
-      onDone: () {
-        print('❌ Mất kết nối với teacher');
-      },
-      cancelOnError: false,
+  Future<http.Response> _checkTeacherConnection(String ip) async {
+    final url = 'http://$ip:$TEACHER_PORT/check';
+    return await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({
+        'type': 'CHECK_TEACHER',
+        'timestamp': DateTime.now().toIso8601String()
+      }),
     );
   }
 
-  void _sendJson(Map<String, dynamic> data) {
-    final jsonStr = json.encode(data);
-    _teacherSocket!.write('$jsonStr\n');
-    print('📤 Đã gửi tin nhắn: $jsonStr');
+  Future<void> _sendHeartbeat() async {
+    if (!isConnected) return;
+
+    try {
+      final url = 'http://$_teacherIP:$TEACHER_PORT/heartbeat';
+      await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'type': 'HEARTBEAT',
+          'timestamp': DateTime.now().toIso8601String()
+        }),
+      );
+    } catch (e) {
+      print('❌ Heartbeat failed: $e');
+    }
   }
 
   Future<void> sendMessage(Map<String, dynamic> message) async {
     if (!isConnected) {
       throw Exception('Chưa kết nối tới teacher');
     }
+
     try {
-      _sendJson(message);
+      final url = 'http://$_teacherIP:$TEACHER_PORT/message';
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(message),
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Gửi tin nhắn thất bại');
+      }
     } catch (e) {
       print('❌ Lỗi khi gửi tin nhắn: $e');
       rethrow;
@@ -184,18 +157,11 @@ class ConnectionService {
   }
 
   Future<void> disconnect() async {
-    try {
-      await _teacherSocket?.close();
-      _teacherSocket = null;
-      _teacherIP = null;
-      print('✅ Đã ngắt kết nối với teacher');
-    } catch (e) {
-      print('⚠️ Lỗi khi ngắt kết nối: $e');
-    }
+    _teacherIP = null;
+    print('✅ Đã ngắt kết nối với teacher');
   }
 
   Future<void> dispose() async {
-    await disconnect();
     await _server?.close();
     _server = null;
     await _messageController.close();

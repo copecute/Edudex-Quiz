@@ -398,7 +398,7 @@ class _HomePageState extends State<HomePage> {
                                       _buildInfoTile(
                                         FluentIcons.timer,
                                         'Thời gian',
-                                        '${_formatDateTime(_selectedPeriod!.startTime)} - ${_formatDateTime(_selectedPeriod!.endTime)}',
+                                        '${_formatDateTime(_selectedPeriod!.startDate)} - ${_formatDateTime(_selectedPeriod!.endDate)}',
                                       ),
                                     ],
                                   ],
@@ -434,7 +434,7 @@ class _HomePageState extends State<HomePage> {
                                       _buildInfoTile(
                                         FluentIcons.home,
                                         'Cơ sở',
-                                        _selectedRoom!.facility,
+                                        _selectedRoom!.location,
                                       ),
                                       _buildInfoTile(
                                         FluentIcons.people_external_share,

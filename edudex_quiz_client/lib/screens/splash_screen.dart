@@ -8,6 +8,8 @@ import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import '../services/connection_service.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -18,6 +20,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> with WindowListener {
   final TextEditingController _ipController = TextEditingController();
+  final TextEditingController _soMayController = TextEditingController();
   bool _isLoading = false;
   static const String TEACHER_IP_KEY = 'teacher_ip';
   static const int STUDENT_PORT = 8688; // Port cho student
@@ -26,6 +29,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
   List<String> _foundTeachers = [];
   final ConnectionService _connectionService = ConnectionService();
   bool _isInitializing = true; // Thêm biến theo dõi trạng thái khởi tạo
+  String? _errorMessage;
 
   @override
   void initState() {
@@ -144,45 +148,81 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     }
   }
 
-  Future<void> _checkTeacherClient(String ip) async {
+  Future<bool> _checkTeacherClient(String ip) async {
     try {
-      print('🔍 Kiểm tra IP: $ip');
-      await _connectionService.connectToTeacher(ip);
-      setState(() => _foundTeachers.add(ip));
-      print('✅ Tìm thấy teacher tại: $ip');
-      // await _connectionService.disconnect();
+      final response = await http.post(
+        Uri.parse('http://$ip:8689/is-teacher').replace(
+          queryParameters: {'may': _soMayController.text},
+        ),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 2));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['status'] == 'success') {
+          setState(() {
+            if (!_foundTeachers.contains(ip)) {
+              _foundTeachers.add(ip);
+            }
+          });
+          return true;
+        }
+      } else if (response.statusCode == 409) {
+        print('⚠️ Máy tính đã được đăng ký với số máy khác tại IP: $ip');
+      }
+      return false;
     } catch (e) {
-      // Bỏ qua lỗi kết nối - IP không phải teacher
+      print('❌ Lỗi khi kiểm tra teacher tại $ip: $e');
+      return false;
     }
   }
 
   Future<void> _handleConnect() async {
-    if (_ipController.text.isEmpty) {
-      print('❌ Địa chỉ IP trống');
+    if (_ipController.text.isEmpty || _soMayController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng nhập đầy đủ thông tin!';
+      });
       return;
     }
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      final ip = _ipController.text.trim();
-      await _connectionService.connectToTeacher(ip);
+      final response = await http.post(
+        Uri.parse('http://${_ipController.text}:8689/is-teacher').replace(
+          queryParameters: {'may': _soMayController.text},
+        ),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          FluentPageRoute(builder: (context) => const LoginScreen()),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
+      print('📥 Status code: ${response.statusCode}');
+      print('📄 Response: ${response.body}');
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        // Lưu thông tin kết nối
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(TEACHER_IP_KEY, _ipController.text);
+
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            FluentPageRoute(builder: (context) => const LoginScreen()),
+          );
+        }
+      } else if (response.statusCode == 409) {
+        // Xử lý trường hợp máy đã được đăng ký
         showDialog(
           context: context,
           builder: (context) => ContentDialog(
-            title: const Text('Lỗi kết nối'),
-            content: SelectableText(
-              e.toString().replaceAll('Exception: ', ''),
-              style: const TextStyle(height: 1.5),
+            title: const Text('Lỗi đăng ký'),
+            content: const Text(
+              'Máy tính này đã được đăng ký với một số máy khác. '
+              'Vui lòng liên hệ giáo viên để được hỗ trợ.',
             ),
             actions: [
               Button(
@@ -192,11 +232,24 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
             ],
           ),
         );
+        setState(() {
+          _errorMessage = 'Máy tính đã được đăng ký với số máy khác';
+        });
+      } else {
+        setState(() {
+          _errorMessage =
+              data['message'] ?? 'Không thể kết nối tới máy giáo viên';
+        });
       }
+    } catch (e) {
+      print('❌ Exception: $e');
+      setState(() {
+        _errorMessage = 'Lỗi kết nối: ${e.toString()}';
+      });
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -346,6 +399,14 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
                 ),
               ),
               const SizedBox(height: 20),
+              SizedBox(
+                width: 300,
+                child: TextBox(
+                  controller: _soMayController,
+                  placeholder: 'Nhập mã số máy',
+                ),
+              ),
+              const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -418,6 +479,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     _connectionService.dispose();
     windowManager.removeListener(this);
     _ipController.dispose();
+    _soMayController.dispose();
     super.dispose();
   }
 

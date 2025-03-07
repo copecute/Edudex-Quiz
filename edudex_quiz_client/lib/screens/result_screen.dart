@@ -11,7 +11,6 @@ import '../utils/crypto.dart';
 import 'dart:developer';
 import 'package:process_run/process_run.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:edudex_quiz_client/utils/cover_date_time.dart';
 
 class ResultScreen extends StatefulWidget {
   final int totalQuestions;
@@ -140,7 +139,7 @@ class _ResultScreenState extends State<ResultScreen> {
             'total_questions': widget.totalQuestions,
             'correct_answers': widget.correctAnswers,
             'score': widget.score,
-            'submitted_at': DateTimeHelper.formatDateTimeForAPI(DateTime.now()),
+            'submitted_at': DateTime.now().toIso8601String(),
           },
         };
 

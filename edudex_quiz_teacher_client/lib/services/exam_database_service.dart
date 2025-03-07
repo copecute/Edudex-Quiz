@@ -1,6 +1,8 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'dart:convert';
+import '../models/exam_schedule.dart';
+import '../models/exam.dart';
 
 class ExamDatabaseService {
   static Database? _database;
@@ -11,10 +13,12 @@ class ExamDatabaseService {
   }
 
   Future<Database> _initDatabase() async {
-    String path = join(await getDatabasesPath(), 'exam.db');
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'exam.db');
+
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: (Database db, int version) async {
         // Bảng môn học
         await db.execute('''
@@ -106,6 +110,7 @@ class ExamDatabaseService {
         await db.execute('''
           CREATE TABLE students (
             id INTEGER PRIMARY KEY,
+            token TEXT,
             exam_code TEXT,
             student_code TEXT,
             full_name TEXT,
@@ -116,6 +121,42 @@ class ExamDatabaseService {
             address TEXT
           )
         ''');
+
+        // Bảng kỳ thi
+        await db.execute('''
+          CREATE TABLE test_sessions (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL
+          )
+        ''');
+
+        // Bảng ca thi
+        await db.execute('''
+          CREATE TABLE shifts (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL
+          )
+        ''');
+
+        // Bảng phòng thi
+        await db.execute('''
+          CREATE TABLE rooms (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL,
+            location TEXT NOT NULL,
+            capacity INTEGER NOT NULL
+          )
+        ''');
+      },
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) {
+          // Thêm cột token vào bảng students nếu chưa có
+          await db.execute('ALTER TABLE students ADD COLUMN token TEXT');
+        }
       },
     );
   }
@@ -335,5 +376,96 @@ class ExamDatabaseService {
   Future<List<Map<String, dynamic>>> getStudents() async {
     final db = await database;
     return await db.query('students', orderBy: 'seat_number ASC');
+  }
+
+  // Lấy thông tin sinh viên theo số báo danh và mã sinh viên
+  Future<Map<String, dynamic>?> getStudentByExamCode(
+      String examCode, String studentCode) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'students',
+      where: 'exam_code = ? AND student_code = ?',
+      whereArgs: [examCode, studentCode],
+    );
+
+    if (results.isEmpty) return null;
+    return results.first;
+  }
+
+  // Cập nhật token cho sinh viên
+  Future<void> updateStudentToken(int studentId, String token) async {
+    final db = await database;
+    await db.update(
+      'students',
+      {'token': token},
+      where: 'id = ?',
+      whereArgs: [studentId],
+    );
+  }
+
+  // Lấy thông tin sinh viên theo token
+  Future<Map<String, dynamic>?> getStudentByToken(String token) async {
+    final db = await database;
+    final List<Map<String, dynamic>> results = await db.query(
+      'students',
+      where: 'token = ?',
+      whereArgs: [token],
+    );
+
+    if (results.isEmpty) return null;
+    return results.first;
+  }
+
+  // Thêm method để lưu thông tin kỳ thi, ca thi và phòng thi
+  Future<void> saveSessionInfo(
+      ExamPeriod period, ExamShift shift, ExamRoom room) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // Xóa dữ liệu cũ
+      await txn.delete('test_sessions');
+      await txn.delete('shifts');
+      await txn.delete('rooms');
+
+      // Lưu thông tin kỳ thi
+      await txn.insert('test_sessions', {
+        'id': period.id,
+        'name': period.name,
+        'start_date': period.startDate.toIso8601String(),
+        'end_date': period.endDate.toIso8601String(),
+      });
+
+      // Lưu thông tin ca thi
+      await txn.insert('shifts', {
+        'id': shift.id,
+        'name': shift.name,
+        'start_time': shift.startTime.toIso8601String(),
+        'end_time': shift.endTime.toIso8601String(),
+      });
+
+      // Lưu thông tin phòng thi
+      await txn.insert('rooms', {
+        'id': room.id,
+        'name': room.name,
+        'location': room.location,
+        'capacity': room.capacity,
+      });
+    });
+  }
+
+  // Method để lấy thông tin phiên thi
+  Future<Map<String, dynamic>?> getSessionInfo() async {
+    final db = await database;
+
+    final List<Map<String, dynamic>> sessions = await db.query('test_sessions');
+    if (sessions.isEmpty) return null;
+
+    final List<Map<String, dynamic>> shifts = await db.query('shifts');
+    final List<Map<String, dynamic>> rooms = await db.query('rooms');
+
+    return {
+      'test_session': sessions.first,
+      'shift': shifts.isNotEmpty ? shifts.first : null,
+      'room': rooms.isNotEmpty ? rooms.first : null,
+    };
   }
 }

@@ -1,15 +1,15 @@
 class ExamPeriod {
-  final int? id;
+  final int id;
   final String name;
-  final DateTime startTime;
-  final DateTime endTime;
+  final DateTime startDate;
+  final DateTime endDate;
   final List<ExamShift> shifts;
 
   ExamPeriod({
-    this.id,
+    required this.id,
     required this.name,
-    required this.startTime,
-    required this.endTime,
+    required this.startDate,
+    required this.endDate,
     required this.shifts,
   });
 
@@ -18,10 +18,10 @@ class ExamPeriod {
     return ExamPeriod(
       id: examPeriod['id'],
       name: examPeriod['name']?.toString() ?? 'Không có tên',
-      startTime: DateTime.parse(
-          examPeriod['start_time'] ?? DateTime.now().toIso8601String()),
-      endTime: DateTime.parse(
-          examPeriod['end_time'] ?? DateTime.now().toIso8601String()),
+      startDate: DateTime.parse(
+          examPeriod['start_date'] ?? DateTime.now().toIso8601String()),
+      endDate: DateTime.parse(
+          examPeriod['end_date'] ?? DateTime.now().toIso8601String()),
       shifts: (json['shifts'] as List?)
               ?.map((shift) => ExamShift.fromJson(shift))
               .toList() ??
@@ -31,14 +31,14 @@ class ExamPeriod {
 }
 
 class ExamShift {
-  final int? id;
+  final int id;
   final String name;
   final DateTime startTime;
   final DateTime endTime;
   final List<ExamRoom> rooms;
 
   ExamShift({
-    this.id,
+    required this.id,
     required this.name,
     required this.startTime,
     required this.endTime,
@@ -65,16 +65,16 @@ class ExamRoom {
   final int? id;
   final String? code;
   final String name;
-  final String facility;
-  final int? capacity;
+  final String location;
+  final int capacity;
   final Subject subject;
 
   ExamRoom({
     this.id,
     this.code,
     required this.name,
-    required this.facility,
-    this.capacity,
+    required this.location,
+    required this.capacity,
     required this.subject,
   });
 
@@ -83,8 +83,8 @@ class ExamRoom {
       id: json['id'],
       code: json['code']?.toString(),
       name: json['name']?.toString() ?? 'Không có tên',
-      facility: json['facility']?.toString() ?? 'Không có cơ sở',
-      capacity: json['capacity'],
+      location: json['facility']?.toString() ?? 'Không có địa điểm',
+      capacity: json['capacity'] ?? 0,
       subject: Subject.fromJson(json['subject'] ?? {}),
     );
   }
