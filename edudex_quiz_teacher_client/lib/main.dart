@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import 'package:system_theme/system_theme.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
@@ -26,6 +28,14 @@ bool get isDesktop {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Khởi tạo SQLite cho Windows
+  if (Platform.isWindows || Platform.isLinux) {
+    // Khởi tạo FFI loader
+    sqfliteFfiInit();
+    // Thay đổi databaseFactory mặc định
+    databaseFactory = databaseFactoryFfi;
+  }
 
   if (kIsWeb) {
     runApp(const MyApp());

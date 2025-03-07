@@ -163,6 +163,22 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
     }
   }
 
+  void _handleExamPeriodSelected(
+      ExamPeriod period, ExamShift shift, ExamRoom room) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_shift_id', shift.id ?? 0);
+    await prefs.setInt('selected_room_id', room.id ?? 0);
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        FluentPageRoute(
+          builder: (context) => const DashboardScreen(),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final appTheme = context.watch<AppTheme>();

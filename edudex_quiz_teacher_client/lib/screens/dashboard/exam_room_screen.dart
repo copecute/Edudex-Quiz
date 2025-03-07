@@ -30,6 +30,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
   final _blockedIpsController = TextEditingController();
 
   Timer? _refreshTimer;
+  Map<int, String> _studentNames = {};
 
   @override
   bool get wantKeepAlive => true;
@@ -196,8 +197,60 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
     );
   }
 
+  Widget _buildComputerStatus(int computerNumber) {
+    final isConnected =
+        widget.httpService.connectionStatus[computerNumber] ?? false;
+    final isAlive = isConnected &&
+        (widget.httpService.connectionStatus[computerNumber] ?? false);
+    final studentName = widget.httpService.studentNames[computerNumber];
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Máy $computerNumber'),
+                if (isConnected)
+                  IconButton(
+                    icon: const Icon(FluentIcons.cancel),
+                    onPressed: () => _disconnectComputer(computerNumber),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: isConnected
+                    ? (isAlive
+                        ? Colors.successPrimaryColor
+                        : Colors.errorPrimaryColor)
+                    : Colors.grey,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                isConnected
+                    ? (studentName ?? 'Chưa đăng nhập') // Hiển thị tên nếu có
+                    : 'Chưa kết nối',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showComputerInfoDialog(
       int computerNumber, String clientIp, DateTime connectionTime) {
+    final student = widget.httpService.studentNames[computerNumber];
+    final examCode = widget.httpService.studentExamCodes[computerNumber];
+    final studentCode = widget.httpService.studentCodes[computerNumber];
+
     showDialog(
       context: context,
       builder: (context) => ContentDialog(
@@ -213,7 +266,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Thông tin cơ bản
+            // Thông tin máy
             _buildInfoGroup('Thông tin máy', [
               _buildInfoRow('Tên máy:', 'PC-$computerNumber'),
               _buildInfoRow('Địa chỉ IP:', clientIp),
@@ -227,9 +280,9 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
 
             // Thông tin thí sinh
             _buildInfoGroup('Thông tin thí sinh', [
-              _buildInfoRow('Họ tên:', 'Chưa đăng nhập'),
-              _buildInfoRow('Số báo danh:', 'Chưa đăng nhập'),
-              _buildInfoRow('Mã sinh viên:', 'Chưa đăng nhập'),
+              _buildInfoRow('Họ tên:', student ?? 'Chưa đăng nhập'),
+              _buildInfoRow('Số báo danh:', examCode ?? 'Chưa đăng nhập'),
+              _buildInfoRow('Mã sinh viên:', studentCode ?? 'Chưa đăng nhập'),
             ]),
           ],
         ),
@@ -361,13 +414,13 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    // Tính toán số cột dựa vào kích thước màn hình
+    // responsive
     final width = MediaQuery.of(context).size.width;
     final crossAxisCount = switch (width) {
-      > 1600 => 12,
-      > 1200 => 10,
-      > 800 => 8,
-      > 600 => 6,
+      > 1600 => 10,
+      > 1200 => 8,
+      > 800 => 6,
+      > 600 => 4,
       _ => 4,
     };
 
@@ -619,7 +672,9 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                                   Text(
                                     isConnected
                                         ? (isAlive
-                                            ? 'Đã kết nối'
+                                            ? (widget.httpService.studentNames[
+                                                    computerNumber] ??
+                                                'Đã kết nối')
                                             : 'Mất kết nối')
                                         : 'Chưa kết nối',
                                     style: TextStyle(
@@ -656,5 +711,19 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
         ),
       ),
     );
+  }
+
+  void updateStudentName(int computerNumber, String name) {
+    setState(() {
+      _studentNames[computerNumber] = name;
+    });
+  }
+
+  String? getStudentName(int computerNumber) {
+    return _studentNames[computerNumber];
+  }
+
+  void _disconnectComputer(int computerNumber) {
+    // Implementation of _disconnectComputer method
   }
 }

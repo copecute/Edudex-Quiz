@@ -5,6 +5,7 @@ import '../../providers/student_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import '../../services/exam_database_service.dart';
 
 class QuizManagementPage extends StatefulWidget {
   const QuizManagementPage({super.key});
@@ -15,6 +16,7 @@ class QuizManagementPage extends StatefulWidget {
 
 class _QuizManagementPageState extends State<QuizManagementPage> {
   final _examIdController = TextEditingController();
+  final _examDb = ExamDatabaseService();
   Map<String, dynamic>? _examData;
   String? _errorMessage;
   bool _isLoading = true;
@@ -22,55 +24,19 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
   @override
   void initState() {
     super.initState();
-    _fetchExamData();
+    _loadExamData();
   }
 
-  Future<void> _fetchExamData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('user_token');
-    final selectedShiftId = prefs.getInt('selected_shift_id');
-    final selectedRoomId = prefs.getInt('selected_room_id');
-    final serverUrl = prefs.getString('server_url');
-
-    if (token == null ||
-        selectedShiftId == null ||
-        selectedRoomId == null ||
-        serverUrl == null) {
-      setState(() {
-        _errorMessage = 'Thông tin không đầy đủ để lấy thông tin đề thi.';
-        _isLoading = false;
-      });
-      return;
-    }
-
+  Future<void> _loadExamData() async {
     try {
-      final url = Uri.parse(
-          '$serverUrl/api/exam-schedule/shifts/$selectedShiftId/rooms/$selectedRoomId/exam');
-      print('Đang lấy thông tin đề thi: $url');
-
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'copecute $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      final data = json.decode(response.body);
-
-      if (data['status'] == 'success') {
-        setState(() {
-          _examData = data['data'];
-          _errorMessage = null;
-        });
-      } else {
-        setState(() {
-          _errorMessage = data['message'] ?? 'Không thể lấy thông tin đề thi';
-        });
-      }
+      final data = await _examDb.getExamData();
+      setState(() {
+        _examData = data;
+        _errorMessage = null;
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Lỗi khi lấy thông tin đề thi: $e';
+        _errorMessage = 'Lỗi khi tải dữ liệu: $e';
       });
     } finally {
       setState(() {

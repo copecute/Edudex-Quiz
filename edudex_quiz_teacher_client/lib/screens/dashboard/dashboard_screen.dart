@@ -16,6 +16,7 @@ import 'statistics.dart';
 import 'exam_room_screen.dart';
 import '../../services/database_service.dart';
 import '../../services/http_server_service.dart';
+import '../../services/exam_database_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -39,17 +40,32 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
 
   final _pageStorageBucket = PageStorageBucket();
   final _httpService = HttpServerService();
+  final _examDb = ExamDatabaseService();
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
+    _loadData();
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final examData = await _examDb.getExamData();
+    if (examData == null) {
+      // Nếu không có dữ liệu, quay về màn hình login
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   Future<void> _handleLogout() async {

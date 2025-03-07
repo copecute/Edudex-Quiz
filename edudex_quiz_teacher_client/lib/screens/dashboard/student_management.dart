@@ -2,6 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../services/exam_database_service.dart';
 
 class StudentManagementPage extends StatefulWidget {
   const StudentManagementPage({super.key});
@@ -11,63 +12,27 @@ class StudentManagementPage extends StatefulWidget {
 }
 
 class _StudentManagementPageState extends State<StudentManagementPage> {
-  List<dynamic> _students = [];
+  final _examDb = ExamDatabaseService();
+  List<Map<String, dynamic>> _students = [];
   String? _errorMessage;
   bool _isLoading = true;
-  String? _serverUrl;
 
   @override
   void initState() {
     super.initState();
-    _fetchStudents();
+    _loadStudents();
   }
 
-  Future<void> _fetchStudents() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('user_token');
-    final selectedShiftId = prefs.getInt('selected_shift_id');
-    final selectedRoomId = prefs.getInt('selected_room_id');
-    _serverUrl = prefs.getString('server_url');
-
-    if (token == null ||
-        selectedShiftId == null ||
-        selectedRoomId == null ||
-        _serverUrl == null) {
-      setState(() {
-        _errorMessage = 'Thông tin không đầy đủ để lấy danh sách sinh viên.';
-        _isLoading = false;
-      });
-      return;
-    }
-
+  Future<void> _loadStudents() async {
     try {
-      final url = Uri.parse(
-          '$_serverUrl/api/exam-schedule/shifts/$selectedShiftId/rooms/$selectedRoomId/students');
-      print('Đang lấy danh sách sinh viên: $url');
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'copecute $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      final data = json.decode(response.body);
-
-      if (data['status'] == 'success') {
-        setState(() {
-          _students = data['data'];
-          _errorMessage = null;
-        });
-      } else {
-        setState(() {
-          _errorMessage =
-              data['message'] ?? 'Không thể lấy danh sách sinh viên';
-        });
-      }
+      final students = await _examDb.getStudents();
+      setState(() {
+        _students = students;
+        _errorMessage = null;
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'Lỗi khi lấy danh sách sinh viên: $e';
+        _errorMessage = 'Lỗi khi tải dữ liệu: $e';
       });
     } finally {
       setState(() {

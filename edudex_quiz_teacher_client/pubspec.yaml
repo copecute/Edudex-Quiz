@@ -27,6 +27,7 @@ dependencies:
   bitsdojo_window: ^0.1.6
   shared_preferences: ^2.2.1
   sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
   path: ^1.8.3
   network_info_plus: ^4.1.0
 
