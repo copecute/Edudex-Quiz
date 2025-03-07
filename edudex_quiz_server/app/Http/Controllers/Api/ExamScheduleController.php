@@ -13,154 +13,6 @@ use App\Models\ExamPeriodRoom;
 
 class ExamScheduleController extends Controller
 {
-    public function index(Request $request)
-    {
-        try {
-            // Lấy thông tin cán bộ coi thi đang đăng nhập
-            $proctor = $request->user();
-            
-            \Log::info('Proctor schedule request', [
-                'proctor' => $proctor->username
-            ]);
-
-            // Lấy các kỳ thi mà CBCT được phân công
-            $examPeriods = ExamPeriod::whereHas('proctors', function($query) use ($proctor) {
-                $query->where('account_id', $proctor->id);
-            })
-            ->where(function($query) {
-                $now = Carbon::now();
-                $query->where('is_active', true)
-                    ->where('start_time', '<=', $now)
-                    ->where('end_time', '>=', $now);
-            })
-            ->get();
-
-            // Nếu không có kỳ thi nào
-            if ($examPeriods->isEmpty()) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Bạn chưa được phân công coi thi cho kỳ thi nào.',
-                    'data' => []
-                ]);
-            }
-
-            \Log::info('Found exam periods', [
-                'count' => $examPeriods->count(),
-                'now' => Carbon::now()->toDateTimeString(),
-                'periods' => $examPeriods->map(function($period) {
-                    return [
-                        'id' => $period->id,
-                        'name' => $period->name,
-                        'start_time' => $period->start_time,
-                        'end_time' => $period->end_time,
-                        'is_active' => $period->is_active
-                    ];
-                })
-            ]);
-
-            $schedules = [];
-            
-            foreach ($examPeriods as $examPeriod) {
-                // Lấy ID của exam_period_proctor
-                $proctorId = ExamPeriodProctor::where('exam_period_id', $examPeriod->id)
-                    ->where('account_id', $proctor->id)
-                    ->value('id');
-
-                // Lấy thông tin các phòng thi được phân công
-                $rooms = $examPeriod->examShifts()
-                    ->with([
-                        'rooms' => function($query) use ($proctorId) {
-                            $query->where('exam_shift_rooms.exam_period_proctor_id', $proctorId);
-                        },
-                        'rooms.room.facility',
-                        'subjects.subject',
-                        'subjects.exam'
-                    ])
-                    ->get()
-                    ->filter(function($shift) {
-                        return $shift->rooms->isNotEmpty();
-                    });
-
-                if ($rooms->isEmpty()) {
-                    continue;
-                }
-
-                $examSchedule = [
-                    'exam_period' => [
-                        'id' => $examPeriod->id,
-                        'name' => $examPeriod->name,
-                        'start_time' => $examPeriod->start_time->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i:s'),
-                        'end_time' => $examPeriod->end_time->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i:s')
-                    ],
-                    'shifts' => []
-                ];
-
-                foreach ($rooms as $shift) {
-                    $shiftInfo = [
-                        'id' => $shift->id,
-                        'name' => $shift->name,
-                        'start_time' => $shift->start_time->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i:s'),
-                        'end_time' => $shift->end_time->setTimezone('Asia/Ho_Chi_Minh')->format('Y-m-d H:i:s'),
-                        'rooms' => []
-                    ];
-
-                    foreach ($shift->rooms as $room) {
-                        $subject = null;
-                        if ($room->pivot->exam_period_subject_id) {
-                            $subject = $shift->subjects->firstWhere('id', $room->pivot->exam_period_subject_id);
-                        }
-
-                        $shiftInfo['rooms'][] = [
-                            'id' => $room->id,
-                            'code' => $room->room->code,
-                            'name' => $room->room->name,
-                            'facility' => $room->room->facility->name,
-                            'capacity' => $room->room->capacity,
-                            'subject' => [
-                                'id' => $subject ? $subject->subject_id : null,
-                                'name' => $subject ? $subject->subject->name : null,
-                                'exam' => $subject ? [
-                                    'id' => $subject->exam_id,
-                                    'name' => $subject->exam ? $subject->exam->name : null,
-                                    'duration' => $subject->exam ? $subject->exam->duration : null,
-                                    'total_questions' => $subject->exam ? $subject->exam->total_questions : null
-                                ] : null
-                            ]
-                        ];
-                    }
-
-                    $examSchedule['shifts'][] = $shiftInfo;
-                }
-
-                $schedules[] = $examSchedule;
-            }
-
-            // Nếu không có ca thi nào được phân công
-            if (empty($schedules)) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Bạn chưa được phân công phòng thi cho kỳ thi nào.',
-                    'data' => []
-                ]);
-            }
-
-            return response()->json([
-                'success' => true,
-                'data' => $schedules
-            ]);
-
-        } catch (\Exception $e) {
-            \Log::error('Error getting proctor schedule', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return response()->json([
-                'success' => false,
-                'message' => 'Có lỗi xảy ra khi lấy lịch coi thi: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function students(Request $request, ExamShift $shift, ExamPeriodRoom $room)
     {
         try {
@@ -225,6 +77,145 @@ class ExamScheduleController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Có lỗi xảy ra khi lấy danh sách thí sinh: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function exam(Request $request, ExamShift $shift, ExamPeriodRoom $room)
+    {
+        try {
+            // Log input parameters
+            \Log::info('Exam info request', [
+                'shift_id' => $shift->id,
+                'room_id' => $room->id
+            ]);
+
+            // Kiểm tra CBCT có được phân công cho phòng thi này không
+            $proctor = $request->user();
+            $proctorId = ExamPeriodProctor::where('exam_period_id', $shift->exam_period_id)
+                ->where('account_id', $proctor->id)
+                ->value('id');
+            
+            \Log::info('Proctor check', [
+                'proctor_id' => $proctorId,
+                'exam_period_id' => $shift->exam_period_id,
+                'account_id' => $proctor->id
+            ]);
+
+            $shiftRoom = DB::table('exam_shift_rooms')
+                ->where('exam_shift_id', $shift->id)
+                ->where('exam_period_room_id', $room->id)
+                ->where('exam_period_proctor_id', $proctorId)
+                ->first();
+            
+            \Log::info('Shift room check', [
+                'shift_room' => $shiftRoom
+            ]);
+
+            if (!$shiftRoom) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Bạn không được phân công coi thi phòng này'
+                ], 403);
+            }
+
+            // Debug step 1: Kiểm tra thông tin môn thi và đề thi
+            $examBasicInfo = DB::table('exam_shift_rooms as esr')
+                ->join('exam_period_subjects as eps', 'esr.exam_period_subject_id', '=', 'eps.id')
+                ->join('subjects as s', 'eps.subject_id', '=', 's.id')
+                ->join('exams as e', 'eps.exam_id', '=', 'e.id')
+                ->where('esr.exam_shift_id', $shift->id)
+                ->where('esr.exam_period_room_id', $room->id)
+                ->select([
+                    'eps.id as subject_id',
+                    's.code as subject_code',
+                    's.name as subject_name',
+                    'e.id as exam_id',
+                    'e.name as exam_name',
+                    'e.duration',
+                    'e.total_questions',
+                    'e.description as exam_description'
+                ])
+                ->first();
+
+            \Log::info('Basic exam info', [
+                'exam_info' => $examBasicInfo
+            ]);
+
+            if (!$examBasicInfo) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy thông tin môn thi và đề thi'
+                ], 404);
+            }
+
+            // Debug step 2: Kiểm tra câu hỏi của đề thi
+            $questions = DB::table('exam_tags as et')
+                ->join('question_tag as qt', 'et.tag_id', '=', 'qt.tag_id')
+                ->join('questions as q', 'qt.question_id', '=', 'q.id')
+                ->where('et.exam_id', $examBasicInfo->exam_id)
+                ->where('q.subject_code', $examBasicInfo->subject_code)
+                ->select([
+                    'q.id as question_id',
+                    'q.content',
+                    'q.link_media',
+                    'q.difficulty as type',
+                    'et.num_questions as score'
+                ])
+                ->orderBy('q.id')
+                ->get();
+
+            \Log::info('Questions info', [
+                'exam_id' => $examBasicInfo->exam_id,
+                'subject_code' => $examBasicInfo->subject_code,
+                'questions_count' => $questions->count()
+            ]);
+
+            if ($questions->isEmpty()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Không tìm thấy câu hỏi cho đề thi'
+                ], 404);
+            }
+
+            // Format dữ liệu trả về
+            $examData = [
+                'subject' => [
+                    'id' => $examBasicInfo->subject_id,
+                    'code' => $examBasicInfo->subject_code,
+                    'name' => $examBasicInfo->subject_name
+                ],
+                'exam' => [
+                    'id' => $examBasicInfo->exam_id,
+                    'name' => $examBasicInfo->exam_name,
+                    'duration' => $examBasicInfo->duration,
+                    'total_questions' => $examBasicInfo->total_questions,
+                    'description' => $examBasicInfo->exam_description
+                ],
+                'questions' => $questions->map(function($question) {
+                    return [
+                        'id' => $question->question_id,
+                        'content' => $question->content,
+                        'type' => $question->type,
+                        'media' => $question->link_media,
+                        'score' => $question->score
+                    ];
+                })
+            ];
+
+            return response()->json([
+                'success' => true,
+                'data' => $examData
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error getting exam info', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Có lỗi xảy ra khi lấy thông tin đề thi: ' . $e->getMessage()
             ], 500);
         }
     }

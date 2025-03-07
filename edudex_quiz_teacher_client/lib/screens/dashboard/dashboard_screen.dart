@@ -165,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
         items: [
           PaneItem(
             icon: const Icon(FluentIcons.home),
-            title: const Text('Trang chủ'),
+            title: const Text('Tổng quan'),
             body: _pages[0],
           ),
           PaneItem(

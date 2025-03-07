@@ -28,6 +28,8 @@ class _HomePageState extends State<HomePage> {
   ExamPeriod? _selectedPeriod;
   ExamShift? _selectedShift;
   ExamRoom? _selectedRoom;
+  String _fullName = '';
+  Map<String, dynamic>? _userInfo;
 
   // Thêm các key constants
   static const String SELECTED_SHIFT_ID = 'selected_shift_id';
@@ -42,8 +44,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _loadUserInfo();
-    _loadExamSchedule();
-    _checkSelectedExam(); // Kiểm tra xem đã chọn ca thi hay chưa
+    _loadSelectedExamInfo();
   }
 
   @override
@@ -55,14 +56,20 @@ class _HomePageState extends State<HomePage> {
   Future<void> _loadUserInfo() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _username = prefs.getString('username') ?? 'Không xác định';
-      _email = prefs.getString('email') ?? 'Không xác định';
-      _serverUrl = prefs.getString('server_url');
-      _serverUrlController.text = _formatServerUrl(_serverUrl);
-      _role = prefs.getInt('user_role') ?? 0;
+      _fullName = prefs.getString('full_name') ?? 'Không xác định';
+
+      // Load user info
+      _userInfo = {
+        'full_name': prefs.getString('full_name'),
+        'date_of_birth': prefs.getString('date_of_birth'),
+        'gender': prefs.getBool('gender'),
+        'phone': prefs.getString('phone'),
+        'address': prefs.getString('address'),
+        'avatar': prefs.getString('avatar'),
+        'email': prefs.getString('email'),
+        'role': prefs.getInt('user_role'),
+      };
     });
-    print(
-        '👤 Loaded user info - Username: $_username, Email: $_email, Role: $_role');
   }
 
   String _formatServerUrl(String? url) {
@@ -111,125 +118,61 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _checkSelectedExam() async {
-    final prefs = await SharedPreferences.getInstance();
-    final selectedPeriodId = prefs.getInt(SELECTED_PERIOD_ID);
-    final selectedShiftId = prefs.getInt(SELECTED_SHIFT_ID);
-    final selectedRoomId = prefs.getInt(SELECTED_ROOM_ID);
-
-    if (selectedPeriodId != null &&
-        selectedShiftId != null &&
-        selectedRoomId != null) {
-      // Nếu đã có thông tin đã chọn, đánh dấu là đã chọn
-      setState(() {
-        _isExamSelected = true;
-        // Tìm kiếm thông tin đã chọn từ _examPeriods
-        _selectedPeriod =
-            _examPeriods.firstWhere((period) => period.id == selectedPeriodId);
-        _selectedShift = _selectedPeriod!.shifts
-            .firstWhere((shift) => shift.id == selectedShiftId);
-        _selectedRoom = _selectedShift!.rooms
-            .firstWhere((room) => room.id == selectedRoomId);
-      });
-    }
-  }
-
-  Future<void> _loadExamSchedule() async {
-    if (_examPeriods.isNotEmpty)
-      return; // Nếu đã có lịch thi, không gọi lại API
+  Future<void> _loadSelectedExamInfo() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('user_token');
-      final serverUrl = prefs.getString('server_url');
 
-      if (token == null || serverUrl == null) {
-        throw Exception('Không tìm thấy thông tin đăng nhập');
+      // Load thông tin lịch thi từ SharedPreferences
+      final scheduleData = prefs.getString('exam_schedule');
+      if (scheduleData == null) {
+        throw Exception('Không tìm thấy thông tin lịch thi');
       }
 
-      final response = await http.get(
-        Uri.parse('$serverUrl/api/exam-schedule'),
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'Authorization': 'copecute $token',
-        },
-      );
+      final scheduleJson = json.decode(scheduleData) as List;
+      _examPeriods =
+          scheduleJson.map((period) => ExamPeriod.fromJson(period)).toList();
 
-      final data = json.decode(response.body);
+      // Lấy thông tin đã chọn từ SharedPreferences
+      final selectedPeriodId = prefs.getInt('selected_period_id');
+      final selectedShiftId = prefs.getInt('selected_shift_id');
+      final selectedRoomId = prefs.getInt('selected_room_id');
 
-      if (data['success'] == true) {
-        if (data['data'].isEmpty) {
-          setState(() {
-            _examPeriods = [];
-            _error = data['message'];
-          });
-        } else {
-          setState(() {
-            _examPeriods = (data['data'] as List).map((periodData) {
-              final examPeriod = periodData['exam_period'];
-              return ExamPeriod(
-                id: examPeriod['id'],
-                name: examPeriod['name'],
-                startTime: DateTime.parse(examPeriod['start_time']),
-                endTime: DateTime.parse(examPeriod['end_time']),
-                shifts: (periodData['shifts'] as List)
-                    .map((shift) => ExamShift.fromJson(shift))
-                    .toList(),
-              );
-            }).toList();
-          });
+      if (selectedPeriodId == null ||
+          selectedShiftId == null ||
+          selectedRoomId == null) {
+        throw Exception('Không tìm thấy thông tin ca thi đã chọn');
+      }
 
-          // Chỉ hiển thị dialog nếu chưa chọn ca thi
-          if (mounted && _examPeriods.isNotEmpty && !_isExamSelected) {
-            showDialog(
-              context: context,
-              builder: (context) => ExamPeriodSelector(
-                examPeriods: _examPeriods,
-                onSelected: (period, shift, room) async {
-                  setState(() {
-                    _selectedPeriod = period;
-                    _selectedShift = shift;
-                    _selectedRoom = room;
-                    _isExamSelected = true; // Đánh dấu đã chọn
-                  });
+      // Hiển thị thông tin đã lưu
+      setState(() {
+        _selectedPeriod = _examPeriods.firstWhere(
+          (p) => p.id == selectedPeriodId,
+          orElse: () => throw Exception('Không tìm thấy kỳ thi đã chọn'),
+        );
 
-                  // Lưu các ID vào SharedPreferences
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setInt(SELECTED_PERIOD_ID, period.id ?? 0);
-                  await prefs.setInt(SELECTED_SHIFT_ID, shift.id ?? 0);
-                  await prefs.setInt(SELECTED_ROOM_ID, room.id ?? 0);
-                  await prefs.setInt(SELECTED_SUBJECT_ID, room.subject.id ?? 0);
-                  await prefs.setInt(
-                      SELECTED_EXAM_ID, room.subject.exam?.id ?? 0);
+        if (_selectedPeriod != null) {
+          _selectedShift = _selectedPeriod!.shifts.firstWhere(
+            (s) => s.id == selectedShiftId,
+            orElse: () => throw Exception('Không tìm thấy ca thi đã chọn'),
+          );
 
-                  print('📅 Đã chọn kỳ thi: ${period.name} (ID: ${period.id})');
-                  print('⏰ Đã chọn ca thi: ${shift.name} (ID: ${shift.id})');
-                  print('🏫 Đã chọn phòng: ${room.name} (ID: ${room.id})');
-                  print(
-                      '📚 Đã chọn môn: ${room.subject.name} (ID: ${room.subject.id})');
-                  if (room.subject.exam != null) {
-                    print(
-                        '📝 Đã chọn đề thi: ${room.subject.exam!.name} (ID: ${room.subject.exam!.id})');
-                  }
-                },
-              ),
+          if (_selectedShift != null) {
+            _selectedRoom = _selectedShift!.rooms.firstWhere(
+              (r) => r.id == selectedRoomId,
+              orElse: () => throw Exception('Không tìm thấy phòng thi đã chọn'),
             );
           }
         }
-      } else {
-        throw Exception(data['message']);
-      }
+      });
     } catch (e) {
       setState(() {
         _error = e.toString();
       });
-      print('🔥 Lỗi load lịch thi: $e'); // Thêm log để debug
     } finally {
       setState(() {
         _isLoading = false;
@@ -250,378 +193,363 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Widget _buildSelectedExamInfo() {
-    if (_selectedPeriod == null || _selectedShift == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Card(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Thông tin ca thi đã chọn',
-            style: FluentTheme.of(context).typography.subtitle,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow(
-                      icon: FluentIcons.calendar,
-                      label: 'Kỳ thi:',
-                      value: _selectedPeriod!.name,
-                    ),
-                    const SizedBox(height: 8),
-                    _buildInfoRow(
-                      icon: FluentIcons.clock,
-                      label: 'Ca thi:',
-                      value: '${_selectedShift!.name}\n'
-                          '${_formatDateTime(_selectedShift!.startTime)} - '
-                          '${_formatDateTime(_selectedShift!.endTime)}',
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 32),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow(
-                      icon: FluentIcons.room,
-                      label: 'Phòng thi:',
-                      value:
-                          '${_selectedRoom?.name} (${_selectedRoom?.facility})',
-                    ),
-                    const SizedBox(height: 8),
-                    _buildInfoRow(
-                      icon: FluentIcons.custom_entity,
-                      label: 'Môn thi:',
-                      value: _selectedRoom?.subject.name ?? '',
-                    ),
-                    if (_selectedRoom?.subject.exam != null) ...[
-                      const SizedBox(height: 8),
-                      _buildInfoRow(
-                        icon: FluentIcons.diet_plan_notebook,
-                        label: 'Đề thi:',
-                        value: '${_selectedRoom?.subject.exam?.name}\n'
-                            'Thời gian: ${_selectedRoom?.subject.exam?.duration} phút\n'
-                            'Số câu hỏi: ${_selectedRoom?.subject.exam?.totalQuestions}',
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
+  void _showUserInfoDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ContentDialog(
+        title: Row(
+          children: [
+            const Icon(FluentIcons.contact_info),
+            const SizedBox(width: 8),
+            const Text('Thông tin cán bộ coi thi'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Họ và tên:', _userInfo?['full_name']),
+            _buildDetailRow(
+              'Ngày sinh:',
+              _formatDate(_userInfo?['date_of_birth']),
+            ),
+            _buildDetailRow(
+              'Giới tính:',
+              _userInfo?['gender'] == true ? 'Nam' : 'Nữ',
+            ),
+            _buildDetailRow('Số điện thoại:', _userInfo?['phone']),
+            _buildDetailRow('Email:', _userInfo?['email']),
+            _buildDetailRow('Địa chỉ:', _userInfo?['address']),
+            _buildDetailRow(
+              'Vai trò:',
+              _getRoleName(_userInfo?['role'] ?? 0),
+            ),
+          ],
+        ),
+        actions: [
+          Button(
+            child: const Text('Đóng'),
+            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildInfoRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(value),
-            ],
-          ),
-        ),
-      ],
-    );
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return 'N/A';
+    try {
+      final date = DateTime.parse(dateStr);
+      return '${date.day}/${date.month}/${date.year}';
+    } catch (e) {
+      return dateStr;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return ScaffoldPage(
-      padding: const EdgeInsets.symmetric(horizontal: 24.0),
       content: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Welcome section
-            Card(
-              padding: const EdgeInsets.all(24.0),
-              child: Row(
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Chào mừng, $_username!',
-                        style: FluentTheme.of(context).typography.titleLarge,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _email,
-                        style: FluentTheme.of(context).typography.body,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Vai trò: ${_getRoleName(_role)}',
-                        style:
-                            FluentTheme.of(context).typography.body?.copyWith(
-                                  color: _role == 2
-                                      ? Colors.successPrimaryColor
-                                      : _role == 1
-                                          ? Colors.warningPrimaryColor
-                                          : Colors.blue,
-                                ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // thông tin máy chủ
-            Card(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Thông tin máy chủ',
-                    style: FluentTheme.of(context).typography.subtitle,
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        'Địa chỉ: ',
-                        style: FluentTheme.of(context).typography.body,
-                      ),
-                      const SizedBox(width: 8),
-                      SizedBox(
-                        width: 120,
-                        child: TextBox(
-                          controller: _serverUrlController,
-                          readOnly: true,
-                          placeholder: 'Chưa cấu hình',
-                          style: FluentTheme.of(context).typography.body,
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        'Trạng thái: ${_isConnected ? 'Đã kết nối' : 'Mất kết nối'}',
-                        style:
-                            FluentTheme.of(context).typography.body?.copyWith(
-                                  color: _isConnected
-                                      ? Colors.successPrimaryColor
-                                      : Colors.errorPrimaryColor,
-                                ),
-                      ),
-                      if (_lastRequestTime != null) ...[
-                        const SizedBox(width: 8),
-                        Text(
-                          '($_lastRequestTime)',
-                          style: FluentTheme.of(context).typography.caption,
-                        ),
-                      ],
-                      const SizedBox(width: 8),
-                      IconButton(
-                        icon: _isCheckingConnection
-                            ? const ProgressRing(strokeWidth: 2)
-                            : const Icon(FluentIcons.refresh),
-                        onPressed: _isCheckingConnection
-                            ? null
-                            : _checkServerConnection,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Thêm thông tin ca thi đã chọn
-            _buildSelectedExamInfo(),
-
-            // Stats section
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    'Tổng số đề thi',
-                    '15',
-                    Colors.blue,
-                    FluentIcons.page_list,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    'Thí sinh đã thi',
-                    '128',
-                    Colors.green,
-                    FluentIcons.people,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: _buildStatCard(
-                    context,
-                    'Tỷ lệ đạt',
-                    '85%',
-                    Colors.orange,
-                    FluentIcons.b_i_dashboard,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            Text(
-              'Lịch thi',
-              style: FluentTheme.of(context).typography.subtitle,
-            ),
-            const SizedBox(height: 16),
-
-            if (_isLoading)
-              const Center(child: ProgressRing())
-            else if (_error != null)
-              InfoBar(
-                title: Text(_error!),
-                severity: InfoBarSeverity.warning,
-              )
-            else if (_examPeriods.isEmpty)
-              const Center(
-                child: Text('Không có lịch thi nào được phân công'),
-              )
-            else
-              for (var period in _examPeriods)
-                Card(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        period.name,
-                        style: FluentTheme.of(context).typography.subtitle,
-                      ),
-                      Text(
-                        'Thời gian: ${_formatDateTime(period.startTime)} - ${_formatDateTime(period.endTime)}',
-                      ),
-                      const SizedBox(height: 16),
-                      for (var shift in period.shifts) ...[
-                        ListTile(
-                          leading: const Icon(FluentIcons.calendar),
-                          title: Text(shift.name),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: _isLoading
+              ? const Center(child: ProgressRing())
+              : _error != null
+                  ? InfoBar(
+                      title: Text(_error!),
+                      severity: InfoBarSeverity.error,
+                    )
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Welcome Section
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                FluentTheme.of(context).accentColor,
+                                FluentTheme.of(context)
+                                    .accentColor
+                                    .withOpacity(0.7),
+                              ],
+                            ),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.all(24.0),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'Thời gian: ${_formatDateTime(shift.startTime)} - ${_formatDateTime(shift.endTime)}',
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(12),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(50),
+                                        ),
+                                        child: const Icon(
+                                          FluentIcons.user_window,
+                                          size: 24,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            'Xin chào,',
+                                            style: FluentTheme.of(context)
+                                                .typography
+                                                .body!
+                                                .copyWith(color: Colors.white),
+                                          ),
+                                          Text(
+                                            _fullName,
+                                            style: FluentTheme.of(context)
+                                                .typography
+                                                .title!
+                                                .copyWith(color: Colors.white),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              for (var room in shift.rooms)
-                                Text(
-                                  '${room.name} (${room.facility}) - ${room.subject.name}${room.subject.exam != null ? ' - ${room.subject.exam!.name}' : ''}',
+                              FilledButton(
+                                style: ButtonStyle(
+                                  backgroundColor:
+                                      ButtonState.resolveWith((states) {
+                                    if (states.isHovering) {
+                                      return Colors.white.withOpacity(0.3);
+                                    }
+                                    return Colors.white.withOpacity(0.2);
+                                  }),
+                                  padding: ButtonState.all(
+                                    const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                  ),
+                                  shape: ButtonState.all(
+                                    RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
                                 ),
+                                onPressed: _showUserInfoDialog,
+                                child: Row(
+                                  children: [
+                                    const Icon(
+                                      FluentIcons.contact_info,
+                                      size: 16,
+                                      color: Colors.white,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    const Text(
+                                      'Thông tin cán bộ',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        if (shift != period.shifts.last) const Divider(),
+                        const SizedBox(height: 24),
+                        // Exam Info Section
+                        Text(
+                          'Thông tin ca thi',
+                          style: FluentTheme.of(context).typography.subtitle,
+                        ),
+                        const SizedBox(height: 12),
+                        Card(
+                          padding: const EdgeInsets.all(0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              border: Border.all(
+                                color: FluentTheme.of(context)
+                                    .resources
+                                    .dividerStrokeColorDefault,
+                              ),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildInfoSection(
+                                  'Kỳ thi',
+                                  [
+                                    if (_selectedPeriod != null) ...[
+                                      _buildInfoTile(
+                                        FluentIcons.calendar,
+                                        'Tên kỳ thi',
+                                        _selectedPeriod!.name,
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.timer,
+                                        'Thời gian',
+                                        '${_formatDateTime(_selectedPeriod!.startTime)} - ${_formatDateTime(_selectedPeriod!.endTime)}',
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                _buildDivider(),
+                                _buildInfoSection(
+                                  'Ca thi',
+                                  [
+                                    if (_selectedShift != null) ...[
+                                      _buildInfoTile(
+                                        FluentIcons.event,
+                                        'Tên ca thi',
+                                        _selectedShift!.name,
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.clock,
+                                        'Thời gian',
+                                        '${_formatDateTime(_selectedShift!.startTime)} - ${_formatDateTime(_selectedShift!.endTime)}',
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                _buildDivider(),
+                                _buildInfoSection(
+                                  'Phòng thi',
+                                  [
+                                    if (_selectedRoom != null) ...[
+                                      _buildInfoTile(
+                                        FluentIcons.room,
+                                        'Phòng',
+                                        _selectedRoom!.name,
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.home,
+                                        'Cơ sở',
+                                        _selectedRoom!.facility,
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.people_external_share,
+                                        'Sức chứa',
+                                        '${_selectedRoom!.capacity ?? 0} máy',
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.education,
+                                        'Môn thi',
+                                        _selectedRoom!.subject.name,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                if (_selectedRoom?.subject.exam != null) ...[
+                                  _buildDivider(),
+                                  _buildInfoSection(
+                                    'Đề thi',
+                                    [
+                                      _buildInfoTile(
+                                        FluentIcons.account_activity,
+                                        'Tên đề',
+                                        _selectedRoom!.subject.exam!.name ??
+                                            'N/A',
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.timer,
+                                        'Thời gian làm bài',
+                                        '${_selectedRoom!.subject.exam!.duration ?? 0} phút',
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.list,
+                                        'Số câu hỏi',
+                                        '${_selectedRoom!.subject.exam!.totalQuestions ?? 0} câu',
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
-                    ],
-                  ),
-                ),
-          ],
+                    ),
         ),
       ),
     );
   }
 
-  Widget _buildStatCard(BuildContext context, String title, String value,
-      AccentColor color, IconData icon) {
-    return Card(
+  Widget _buildInfoSection(String title, List<Widget> children) {
+    return Padding(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 24),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: FluentTheme.of(context).typography.body,
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
           Text(
-            value,
-            style: FluentTheme.of(context)
-                .typography
-                .titleLarge!
-                .copyWith(color: color),
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        children: [
+          Icon(icon, size: 16),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 120,
+            child: Text(label),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildActivityItem(BuildContext context, String action, String subject,
-      String detail, DateTime date) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 40,
-          decoration: BoxDecoration(
-            color: Colors.successPrimaryColor,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                action,
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              Text(subject),
-            ],
-          ),
-        ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              detail,
-              style: const TextStyle(color: Colors.successPrimaryColor),
+  Widget _buildDivider() {
+    return const Divider(
+      style: DividerThemeData(
+        horizontalMargin: EdgeInsets.zero,
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
-            Text(
-              '${date.day}/${date.month}/${date.year}',
-              style: const TextStyle(fontSize: 12),
-            ),
-          ],
-        ),
-      ],
+          ),
+          Expanded(child: Text(value)),
+        ],
+      ),
     );
   }
 
