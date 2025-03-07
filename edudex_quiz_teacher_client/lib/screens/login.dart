@@ -7,6 +7,8 @@ import 'package:edudex_quiz_teacher_client/screens/dashboard/dashboard_screen.da
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../models/exam_schedule.dart';
+import '../widgets/exam_period_selector.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -32,6 +34,13 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   static const String SERVER_URL_KEY = 'server_url';
   bool _isLoading = false;
   bool _obscurePassword = true;
+
+  // Define the constants for SharedPreferences keys
+  static const String SELECTED_PERIOD_ID = 'selected_period_id';
+  static const String SELECTED_SHIFT_ID = 'selected_shift_id';
+  static const String SELECTED_ROOM_ID = 'selected_room_id';
+  static const String SELECTED_SUBJECT_ID = 'selected_subject_id';
+  static const String SELECTED_EXAM_ID = 'selected_exam_id';
 
   @override
   void initState() {
@@ -59,96 +68,114 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   Future<void> _login() async {
     setState(() {
       _errorMessage = null;
-    });
-
-    // Kiểm tra username trống
-    if (_soBaoDanhController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Vui lòng nhập tên tài khoản';
-      });
-      return;
-    }
-
-    // Kiểm tra password trống
-    if (_maSinhVienController.text.isEmpty) {
-      setState(() {
-        _errorMessage = 'Vui lòng nhập mật khẩu';
-      });
-      return;
-    }
-
-    setState(() {
       _isLoading = true;
     });
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverUrl = prefs.getString(SERVER_URL_KEY);
-      print('🌐 Server URL: $serverUrl');
+      final serverUrl = prefs.getString('server_url');
 
       if (serverUrl == null) {
-        print('❌ Không tìm thấy địa chỉ máy chủ');
-        setState(() {
-          _errorMessage = 'Không tìm thấy địa chỉ máy chủ';
-        });
-        return;
+        throw Exception('Không tìm thấy địa chỉ máy chủ');
       }
 
-      final loginUrl = '$serverUrl/api/login';
-      print('🚀 Login URL: $loginUrl');
-      print('👤 Username: ${_soBaoDanhController.text}');
-
       final response = await http.post(
-        Uri.parse(loginUrl).replace(queryParameters: {
-          'username': _soBaoDanhController.text,
-          'password': _maSinhVienController.text,
-        }),
+        Uri.parse('$serverUrl/api/login'),
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
+        body: json.encode({
+          'username': _soBaoDanhController.text,
+          'password': _maSinhVienController.text,
+        }),
       );
 
-      print('📥 Status code: ${response.statusCode}');
-      print('📦 Headers: ${response.headers}');
-      print('📦 Response body: ${response.body}');
-
       final data = json.decode(response.body);
-      print('✅ Parsed data: $data');
 
-      if (data['type'] == 'success') {
-        print('✨ Đăng nhập thành công');
-        print('🔑 Token: ${data['token']}');
-        print('👤 User info: ${data['user']}');
+      if (data['status'] == 'success') {
+        // Lưu thông tin người dùng
+        await prefs.setString(TOKEN_KEY, data['data']['token']);
+        await prefs.setInt(USER_ID_KEY, data['data']['user']['id']);
+        await prefs.setString(USERNAME_KEY, data['data']['user']['username']);
+        await prefs.setString(EMAIL_KEY, data['data']['user']['email']);
+        await prefs.setInt(ROLE_KEY, data['data']['user']['role']);
 
-        await prefs.setString(TOKEN_KEY, data['token']);
-        await prefs.setInt(USER_ID_KEY, data['user']['id']);
-        await prefs.setString(USERNAME_KEY, data['user']['username']);
-        await prefs.setString(EMAIL_KEY, data['user']['email']);
-        await prefs.setInt(ROLE_KEY, data['user']['role']);
-        print('💾 Đã lưu thông tin người dùng');
+        // Lưu thông tin cá nhân
+        final userInfo = data['data']['info'];
+        await prefs.setString('full_name', userInfo['full_name']);
+        await prefs.setString('date_of_birth', userInfo['date_of_birth']);
+        await prefs.setBool('gender', userInfo['gender']);
+        await prefs.setString('phone', userInfo['phone']);
+        await prefs.setString('address', userInfo['address']);
+        if (userInfo['avatar'] != null) {
+          await prefs.setString('avatar', userInfo['avatar']);
+        }
 
-        // ignore: use_build_context_synchronously
-        Navigator.pushReplacement(
-          context,
-          FluentPageRoute(builder: (context) => const DashboardScreen()),
+        // Lưu thông tin lịch thi
+        final scheduleData = json.encode(data['data']['schedule']);
+        await prefs.setString('exam_schedule', scheduleData);
+
+        // Hiển thị dialog chọn ca thi
+        if (!mounted) return;
+
+        final examPeriods = (data['data']['schedule'] as List)
+            .map((period) => ExamPeriod.fromJson(period))
+            .toList();
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => ExamPeriodSelector(
+            examPeriods: examPeriods,
+            onSelected: (period, shift, room) async {
+              await prefs.setInt(SELECTED_PERIOD_ID, period.id ?? 0);
+              await prefs.setInt(SELECTED_SHIFT_ID, shift.id ?? 0);
+              await prefs.setInt(SELECTED_ROOM_ID, room.id ?? 0);
+              if (room.subject.id != null) {
+                await prefs.setInt(SELECTED_SUBJECT_ID, room.subject.id!);
+              }
+              if (room.subject.exam?.id != null) {
+                await prefs.setInt(SELECTED_EXAM_ID, room.subject.exam!.id!);
+              }
+
+              if (!mounted) return;
+              Navigator.pushReplacement(
+                context,
+                FluentPageRoute(builder: (context) => const DashboardScreen()),
+              );
+            },
+          ),
         );
       } else {
-        print('❌ Đăng nhập thất bại: ${data['message']}');
         setState(() {
-          _errorMessage = data['message'];
+          _errorMessage = data['message'] ?? 'Đăng nhập thất bại';
         });
       }
-    } catch (e, stackTrace) {
-      print('🔥 Lỗi đăng nhập: $e');
-      print('📚 Stack trace: $stackTrace');
+    } catch (e) {
       setState(() {
-        _errorMessage = 'Đã có lỗi xảy ra khi đăng nhập';
+        _errorMessage = 'Lỗi đăng nhập: $e';
       });
     } finally {
       setState(() {
         _isLoading = false;
       });
+    }
+  }
+
+  void _handleExamPeriodSelected(
+      ExamPeriod period, ExamShift shift, ExamRoom room) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('selected_shift_id', shift.id ?? 0);
+    await prefs.setInt('selected_room_id', room.id ?? 0);
+
+    if (mounted) {
+      Navigator.pushReplacement(
+        context,
+        FluentPageRoute(
+          builder: (context) => const DashboardScreen(),
+        ),
+      );
     }
   }
 

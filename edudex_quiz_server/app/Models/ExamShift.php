@@ -32,15 +32,15 @@ class ExamShift extends Model
 
     public function subjects(): BelongsToMany
     {
-        return $this->belongsToMany(ExamPeriodSubject::class, 'exam_period_subject_shifts')
-                    ->withTimestamps();
+        return $this->belongsToMany(ExamPeriodSubject::class, 'exam_period_subject_shifts');
     }
 
     public function rooms(): BelongsToMany
     {
         return $this->belongsToMany(ExamPeriodRoom::class, 'exam_shift_rooms')
-                    ->withPivot('id')
-                    ->withTimestamps();
+            ->withPivot(['id', 'exam_period_subject_id', 'exam_period_proctor_id'])
+            ->with(['room.facility'])
+            ->withTimestamps();
     }
 
     public function proctors()

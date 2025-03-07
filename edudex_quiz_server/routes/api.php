@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Middleware\APITokenAuthentication;
 use App\Http\Controllers\Api\ExamResultController;
+use App\Http\Controllers\Api\ExamScheduleController;
 
 // routes không cần xác thực
 
@@ -43,4 +44,8 @@ Route::middleware(APITokenAuthentication::class)->group(function () {
 
     // nộp bài
     Route::post('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'store']);
+    
+    // Lấy danh sách thí sinh và đề thi
+    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/students', [ExamScheduleController::class, 'students']);
+    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/exam', [ExamScheduleController::class, 'exam']);
 });

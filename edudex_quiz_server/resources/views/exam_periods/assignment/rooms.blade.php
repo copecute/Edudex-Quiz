@@ -200,9 +200,9 @@
                                                                                 $roomInShift &&
                                                                                 $roomInShift->pivot
                                                                                     ->exam_period_proctor_id ==
-                                                                                    $proctor->proctor_id;
+                                                                                    $proctor->id;
                                                                         @endphp
-                                                                        <option value="{{ $proctor->proctor_id }}"
+                                                                        <option value="{{ $proctor->id }}"
                                                                             {{ $isSelected ? 'selected' : '' }}>
                                                                             {{ $proctor->username }} -
                                                                             {{ $proctor->fullName }}
@@ -469,8 +469,8 @@
                         rooms.push({
                             room_id: roomId,
                             subject_id: subjectId,
-                            proctor_id: $(this).closest('.card-body').find(
-                                '.proctor-select').val() || null
+                            proctor_id: parseInt($(this).closest('.card-body').find(
+                                '.proctor-select').val()) || null
                         });
                     });
 

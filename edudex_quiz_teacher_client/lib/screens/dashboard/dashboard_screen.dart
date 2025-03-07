@@ -14,9 +14,9 @@ import 'quiz_management.dart';
 import 'student_management.dart';
 import 'statistics.dart';
 import 'exam_room_screen.dart';
-import '../../services/tcp_server_service.dart';
-import '../../services/log_service.dart';
 import '../../services/database_service.dart';
+import '../../services/http_server_service.dart';
+import '../../services/exam_database_service.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -38,26 +38,34 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
     Settings(),
   ];
 
-  final TcpServerService _tcpService;
-  final LogService _logService;
-
-  _DashboardScreenState()
-      : _tcpService = TcpServerService(
-          dbService: DatabaseService(),
-          logService: LogService(),
-        ),
-        _logService = LogService();
+  final _pageStorageBucket = PageStorageBucket();
+  final _httpService = HttpServerService();
+  final _examDb = ExamDatabaseService();
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
+    _loadData();
   }
 
   @override
   void dispose() {
     windowManager.removeListener(this);
     super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    final examData = await _examDb.getExamData();
+    if (examData == null) {
+      // Nếu không có dữ liệu, quay về màn hình login
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          FluentPageRoute(builder: (context) => const LoginScreen()),
+        );
+      }
+    }
   }
 
   Future<void> _handleLogout() async {
@@ -125,114 +133,116 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
   Widget build(BuildContext context) {
     final appTheme = context.watch<AppTheme>();
 
-    return NavigationView(
-      key: viewKey,
-      appBar: NavigationAppBar(
-        automaticallyImplyLeading: false,
-        title: const DragToMoveArea(
-          child: Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: Text('EduDex Quiz'),
+    return PageStorage(
+      bucket: _pageStorageBucket,
+      child: NavigationView(
+        key: viewKey,
+        appBar: NavigationAppBar(
+          automaticallyImplyLeading: false,
+          title: const DragToMoveArea(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text('EduDex Quiz'),
+            ),
           ),
-        ),
-        actions: Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            Align(
-              alignment: AlignmentDirectional.centerEnd,
-              child: Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8.0),
-                child: ToggleSwitch(
-                  content: const Text('Chế độ tối'),
-                  checked: FluentTheme.of(context).brightness.isDark,
-                  onChanged: (v) {
-                    if (v) {
-                      appTheme.mode = ThemeMode.dark;
-                    } else {
-                      appTheme.mode = ThemeMode.light;
-                    }
-                  },
+          actions: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 8.0),
+                  child: ToggleSwitch(
+                    content: const Text('Chế độ tối'),
+                    checked: FluentTheme.of(context).brightness.isDark,
+                    onChanged: (v) {
+                      if (v) {
+                        appTheme.mode = ThemeMode.dark;
+                      } else {
+                        appTheme.mode = ThemeMode.light;
+                      }
+                    },
+                  ),
                 ),
               ),
+              const WindowButtons(),
+            ],
+          ),
+        ),
+        pane: NavigationPane(
+          selected: _selectedIndex,
+          onChanged: (index) => setState(() => _selectedIndex = index),
+          items: [
+            PaneItem(
+              icon: const Icon(FluentIcons.home),
+              title: const Text('Tổng quan'),
+              body: _pages[0],
             ),
-            const WindowButtons(),
+            PaneItem(
+              icon: const Icon(FluentIcons.page_list),
+              title: const Text('Quản lý đề thi'),
+              body: _pages[1],
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.people),
+              title: const Text('Quản lý thí sinh'),
+              body: _pages[2],
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.b_i_dashboard),
+              title: const Text('Thống kê'),
+              body: _pages[3],
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.room),
+              title: const Text('Phòng thi'),
+              body: ExamRoomScreen(
+                httpService: _httpService,
+              ),
+            ),
+          ],
+          footerItems: [
+            PaneItemSeparator(),
+            PaneItem(
+              icon: const Icon(FluentIcons.settings),
+              title: const Text('Cài đặt'),
+              body: _pages[4],
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.sign_out),
+              title: const Text('Đăng xuất'),
+              body: _pages[0],
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => ContentDialog(
+                    title: const Text('Xác nhận đăng xuất'),
+                    content: const Text(
+                        'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
+                    actions: [
+                      FilledButton(
+                        child: const Text('Có'),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _handleLogout();
+                        },
+                      ),
+                      Button(
+                        child: const Text('Không'),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          setState(() {
+                            _selectedIndex = 0;
+                          });
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
-      ),
-      pane: NavigationPane(
-        selected: _selectedIndex,
-        onChanged: (index) => setState(() => _selectedIndex = index),
-        items: [
-          PaneItem(
-            icon: const Icon(FluentIcons.home),
-            title: const Text('Trang chủ'),
-            body: _pages[0],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.page_list),
-            title: const Text('Quản lý đề thi'),
-            body: _pages[1],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.people),
-            title: const Text('Quản lý thí sinh'),
-            body: _pages[2],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.b_i_dashboard),
-            title: const Text('Thống kê'),
-            body: _pages[3],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.room),
-            title: const Text('Phòng thi'),
-            body: ExamRoomScreen(
-              tcpService: _tcpService,
-              logService: _logService,
-            ),
-          ),
-        ],
-        footerItems: [
-          PaneItemSeparator(),
-          PaneItem(
-            icon: const Icon(FluentIcons.settings),
-            title: const Text('Cài đặt'),
-            body: _pages[4],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.sign_out),
-            title: const Text('Đăng xuất'),
-            body: _pages[0],
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => ContentDialog(
-                  title: const Text('Xác nhận đăng xuất'),
-                  content: const Text(
-                      'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
-                  actions: [
-                    FilledButton(
-                      child: const Text('Có'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _handleLogout();
-                      },
-                    ),
-                    Button(
-                      child: const Text('Không'),
-                      onPressed: () {
-                        Navigator.pop(context);
-                        setState(() {
-                          _selectedIndex = 0;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
       ),
     );
   }

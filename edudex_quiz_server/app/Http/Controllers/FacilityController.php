@@ -84,12 +84,12 @@ class FacilityController extends Controller
         try {
             $facility->update(['is_active' => !$facility->is_active]);
             return response()->json([
-                'success' => true,
+                'status' => 'success',
                 'message' => $facility->is_active ? 'Mở khóa cơ sở thành công!' : 'Khóa cơ sở thành công!'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false,
+                'status' => 'error',
                 'message' => 'Có lỗi xảy ra khi thay đổi trạng thái'
             ], 500);
         }

@@ -112,12 +112,12 @@ class RoomController extends Controller
         try {
             $room->update(['is_active' => !$room->is_active]);
             return response()->json([
-                'success' => true,
+                'status' => 'success',
                 'message' => $room->is_active ? 'Mở khóa phòng thi thành công!' : 'Khóa phòng thi thành công!'
             ]);
         } catch (\Exception $e) {
             return response()->json([
-                'success' => false,
+                'status' => 'error',
                 'message' => 'Có lỗi xảy ra khi thay đổi trạng thái'
             ], 500);
         }
