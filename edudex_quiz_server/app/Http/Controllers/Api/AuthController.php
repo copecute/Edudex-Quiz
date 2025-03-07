@@ -136,7 +136,7 @@ class AuthController extends Controller
             if (empty($schedules)) {
                 Auth::logout();
                 return response()->json([
-                    'success' => false,
+                    'status' => 'success',
                     'message' => 'Bạn chưa được phân công phòng thi cho kỳ thi nào.'
                 ], Response::HTTP_FORBIDDEN);
             }

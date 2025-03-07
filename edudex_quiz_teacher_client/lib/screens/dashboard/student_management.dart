@@ -41,9 +41,11 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
     }
 
     try {
+      final url = Uri.parse(
+          '$_serverUrl/api/exam-schedule/shifts/$selectedShiftId/rooms/$selectedRoomId/students');
+      print('Đang lấy danh sách sinh viên: $url');
       final response = await http.get(
-        Uri.parse(
-            '$_serverUrl/api/exam-schedule/shifts/$selectedShiftId/rooms/$selectedRoomId/students'),
+        url,
         headers: {
           'Authorization': 'copecute $token',
           'Accept': 'application/json',
@@ -52,7 +54,7 @@ class _StudentManagementPageState extends State<StudentManagementPage> {
 
       final data = json.decode(response.body);
 
-      if (data['success'] == true) {
+      if (data['status'] == 'success') {
         setState(() {
           _students = data['data'];
           _errorMessage = null;

@@ -149,7 +149,7 @@
                 }
             }).then(response => response.json())
               .then(data => {
-                  if (data.success) {
+                  if (data.status === 'success') {
                       window.location.href = '{{ route("facilities.index") }}?success=' + encodeURIComponent(data.message);
                   } else {
                       throw new Error(data.message);
