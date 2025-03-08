@@ -26,6 +26,7 @@ dependencies:
   flutter_svg: ^2.0.9
   bitsdojo_window: ^0.1.6
   shared_preferences: ^2.2.1
+  encrypt: ^5.0.1
   sqflite: ^2.3.0
   sqflite_common_ffi: ^2.3.0
   path: ^1.8.3

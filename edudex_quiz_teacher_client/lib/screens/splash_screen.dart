@@ -6,6 +6,7 @@ import 'login.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/exam_database_service.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -40,6 +41,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
   @override
   void initState() {
     windowManager.addListener(this);
+    _initializeApp();
     super.initState();
     _loadSavedServerUrl();
   }
@@ -346,6 +348,16 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
           );
         },
       );
+    }
+  }
+
+  Future<void> _initializeApp() async {
+    try {
+      // Xóa dữ liệu cũ
+      final examDb = ExamDatabaseService();
+      await examDb.clearAllData();
+    } catch (e) {
+      print('❌ Lỗi khởi tạo: $e');
     }
   }
 }

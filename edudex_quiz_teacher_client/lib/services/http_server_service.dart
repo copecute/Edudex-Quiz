@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 import './exam_database_service.dart';
+import 'package:intl/intl.dart';
 
 class HttpServerService {
   static final HttpServerService _instance = HttpServerService._internal();
@@ -118,6 +119,22 @@ class HttpServerService {
             await handleComputerRegistration(request);
             break;
 
+          case '/exam-info':
+            await _handleRequest(request);
+            break;
+
+          case '/exam-questions': // Thêm case mới
+            if (request.method == 'GET') {
+              await handleExamQuestions(request);
+            }
+            break;
+
+          case '/exam-submissions':
+            if (request.method == 'POST') {
+              await handleExamSubmission(request);
+            }
+            break;
+
           default:
             request.response.statusCode = HttpStatus.notFound;
             request.response.write(json.encode({
@@ -226,11 +243,11 @@ class HttpServerService {
   Future<void> handleStudentAuth(HttpRequest request) async {
     try {
       final queryParams = request.uri.queryParameters;
-      final examCode = queryParams['exam_code']?.toUpperCase();
-      final studentCode = queryParams['student_code']?.toUpperCase();
-      final clientIp = request.connectionInfo?.remoteAddress.address;
+      final examCode = queryParams['exam_code'];
+      final studentCode = queryParams['student_code'];
 
-      if (examCode == null || studentCode == null || clientIp == null) {
+      // Kiểm tra tham số
+      if (examCode == null || studentCode == null) {
         request.response.statusCode = HttpStatus.badRequest;
         request.response.write(json.encode({
           'status': 'error',
@@ -239,29 +256,29 @@ class HttpServerService {
         return;
       }
 
-      // Tìm số máy từ IP đã đăng ký
-      final computerNumber = _getConnectedComputer(clientIp);
-      if (computerNumber == null) {
+      // Lấy IP của client request
+      final clientIp = request.connectionInfo?.remoteAddress.address;
+
+      // Kiểm tra xem IP này đã được xác thực chưa
+      final mayId = _connectedComputers.entries
+          .firstWhere((entry) => entry.value == clientIp,
+              orElse: () => const MapEntry(0, ''))
+          .key;
+
+      if (mayId == 0) {
         request.response.statusCode = HttpStatus.unauthorized;
         request.response.write(json.encode({
           'status': 'error',
-          'message': 'Máy chưa được kết nối với giám thị',
+          'message': 'Máy chưa được xác thực',
         }));
         return;
       }
 
+      // Kiểm tra thông tin sinh viên
       final examDb = ExamDatabaseService();
-      final db = await examDb.database;
+      final student = await examDb.getStudentByExamCode(examCode, studentCode);
 
-      // Kiểm tra thông tin đăng nhập
-      final List<Map<String, dynamic>> students = await db.query(
-        'students',
-        where: 'UPPER(exam_code) = ? AND UPPER(student_code) = ?',
-        whereArgs: [examCode, studentCode],
-        limit: 1,
-      );
-
-      if (students.isEmpty) {
+      if (student == null) {
         request.response.statusCode = HttpStatus.unauthorized;
         request.response.write(json.encode({
           'status': 'error',
@@ -270,24 +287,40 @@ class HttpServerService {
         return;
       }
 
-      final student = students.first;
-      _studentNames[computerNumber] = student['full_name'];
-      _studentExamCodes[computerNumber] = student['exam_code'];
-      _studentCodes[computerNumber] = student['student_code'];
-
-      // tạo token
+      // Tạo token mới
       final token = base64Encode(utf8.encode(
           'copecute${student['exam_code']}${DateTime.now().day}${DateTime.now().month}${student['student_code']}${DateTime.now().hour}${DateTime.now().minute}${DateTime.now().second}'));
 
+      // Cập nhật token mới vào database
+      await examDb.updateStudentToken(student['id'], token);
+
+      // Lưu thông tin sinh viên vào maps để hiển thị
+      final computerNumber = _getConnectedComputer(clientIp!) ?? 0;
+      _studentNames[computerNumber] = student['full_name'] ?? '';
+      _studentExamCodes[computerNumber] = student['exam_code'] ?? '';
+      _studentCodes[computerNumber] = student['student_code'] ?? '';
+
+      // Trả về response thành công
       request.response.write(json.encode({
         'status': 'success',
         'message': 'Đăng nhập thành công',
         'data': {
           'token': token,
-          'student': student,
+          'student': {
+            'id': student['id'],
+            'exam_code': student['exam_code'],
+            'student_code': student['student_code'],
+            'full_name': student['full_name'],
+            'date_of_birth': student['date_of_birth'],
+            'gender': student['gender'],
+            'phone': student['phone'],
+            'seat_number': student['seat_number'],
+            'address': student['address'],
+          },
         },
       }));
     } catch (e) {
+      print('Lỗi xử lý đăng nhập: $e');
       request.response.statusCode = HttpStatus.internalServerError;
       request.response.write(json.encode({
         'status': 'error',
@@ -415,6 +448,349 @@ class HttpServerService {
         'status': 'error',
         'message': 'Lỗi server: $e',
       }));
+      await request.response.close();
+    }
+  }
+
+  Future<void> _handleRequest(HttpRequest request) async {
+    request.response.headers.contentType = ContentType.json;
+
+    try {
+      if (request.uri.path == '/exam-info') {
+        // Kiểm tra header Authorization
+        final authHeader = request.headers.value('Authorization');
+        if (authHeader == null || !authHeader.startsWith('copecute ')) {
+          request.response.statusCode = HttpStatus.unauthorized;
+          request.response.write(json.encode({
+            'status': 'error',
+            'message': 'Không có token xác thực',
+          }));
+          return;
+        }
+
+        final token = authHeader.substring('copecute '.length);
+
+        // Kiểm tra token trong database
+        final examDb = ExamDatabaseService();
+        final student = await examDb.getStudentByToken(token);
+
+        if (student == null) {
+          request.response.statusCode = HttpStatus.unauthorized;
+          request.response.write(json.encode({
+            'status': 'error',
+            'message': 'Token không hợp lệ hoặc đã hết hạn',
+          }));
+          return;
+        }
+
+        // Lấy thông tin đề thi và thông tin phiên thi từ database
+        final examData = await examDb.getExamData();
+        final sessionInfo = await examDb.getSessionInfo();
+
+        print('📝 Exam data: $examData');
+        print('📝 Session info: $sessionInfo');
+
+        if (examData == null) {
+          request.response.statusCode = HttpStatus.notFound;
+          request.response.write(json.encode({
+            'status': 'error',
+            'message': 'Không tìm thấy thông tin đề thi',
+          }));
+          return;
+        }
+
+        // Trả về thông tin đề thi với thông tin phiên thi từ database
+        request.response.write(json.encode({
+          'status': 'success',
+          'message': 'Lấy thông tin đề thi thành công',
+          'data': {
+            'subject': {
+              'name': examData['subject']['name'] ?? 'Chưa có tên môn học',
+              'code': examData['subject']['code'] ?? '',
+            },
+            'exam': {
+              'name': examData['exam']['name'] ?? 'Chưa có tên đề thi',
+              'duration': examData['exam']['duration'] ?? 0,
+              'total_questions': examData['exam']['total_questions'] ?? 0,
+              'description': examData['exam']['description'] ?? '',
+            },
+            'shift': sessionInfo?['shift'] ??
+                {
+                  'name': 'Ca 1',
+                  'start_time': DateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+                      .format(DateTime.now().toLocal()),
+                  'end_time': DateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS").format(
+                      DateTime.now().toLocal().add(const Duration(hours: 2))),
+                },
+            'room': {
+              'name': sessionInfo?['room']?['name'] ?? 'Phòng máy 1',
+              'facility': sessionInfo?['room']?['location'] ?? 'Tầng 1',
+            },
+            'test_session': sessionInfo?['test_session'] ??
+                {
+                  'name': 'Kỳ thi mặc định',
+                  'start_date': DateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS")
+                      .format(DateTime.now().toLocal()),
+                  'end_date': DateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSS").format(
+                      DateTime.now().toLocal().add(const Duration(days: 7))),
+                }
+          }
+        }));
+      } else {
+        request.response.statusCode = HttpStatus.notFound;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Không tìm thấy endpoint',
+        }));
+      }
+
+      await request.response.close();
+    } catch (e) {
+      print('❌ Lỗi xử lý request: $e');
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.write(json.encode({
+        'status': 'error',
+        'message': 'Lỗi server: $e',
+      }));
+      await request.response.close();
+    }
+  }
+
+  // Thêm method xử lý exam questions
+  Future<void> handleExamQuestions(HttpRequest request) async {
+    try {
+      // Kiểm tra header Authorization
+      final authHeader = request.headers.value('Authorization');
+      if (authHeader == null || !authHeader.startsWith('copecute ')) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Không có token xác thực',
+        }));
+        return;
+      }
+
+      final token = authHeader.substring('copecute '.length);
+
+      // Kiểm tra token trong database
+      final examDb = ExamDatabaseService();
+      final student = await examDb.getStudentByToken(token);
+
+      if (student == null) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Token không hợp lệ hoặc đã hết hạn',
+        }));
+        return;
+      }
+
+      // Lấy thông tin đề thi
+      final examData = await examDb.getExamData();
+      if (examData == null) {
+        request.response.statusCode = HttpStatus.notFound;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Không tìm thấy thông tin đề thi',
+        }));
+        return;
+      }
+
+      // Lấy danh sách câu hỏi và random
+      List<Map<String, dynamic>> questions =
+          examData['questions'].cast<Map<String, dynamic>>();
+      questions.shuffle(); // Random thứ tự câu hỏi
+
+      // Xử lý từng câu hỏi
+      final processedQuestions = questions.map((q) {
+        // Random thứ tự đáp án
+        List<Map<String, dynamic>> answers = List.from(q['answers']);
+        answers.shuffle();
+
+        // Loại bỏ thông tin đáp án đúng
+        answers = answers
+            .map((a) => {
+                  'id': a['id'],
+                  'content': a['content'],
+                  'media': a['media'],
+                })
+            .toList();
+
+        return {
+          'id': q['id'],
+          'content': q['content'],
+          'type': q['type'],
+          'media': q['media'],
+          'tags': q['tags'],
+          'answers': answers,
+        };
+      }).toList();
+
+      // Trả về response
+      request.response.write(json.encode({
+        'status': 'success',
+        'message': 'Lấy danh sách câu hỏi thành công',
+        'data': {
+          'questions': processedQuestions,
+        }
+      }));
+    } catch (e) {
+      print('❌ Lỗi xử lý exam questions: $e');
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.write(json.encode({
+        'status': 'error',
+        'message': 'Lỗi server: $e',
+      }));
+    } finally {
+      await request.response.close();
+    }
+  }
+
+  Future<void> handleExamSubmission(HttpRequest request) async {
+    try {
+      // Kiểm tra header Authorization
+      final authHeader = request.headers.value('Authorization');
+      if (authHeader == null || !authHeader.startsWith('copecute ')) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Không có token xác thực',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      final token = authHeader.substring('copecute '.length);
+      print('Xử lý nộp bài:');
+      print('Token: $token');
+
+      // Kiểm tra token trong database
+      final examDb = ExamDatabaseService();
+      final student = await examDb.getStudentByToken(token);
+      print('Student: ${json.encode(student)}');
+
+      if (student == null) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Token không hợp lệ hoặc đã hết hạn',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      // Kiểm tra đã nộp bài chưa
+      final hasSubmitted = await examDb.hasSubmittedExam(
+        student['exam_code'],
+        student['student_code'],
+      );
+
+      if (hasSubmitted) {
+        request.response.statusCode = HttpStatus.badRequest;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Bạn đã nộp bài trước đó không thể nộp lại',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      // Parse request body
+      final body = await utf8.decoder.bind(request).join();
+      final data = json.decode(body);
+      print('Request data: ${json.encode(data)}');
+
+      // Kiểm tra kết quả
+      int totalCorrect = 0;
+      final answers = List<Map<String, dynamic>>.from(data['answers']);
+
+      // Lấy câu hỏi và đáp án đúng
+      final examData = await examDb.getExamData();
+      if (examData == null || examData['questions'] == null) {
+        throw Exception('Không tìm thấy thông tin đề thi');
+      }
+
+      final questions = List<Map<String, dynamic>>.from(examData['questions']);
+      print('Questions count: ${questions.length}');
+
+      // Tạo map câu hỏi -> đáp án đúng
+      final correctAnswers = <int, int>{};
+      for (final q in questions) {
+        try {
+          final answers = List<Map<String, dynamic>>.from(q['answers']);
+          final correctAnswer = answers.firstWhere(
+            (a) => a['is_correct'] == true,
+            orElse: () => <String, dynamic>{},
+          );
+
+          if (correctAnswer.isNotEmpty && correctAnswer['id'] != null) {
+            // Lưu theo dạng question_id -> correct_answer_id
+            correctAnswers[q['id']] = correctAnswer['id'];
+          }
+        } catch (e) {
+          print(
+              'Warning: Không tìm thấy đáp án đúng cho câu hỏi ${q['id']}: $e');
+          continue;
+        }
+      }
+      print('Correct answers map: $correctAnswers');
+
+      // Kiểm tra từng câu trả lời
+      for (final answer in answers) {
+        final questionId = answer['question_id'];
+        final answerId = answer['answer_id'];
+
+        // So sánh answer_id với correct_answer_id
+        if (correctAnswers.containsKey(questionId) &&
+            correctAnswers[questionId] == answerId) {
+          totalCorrect++;
+          print('✅ Câu $questionId đúng (answer: $answerId)');
+        } else {
+          print(
+              '❌ Câu $questionId sai (answer: $answerId, correct: ${correctAnswers[questionId]})');
+        }
+      }
+
+      // Tính điểm
+      final totalQuestions = questions.length;
+      final score = double.parse(
+          ((totalCorrect / totalQuestions) * 10).toStringAsFixed(1));
+
+      print('Score calculation:');
+      print('Total correct: $totalCorrect');
+      print('Total questions: $totalQuestions');
+      print('Score: $score');
+
+      // Lưu kết quả
+      await examDb.saveExamResult(
+        examCode: student['exam_code'],
+        studentCode: student['student_code'],
+        correctAnswers: totalCorrect,
+        totalQuestions: totalQuestions,
+        score: score,
+        logFile: data['submission_file'],
+      );
+
+      // Trả về kết quả
+      request.response.write(json.encode({
+        'status': 'success',
+        'message': 'Nộp bài thành công',
+        'data': {
+          'total_questions': totalQuestions,
+          'correct_answers': totalCorrect,
+          'score': score,
+        }
+      }));
+    } catch (e, stackTrace) {
+      print('❌ Lỗi xử lý nộp bài:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.write(json.encode({
+        'status': 'error',
+        'message': 'Lỗi server: $e',
+      }));
+    } finally {
       await request.response.close();
     }
   }

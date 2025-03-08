@@ -51,11 +51,37 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
     return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
+  Future<void> _onPeriodSelected() async {
+    try {
+      final period = _selectedPeriod;
+      final shift = _selectedShift;
+      final room = _selectedRoom;
+
+      if (period != null && shift != null && room != null) {
+        // Lưu thông tin vào database
+        final examDb = ExamDatabaseService();
+        await examDb.saveSessionInfo(period, shift, room);
+
+        // Chỉ lưu room_capacity vào SharedPreferences vì cần cho việc kiểm tra kết nối máy
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt('room_capacity', room.capacity);
+      } else {
+        throw Exception('Vui lòng chọn đầy đủ thông tin');
+      }
+    } catch (e) {
+      print('❌ Lỗi lưu session info: $e');
+      rethrow;
+    }
+  }
+
   Future<void> _loadAndSaveData(
       ExamPeriod period, ExamShift shift, ExamRoom room) async {
-    setState(() => _isLoading = true);
-
     try {
+      setState(() => _isLoading = true);
+
+      // Lưu thông tin session trước
+      await _onPeriodSelected();
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('user_token');
       final serverUrl = prefs.getString('server_url');
@@ -135,11 +161,9 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
           throw Exception('Không thể lưu dữ liệu vào bộ nhớ');
         }
 
-        // Gọi callback và đóng tất cả dialog
+        // Chỉ gọi callback một lần ở đây sau khi mọi thứ đã lưu xong
         if (mounted) {
-          Navigator.of(context).pop(); // Đóng dialog hiện tại
-          widget.onSelected(
-              period, shift, room); // Callback sẽ xử lý navigation
+          widget.onSelected(period, shift, room);
         }
       } else {
         throw Exception(
@@ -284,7 +308,7 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
                                         children: [
                                           Text(room.name),
                                           Text(
-                                            '${room.facility} - ${room.subject.name}',
+                                            '${room.location} - ${room.subject.name}',
                                             style: FluentTheme.of(context)
                                                 .typography
                                                 .caption,
@@ -305,7 +329,7 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
                                     const Icon(FluentIcons.room, size: 12),
                                     const SizedBox(width: 4),
                                     Text(
-                                      '${room.name} (${room.facility}) - ${room.subject.name}',
+                                      '${room.name} (${room.location}) - ${room.subject.name}',
                                       style: FluentTheme.of(context)
                                           .typography
                                           .caption,
@@ -329,11 +353,13 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
               (_selectedShift == null || _selectedRoom == null || _isLoading)
                   ? null
                   : () async {
+                      // Lưu thông tin vào database trước
                       await _loadAndSaveData(
                         _selectedPeriod ?? widget.examPeriods.first,
                         _selectedShift!,
                         _selectedRoom!,
                       );
+
                       if (mounted && !_isLoading) {
                         Navigator.pop(context);
                       }

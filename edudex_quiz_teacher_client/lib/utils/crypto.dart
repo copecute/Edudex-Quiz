@@ -3,7 +3,7 @@ import 'dart:developer';
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
 
-// Key và IV cố định cho toàn bộ ứng dụng
+// Key và IV cố định cho toàn bộ ứng dụng - phải giống với client
 class AppCrypto {
   static final key = encrypt.Key.fromBase64(
       'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY='); // base64 của 32 bytes
@@ -24,31 +24,29 @@ class AppCrypto {
     }
   }
 
-  // Giải mã từ bytes thành văn bản
+  // Giải mã từ bytes
   static String decryptFromBytes(List<int> bytes) {
     try {
       final encrypted = encrypt.Encrypted(Uint8List.fromList(bytes));
       return encrypter.decrypt(encrypted, iv: iv);
     } catch (e) {
-      log('Decryption error: $e', error: e, stackTrace: StackTrace.current);
-      throw Exception('Không thể giải mã file: ${e.toString()}');
+      log('Decryption error: $e');
+      rethrow;
     }
   }
 
-  // Thêm hàm kiểm tra file có phải định dạng .edudex hợp lệ không
+  // Kiểm tra file có phải định dạng .edudex hợp lệ không
   static bool isValidEdudexFile(List<int> bytes) {
     try {
-      final decrypted = decryptFromBytes(bytes);
-      // Kiểm tra xem nội dung có chứa các chuỗi đặc trưng không
-      return decrypted.contains('KẾT QUẢ BÀI THI') &&
-          decrypted.contains('THÔNG TIN THÍ SINH');
+      // Thử giải mã
+      decryptFromBytes(bytes);
+      return true;
     } catch (e) {
-      log('Invalid edudex file: $e');
       return false;
     }
   }
 
-  // Thêm hàm mã hóa và chuyển sang base64
+  // Mã hóa văn bản thành base64
   static String encryptToBase64(String text) {
     try {
       final encrypted = encrypter.encrypt(text, iv: iv);
@@ -59,7 +57,7 @@ class AppCrypto {
     }
   }
 
-  // Thêm hàm giải mã từ base64
+  // Giải mã từ base64
   static String decryptFromBase64(String base64Text) {
     try {
       final encrypted = encrypt.Encrypted.fromBase64(base64Text);

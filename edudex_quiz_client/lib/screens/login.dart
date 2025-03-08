@@ -2,7 +2,7 @@ import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:provider/provider.dart';
-import '../theme.dart';
+import 'package:edudex_quiz_client/theme.dart';
 import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
@@ -65,19 +65,20 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final serverUrl = prefs.getString('server_url');
+      final teacherIp = prefs.getString('teacher_ip');
 
-      if (serverUrl == null) {
+      if (teacherIp == null) {
         throw Exception('Không tìm thấy địa chỉ máy chủ');
       }
 
       print('🔐 Đang đăng nhập...');
-      print('📡 URL: $serverUrl/api/student/login');
+      final url = 'http://$teacherIp:8689/auth/student';
+      print('📡 URL: $url');
       print(
           '📝 Params: student_code=${_maSinhVienController.text}, exam_code=${_soBaoDanhController.text}');
 
       final response = await http.post(
-        Uri.parse('$serverUrl/api/student/login').replace(queryParameters: {
+        Uri.parse(url).replace(queryParameters: {
           'student_code': _maSinhVienController.text,
           'exam_code': _soBaoDanhController.text,
         }),
@@ -90,13 +91,13 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
       print('📥 Status code: ${response.statusCode}');
       print('📄 Response: ${response.body}');
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+      final data = json.decode(response.body);
 
-        // Sửa lại cách lấy token - token là string trực tiếp
-        await prefs.setString('token', data['token']);
-        await prefs.setString('student_data', json.encode(data['student']));
-        await prefs.setString('exams_data', json.encode(data['exams']));
+      if (response.statusCode == 200 && data['status'] == 'success') {
+        // Lưu thông tin đăng nhập
+        await prefs.setString('token', data['data']['token']);
+        await prefs.setString(
+            'student_data', json.encode(data['data']['student']));
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -104,18 +105,12 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
             FluentPageRoute(builder: (context) => const DashboardScreen()),
           );
         }
-      } else if (response.statusCode == 401) {
-        final data = json.decode(response.body);
+      } else {
         setState(() {
           _errorMessage =
               data['message'] ?? 'Thông tin đăng nhập không chính xác!';
         });
         print('❌ Lỗi đăng nhập: ${data['message']}');
-      } else {
-        print('❌ Lỗi đăng nhập: ${response.statusCode}');
-        setState(() {
-          _errorMessage = 'Thông tin đăng nhập không chính xác!';
-        });
       }
     } catch (e) {
       print('❌ Exception: $e');

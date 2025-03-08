@@ -24,6 +24,7 @@ class DatabaseService {
         await db.execute('''
           CREATE TABLE students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            token TEXT NULL,
             student_code TEXT NOT NULL,
             name TEXT NOT NULL,
             exam_id INTEGER NOT NULL,
