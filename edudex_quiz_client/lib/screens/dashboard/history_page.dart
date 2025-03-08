@@ -138,8 +138,9 @@ class _HistoryPageState extends State<HistoryPage> {
         return;
       }
 
-      // Đọc file dưới dạng base64
-      final base64Content = await file.readAsString();
+      // Đọc file dưới dạng bytes và chuyển thành base64
+      final bytes = await file.readAsBytes();
+      final base64Content = base64Encode(bytes);
 
       // Giải mã nội dung
       final decryptedText = AppCrypto.decryptFromBase64(base64Content);

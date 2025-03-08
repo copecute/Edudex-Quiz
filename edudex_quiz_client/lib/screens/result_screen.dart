@@ -11,6 +11,7 @@ import '../utils/crypto.dart';
 import 'dart:developer';
 import 'package:process_run/process_run.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:encrypt/encrypt.dart';
 
 class ResultScreen extends StatefulWidget {
   final int totalQuestions;
@@ -48,72 +49,8 @@ class _ResultScreenState extends State<ResultScreen> {
       final baseFileName =
           'ket_qua_thi_${widget.studentInfo['code'] ?? 'unknown'}_${formatter.format(now)}';
 
-      // Tạo nội dung file
-      final buffer = StringBuffer();
-      buffer.writeln('KẾT QUẢ BÀI THI');
-      buffer.writeln('==============');
-      buffer.writeln();
-
-      // Thông tin thí sinh
-      buffer.writeln('THÔNG TIN THÍ SINH');
-      buffer
-          .writeln('Mã sinh viên: ${widget.studentInfo['code'] ?? 'Chưa có'}');
-      buffer.writeln('Họ và tên: ${widget.studentInfo['name'] ?? 'Chưa có'}');
-      buffer.writeln(
-          'Số báo danh: ${widget.studentInfo['exam_code'] ?? 'Chưa có'}');
-      buffer.writeln();
-
-      // Thông tin bài thi
-      buffer.writeln('THÔNG TIN BÀI THI');
-      buffer.writeln(
-          'Kỳ thi: ${widget.examInfo['test_session']?['name'] ?? 'Chưa có'}');
-      buffer.writeln(
-          'Môn thi: ${widget.examInfo['subject']?['name'] ?? 'Chưa có'} (${widget.examInfo['subject']?['code'] ?? ''})');
-      buffer.writeln(
-          'Phòng thi: ${widget.examInfo['room']?['name'] ?? 'Chưa có'} - ${widget.examInfo['room']?['location'] ?? ''}');
-      buffer.writeln(
-          'Ca thi: ${widget.examInfo['room']?['shift']?['name'] ?? 'Chưa có'}');
-      buffer.writeln();
-
-      // Kết quả
-      buffer.writeln('KẾT QUẢ');
-      buffer.writeln('Tổng số câu hỏi: ${widget.totalQuestions}');
-      buffer.writeln('Số câu trả lời đúng: ${widget.correctAnswers}');
-      buffer.writeln('Điểm số: ${widget.score.toStringAsFixed(1)}');
-      buffer.writeln('Kết quả: ${widget.score >= 5.0 ? 'Đạt' : 'Không đạt'}');
-      buffer.writeln();
-
-      // Chi tiết bài làm
-      buffer.writeln('\nCHI TIẾT BÀI LÀM');
-      buffer.writeln('===============');
-      for (var i = 0; i < widget.questions.length; i++) {
-        final question = widget.questions[i];
-        final selectedAnswerIndex = widget.userAnswers[i];
-        final answers = question['answers'] as List? ?? [];
-
-        buffer.writeln('Câu ${i + 1}:');
-        buffer
-            .writeln('Nội dung: ${question['content'] ?? 'Không có nội dung'}');
-        buffer.writeln(
-            'Độ khó: ${_getDifficultyText(question['level'] as int? ?? 0)}');
-        if (selectedAnswerIndex != null && answers.isNotEmpty) {
-          buffer.writeln(
-              'Đáp án đã chọn: ${answers[selectedAnswerIndex]['content'] ?? 'Không có nội dung'}');
-        } else {
-          buffer.writeln('Chưa chọn đáp án');
-        }
-        buffer.writeln();
-      }
-
-      // Log hành động
-      buffer.writeln('LOG HÀNH ĐỘNG');
-      for (final log in widget.actionLogs) {
-        buffer.writeln(log);
-      }
-
-      buffer.writeln('\nThời gian xuất kết quả: ${formatter.format(now)}');
-
-      final content = buffer.toString();
+      // Sử dụng submissionFile đã được truyền từ quiz_screen (đã là base64 được mã hóa)
+      final submissionContent = widget.submissionFile;
 
       // Lưu file mã hóa .edudex
       final encryptedResult = await FilePicker.platform.saveFile(
@@ -125,8 +62,11 @@ class _ResultScreenState extends State<ResultScreen> {
 
       if (encryptedResult != null) {
         final encryptedFile = File(encryptedResult);
-        final encryptedBytes = AppCrypto.encryptToBytes(content);
-        await encryptedFile.writeAsBytes(encryptedBytes);
+
+        // Lưu trực tiếp nội dung đã mã hóa
+        // Chuyển base64 thành bytes để lưu vào file
+        final bytes = base64Decode(submissionContent);
+        await encryptedFile.writeAsBytes(bytes);
       }
 
       if (mounted && (encryptedResult != null)) {

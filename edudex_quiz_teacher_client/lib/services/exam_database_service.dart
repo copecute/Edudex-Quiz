@@ -3,6 +3,7 @@ import 'package:path/path.dart';
 import 'dart:convert';
 import '../models/exam_schedule.dart';
 import '../models/exam.dart';
+import '../utils/crypto.dart' as crypto_util;
 
 class ExamDatabaseService {
   static Database? _database;
@@ -12,11 +13,23 @@ class ExamDatabaseService {
   ExamDatabaseService._internal();
 
   Future<Database> get database async {
-    if (_database != null && _database!.isOpen) {
+    try {
+      if (_database != null && _database!.isOpen) {
+        return _database!;
+      }
+
+      // Đảm bảo đóng database cũ nếu còn mở
+      await closeDatabase();
+
+      _database = await _initDatabase();
+      return _database!;
+    } catch (e) {
+      print('❌ Lỗi khi mở database: $e');
+      // Thử tạo lại database nếu có lỗi
+      await closeDatabase();
+      _database = await _initDatabase();
       return _database!;
     }
-    _database = await _initDatabase();
-    return _database!;
   }
 
   Future<void> closeDatabase() async {
@@ -178,16 +191,16 @@ class ExamDatabaseService {
 
         // Thêm bảng kết quả thi
         await db.execute('''
-          CREATE TABLE exam_results (
-            id INTEGER PRIMARY KEY,
-            exam_code TEXT,
+          CREATE TABLE IF NOT EXISTS exam_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             student_code TEXT,
+            exam_code TEXT,
+            full_name TEXT,
             correct_answers INTEGER,
             total_questions INTEGER,
             score REAL,
-            log_file TEXT,
-            note TEXT,
-            submitted_at TEXT
+            submitted_at TEXT,
+            log_file TEXT
           )
         ''');
       },
@@ -198,15 +211,15 @@ class ExamDatabaseService {
         if (oldVersion < 3) {
           await db.execute('''
             CREATE TABLE IF NOT EXISTS exam_results (
-              id INTEGER PRIMARY KEY,
-              exam_code TEXT,
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
               student_code TEXT,
+              exam_code TEXT,
+              full_name TEXT,
               correct_answers INTEGER,
               total_questions INTEGER,
               score REAL,
-              log_file TEXT,
-              note TEXT,
-              submitted_at TEXT
+              submitted_at TEXT,
+              log_file TEXT
             )
           ''');
         }
@@ -627,5 +640,138 @@ class ExamDatabaseService {
         rethrow;
       }
     });
+  }
+
+  Future<List<Map<String, dynamic>>> getExamResults() async {
+    try {
+      // Tạo kết nối mới mỗi lần truy vấn để tránh xung đột
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, 'exam.db');
+
+      final db = await openDatabase(
+        path,
+        version: 3,
+        readOnly: false,
+      );
+
+      try {
+        // Kiểm tra bảng có tồn tại không
+        final tableExists = await _checkTableExists(db, 'exam_results');
+        if (!tableExists) {
+          print('⚠️ Bảng exam_results không tồn tại, đang tạo mới...');
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS exam_results (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              student_code TEXT,
+              exam_code TEXT,
+              correct_answers INTEGER,
+              total_questions INTEGER,
+              score REAL,
+              submitted_at TEXT,
+              log_file TEXT
+            )
+          ''');
+          return [];
+        }
+
+        // Lấy kết quả từ bảng exam_results
+        final results =
+            await db.query('exam_results', orderBy: 'submitted_at DESC');
+        print('✅ Đã tải ${results.length} kết quả');
+
+        // Kiểm tra bảng students có tồn tại không
+        final studentsTableExists = await _checkTableExists(db, 'students');
+
+        // Xử lý kết quả
+        final processedResults = <Map<String, dynamic>>[];
+        for (var result in results) {
+          final processedResult = Map<String, dynamic>.from(result);
+
+          // Nếu bảng students tồn tại, lấy thông tin họ tên
+          if (studentsTableExists) {
+            try {
+              final studentCode = processedResult['student_code'];
+              final examCode = processedResult['exam_code'];
+
+              if (studentCode != null) {
+                // Tìm thông tin sinh viên từ bảng students
+                final studentData = await db.query(
+                  'students',
+                  columns: ['full_name'],
+                  where: 'student_code = ? AND exam_code = ?',
+                  whereArgs: [studentCode, examCode],
+                  limit: 1,
+                );
+
+                if (studentData.isNotEmpty) {
+                  processedResult['full_name'] = studentData.first['full_name'];
+                }
+              }
+            } catch (e) {
+              print('⚠️ Lỗi khi lấy thông tin sinh viên: $e');
+            }
+          }
+
+          // Xử lý log file nếu có
+          if (processedResult['log_file'] != null) {
+            try {
+              processedResult['log_content'] =
+                  await _decryptLogFile(processedResult['log_file']);
+            } catch (e) {
+              print('⚠️ Không thể đọc log file: $e');
+              processedResult['log_content'] = 'Không thể đọc nội dung bài làm';
+            }
+          }
+
+          processedResults.add(processedResult);
+        }
+
+        return processedResults;
+      } finally {
+        // Đảm bảo đóng kết nối sau khi sử dụng
+        await db.close();
+      }
+    } catch (e) {
+      print('❌ Lỗi khi lấy kết quả thi: $e');
+      rethrow;
+    }
+  }
+
+  // Phương thức kiểm tra bảng tồn tại (sử dụng kết nối đã mở)
+  Future<bool> _checkTableExists(Database db, String tableName) async {
+    try {
+      final result = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        [tableName],
+      );
+      return result.isNotEmpty;
+    } catch (e) {
+      print('❌ Lỗi khi kiểm tra bảng $tableName: $e');
+      return false;
+    }
+  }
+
+  // Đơn giản hóa phương thức giải mã log file
+  Future<String> _decryptLogFile(String base64Data) async {
+    try {
+      // Sử dụng trực tiếp AppCrypto từ crypto_util
+      return crypto_util.AppCrypto.decryptFromBase64(base64Data);
+    } catch (e) {
+      print('❌ Lỗi khi giải mã log file: $e');
+
+      // Thử phương pháp giải mã thay thế
+      try {
+        final bytes = base64Decode(base64Data);
+        return utf8.decode(bytes);
+      } catch (e2) {
+        print('❌ Lỗi khi giải mã base64: $e2');
+
+        // Trả về một phần của chuỗi base64 nếu không thể giải mã
+        if (base64Data.length > 100) {
+          return '${base64Data.substring(0, 100)}... (Nội dung đã được mã hóa)';
+        }
+        return base64Data;
+      }
+    }
   }
 }
