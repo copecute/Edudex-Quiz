@@ -12,7 +12,7 @@ import '../splash_screen.dart';
 import '../login.dart';
 import 'quiz_management.dart';
 import 'student_management.dart';
-import 'statistics.dart';
+import 'package:edudex_quiz_teacher_client/screens/dashboard/results.dart';
 import 'exam_room_screen.dart';
 import '../../services/database_service.dart';
 import '../../services/http_server_service.dart';
@@ -34,7 +34,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
     HomePage(),
     QuizManagementPage(),
     StudentManagementPage(),
-    StatisticsPage(),
+    ResultsPage(),
     Settings(),
   ];
 
@@ -190,7 +190,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             ),
             PaneItem(
               icon: const Icon(FluentIcons.b_i_dashboard),
-              title: const Text('Thống kê'),
+              title: const Text('Kết quả'),
               body: _pages[3],
             ),
             PaneItem(

@@ -143,4 +143,9 @@ class DatabaseService {
     );
     return List.generate(maps.length, (i) => Submission.fromMap(maps[i]));
   }
+
+  Future<List<Map<String, dynamic>>> getExamResults() async {
+    final db = await database;
+    return await db.query('exam_results', orderBy: 'submitted_at DESC');
+  }
 }

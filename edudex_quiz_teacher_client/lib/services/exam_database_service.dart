@@ -6,19 +6,43 @@ import '../models/exam.dart';
 
 class ExamDatabaseService {
   static Database? _database;
+  static final ExamDatabaseService _instance = ExamDatabaseService._internal();
+
+  factory ExamDatabaseService() => _instance;
+  ExamDatabaseService._internal();
 
   Future<Database> get database async {
-    _database ??= await _initDatabase();
+    if (_database != null && _database!.isOpen) {
+      return _database!;
+    }
+    _database = await _initDatabase();
     return _database!;
+  }
+
+  Future<void> closeDatabase() async {
+    if (_database != null && _database!.isOpen) {
+      await _database!.close();
+      _database = null;
+    }
   }
 
   Future<Database> _initDatabase() async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, 'exam.db');
 
+    // Đóng database cũ nếu còn mở
+    await closeDatabase();
+
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
+      readOnly: false,
+      singleInstance: true,
+      onConfigure: (db) async {
+        // Bật foreign keys và sử dụng DELETE mode
+        await db.execute('PRAGMA foreign_keys = ON');
+        await db.execute('PRAGMA journal_mode = DELETE');
+      },
       onCreate: (Database db, int version) async {
         // Bảng môn học
         await db.execute('''
@@ -151,11 +175,63 @@ class ExamDatabaseService {
             capacity INTEGER NOT NULL
           )
         ''');
+
+        // Thêm bảng kết quả thi
+        await db.execute('''
+          CREATE TABLE exam_results (
+            id INTEGER PRIMARY KEY,
+            exam_code TEXT,
+            student_code TEXT,
+            correct_answers INTEGER,
+            total_questions INTEGER,
+            score REAL,
+            log_file TEXT,
+            note TEXT,
+            submitted_at TEXT
+          )
+        ''');
       },
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
-          // Thêm cột token vào bảng students nếu chưa có
           await db.execute('ALTER TABLE students ADD COLUMN token TEXT');
+        }
+        if (oldVersion < 3) {
+          await db.execute('''
+            CREATE TABLE IF NOT EXISTS exam_results (
+              id INTEGER PRIMARY KEY,
+              exam_code TEXT,
+              student_code TEXT,
+              correct_answers INTEGER,
+              total_questions INTEGER,
+              score REAL,
+              log_file TEXT,
+              note TEXT,
+              submitted_at TEXT
+            )
+          ''');
+        }
+      },
+      onOpen: (db) async {
+        // Kiểm tra quyền ghi
+        try {
+          await db.rawQuery('PRAGMA journal_mode'); // Kiểm tra journal mode
+          await db.rawQuery('PRAGMA synchronous'); // Kiểm tra sync mode
+
+          await db.insert('exam_results', {
+            'exam_code': 'test',
+            'student_code': 'test',
+            'correct_answers': 0,
+            'total_questions': 0,
+            'score': 0.0,
+            'log_file': 'test',
+            'submitted_at': DateTime.now().toIso8601String(),
+          });
+          await db.delete('exam_results',
+              where: 'exam_code = ?', whereArgs: ['test']);
+          print('✅ Database có quyền ghi');
+        } catch (e) {
+          print('❌ Database không có quyền ghi: $e');
+          rethrow;
         }
       },
     );
@@ -467,5 +543,89 @@ class ExamDatabaseService {
       'shift': shifts.isNotEmpty ? shifts.first : null,
       'room': rooms.isNotEmpty ? rooms.first : null,
     };
+  }
+
+  Future<void> saveExamResult({
+    required String examCode,
+    required String studentCode,
+    required int correctAnswers,
+    required int totalQuestions,
+    required double score,
+    required String logFile,
+    String? note,
+  }) async {
+    final db = await database;
+
+    await db.insert('exam_results', {
+      'exam_code': examCode,
+      'student_code': studentCode,
+      'correct_answers': correctAnswers,
+      'total_questions': totalQuestions,
+      'score': score,
+      'log_file': logFile,
+      'note': note,
+      'submitted_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<List<Map<String, dynamic>>> getExamQuestions() async {
+    final db = await database;
+    final questions = await db.query('questions');
+
+    // Lấy đáp án đúng cho mỗi câu hỏi
+    for (var q in questions) {
+      final answers = await db.query(
+        'answers',
+        where: 'question_id = ? AND is_correct = 1',
+        whereArgs: [q['id']],
+      );
+      if (answers.isNotEmpty) {
+        q['correct_answer_id'] = answers.first['id'];
+      }
+    }
+
+    return questions;
+  }
+
+  // Thêm phương thức kiểm tra đã nộp bài chưa
+  Future<bool> hasSubmittedExam(String examCode, String studentCode) async {
+    final db = await database;
+    final results = await db.query(
+      'exam_results',
+      where: 'exam_code = ? AND student_code = ?',
+      whereArgs: [examCode, studentCode],
+    );
+    return results.isNotEmpty;
+  }
+
+  // Thêm phương thức xóa toàn bộ dữ liệu
+  Future<void> clearAllData() async {
+    final db = await database;
+    await db.transaction((txn) async {
+      try {
+        // Xóa dữ liệu theo thứ tự để tránh lỗi foreign key
+        print('🗑️ Đang xóa dữ liệu...');
+
+        // Xóa các bảng con trước
+        await txn.execute('DELETE FROM exam_results');
+        await txn.execute('DELETE FROM answers');
+        await txn.execute('DELETE FROM question_tags');
+        await txn.execute('DELETE FROM questions');
+        await txn.execute('DELETE FROM tag_difficulty_rates');
+        await txn.execute('DELETE FROM tags');
+        await txn.execute('DELETE FROM exam_difficulty_rates');
+        await txn.execute('DELETE FROM exams');
+        await txn.execute('DELETE FROM subjects');
+        await txn.execute('DELETE FROM students');
+        await txn.execute('DELETE FROM test_sessions');
+        await txn.execute('DELETE FROM shifts');
+        await txn.execute('DELETE FROM rooms');
+
+        print('✅ Đã xóa toàn bộ dữ liệu');
+      } catch (e) {
+        print('❌ Lỗi khi xóa dữ liệu: $e');
+        rethrow;
+      }
+    });
   }
 }

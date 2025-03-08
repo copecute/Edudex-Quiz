@@ -93,6 +93,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   @override
   void initState() {
     super.initState();
+    _loadStudentData();
     _loadTestPaper();
     _setupFullScreen();
 
@@ -112,6 +113,24 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
           'kích thước màn hình: ${size.width.round()}x${size.height.round()}');
       _addLog('bắt đầu làm bài');
     });
+  }
+
+  Future<void> _loadStudentData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final studentDataStr = prefs.getString('student_data');
+
+      if (studentDataStr != null) {
+        setState(() {
+          _studentData = json.decode(studentDataStr);
+        });
+        print('✅ Loaded student data: $_studentData');
+      } else {
+        print('❌ No student data found in SharedPreferences');
+      }
+    } catch (e) {
+      print('❌ Error loading student data: $e');
+    }
   }
 
   Future<void> _loadTestPaper() async {
@@ -260,14 +279,11 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   }
 
   Future<void> _submitTest() async {
-    _addLog('Nộp bài');
-    if (_isSubmitting) return;
-
-    setState(() {
-      _isSubmitting = true;
-    });
-
     try {
+      setState(() {
+        _isSubmitting = true;
+      });
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final teacherIp = prefs.getString('teacher_ip');
@@ -276,116 +292,59 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         throw Exception('Không tìm thấy thông tin cần thiết');
       }
 
-      // Chuẩn bị dữ liệu answers cho API
-      final List<Map<String, dynamic>> answers = [];
-      _userAnswers.forEach((questionIndex, answerIndex) {
-        final question = _questions[questionIndex];
-        final answer = question['answers'][answerIndex];
-        answers.add({
-          'question_id': question['id'],
-          'answer_id': answer['id'],
-        });
-      });
+      // Tạo danh sách câu trả lời
+      final answers = _userAnswers.entries
+          .map((e) => {
+                'question_id': _questions[e.key]['id'],
+                'answer_id': e.value != null
+                    ? _questions[e.key]['answers'][e.value]['id']
+                    : null,
+              })
+          .toList();
 
-      // Tạo nội dung submission file theo định dạng text
+      // Tạo nội dung file log
       final buffer = StringBuffer();
-
-      // Phần 1: Thông tin cá nhân
-      buffer.writeln('Thông tin cá nhân:');
-      buffer.writeln('Mã sinh viên: ${_studentData?['code']}');
-      buffer.writeln('Họ và tên: ${_studentData?['name']}');
-      buffer.writeln(
-          'Chuyên ngành: ${_studentData?['majors'].firstWhere((m) => m['is_main'] == 1)['name']}');
-      buffer.writeln('Số báo danh: ${_examsData![0]['exam_code']}');
+      buffer.writeln('Thông tin thí sinh:');
+      buffer.writeln('Mã sinh viên: ${_studentData?['student_code'] ?? ''}');
+      buffer.writeln('Họ và tên: ${_studentData?['full_name'] ?? ''}');
+      buffer.writeln('Số báo danh: ${_studentData?['exam_code'] ?? ''}');
       buffer.writeln();
 
-      // Phần 2: Chi tiết đề thi
       buffer.writeln('===============================================');
       buffer.writeln('Chi tiết đề thi:');
-      if (_examsData != null && _examsData!.isNotEmpty) {
-        final testSession = _examsData![0]['test_session'];
-        final subject = _examsData![0]['subject'];
-        final room = _examsData![0]['room'];
-        final shift = room['shift'];
-        final testPaper = _testPaperDetails;
+      buffer.writeln(
+          'Môn thi: ${widget.examInfo['subject']['name']} (${widget.examInfo['subject']['code'] ?? ''}');
+      buffer.writeln('Tên đề thi: ${widget.examInfo['exam']['name'] ?? ''}');
+      buffer.writeln(
+          'Thời gian: ${widget.examInfo['exam']['duration'] ?? ''} phút');
+      buffer.writeln(
+          'Số câu hỏi: ${widget.examInfo['exam']['total_questions'] ?? ''} câu');
+      buffer.writeln(
+          'Phòng thi: ${widget.examInfo['room']['name'] ?? ''} - ${widget.examInfo['room']['facility'] ?? ''}');
+      buffer.writeln('Ca thi: ${widget.examInfo['shift']['name'] ?? ''}');
+      buffer.writeln();
 
-        buffer.writeln('Kỳ thi: ${testSession['name']}');
+      buffer.writeln('===============================================');
+      buffer.writeln('Chi tiết bài làm:');
+      buffer.writeln('Thời gian bắt đầu: ${_startedAt.toIso8601String()}');
+      buffer.writeln('Thời gian nộp bài: ${DateTime.now().toIso8601String()}');
+      buffer.writeln('Câu trả lời:');
+      for (final answer in answers) {
         buffer.writeln(
-            'Thời gian kỳ thi: ${testSession['start_date']} - ${testSession['end_date']}');
-        buffer.writeln('Môn thi: ${subject['name']} (${subject['code']})');
-        buffer.writeln('Ca thi: ${shift['name']}');
-        buffer.writeln(
-            'Thời gian ca thi: ${shift['start_time']} - ${shift['end_time']}');
-        buffer.writeln('Phòng thi: ${room['name']} - ${room['location']}');
-        buffer.writeln();
-
-        buffer.writeln('Tên đề thi: ${testPaper?['name']}');
-        buffer.writeln('Thời gian làm bài: ${testPaper?['duration']} phút');
-        buffer.writeln('Tổng số câu hỏi: ${testPaper?['total_questions']} câu');
-
-        buffer.writeln('\nTỷ lệ độ khó:');
-        final difficultyRates = testPaper?['difficulty_rates'];
-        buffer.writeln('- Dễ: ${difficultyRates['easy'].toStringAsFixed(1)}%');
-        buffer.writeln(
-            '- Trung bình: ${difficultyRates['medium'].toStringAsFixed(1)}%');
-        buffer.writeln('- Khó: ${difficultyRates['hard'].toStringAsFixed(1)}%');
-
-        buffer.writeln('\nPhân bố theo chủ đề:');
-        for (final tag in testPaper?['tags']) {
-          final questionsLevel = tag['questions_by_level'];
-          final rates = tag['rates'];
-          buffer.writeln('${tag['name']}: ${tag['total_questions']} câu');
-          buffer.writeln(
-              '- Số câu theo độ khó: Dễ (${questionsLevel['easy']}), TB (${questionsLevel['medium']}), Khó (${questionsLevel['hard']})');
-          buffer.writeln(
-              '- Tỷ lệ: ${double.parse(rates['easy']).toStringAsFixed(1)}%/${double.parse(rates['medium']).toStringAsFixed(1)}%/${double.parse(rates['hard']).toStringAsFixed(1)}%');
-        }
+            '- Câu ${answer['question_id'] ?? ''} : ${answer['answer_id'] ?? ''}');
       }
       buffer.writeln();
 
-      // Phần 3: Chi tiết bài làm
-      buffer.writeln('===============================================');
-      buffer.writeln('Chi tiết bài làm:');
-      final testDetails = {
-        'test_session_subject_id': _examsData![0]['test_session_subject_id'],
-        'started_at': _startedAt.toIso8601String(),
-        'submitted_at': DateTime.now().toIso8601String(),
-        'answers': answers,
-      };
-      final prettyJson =
-          const JsonEncoder.withIndent('  ').convert(testDetails);
-      buffer.writeln(prettyJson);
-      buffer.writeln();
-
-      // Phần 4: Log
       buffer.writeln('===============================================');
       buffer.writeln('Log:');
       for (final log in _actionLogs) {
         buffer.writeln(log);
       }
 
-      // Mã hóa nội dung text
-      final encryptedData =
-          AppCrypto.encrypter.encrypt(buffer.toString(), iv: AppCrypto.iv);
+      // Mã hóa nội dung file và chuyển sang base64
+      final base64Data = AppCrypto.encryptToBase64(buffer.toString());
 
-      // Tạo request body cho API
-      final requestBody = {
-        'test_session_subject_id': _examsData![0]['test_session_subject_id'],
-        'answers': answers,
-        'submission_file': encryptedData.base64,
-        'started_at': _startedAt.toIso8601String(),
-      };
-
-      print('===============================================');
-      print('📤 Submit request:');
-      print('URL: http://$teacherIp:8689/exam-submissions');
-      print('Headers: ${json.encode({
-            'Authorization': 'copecute $token',
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          })}');
-      print('Body: ${json.encode(requestBody)}');
-
+      // Gửi request nộp bài với format mới
       final response = await http.post(
         Uri.parse('http://$teacherIp:8689/exam-submissions'),
         headers: {
@@ -393,15 +352,16 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: json.encode(requestBody),
+        body: json.encode({
+          'answers': answers,
+          'submission_file': base64Data,
+          'started_at': _startedAt.toIso8601String(),
+        }),
       );
-
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
 
       final data = json.decode(response.body);
 
-      if (response.statusCode == 200 && data['success'] == true) {
+      if (response.statusCode == 200 && data['status'] == 'success') {
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -412,8 +372,29 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                 score: data['data']['score'].toDouble(),
                 questions: _questions,
                 userAnswers: Map<int, int>.from(_userAnswers),
-                submissionFile: encryptedData.base64,
+                submissionFile: base64Data,
                 actionLogs: _actionLogs,
+                studentInfo: {
+                  'code': _studentData?['student_code'],
+                  'name': _studentData?['full_name'],
+                  'exam_code': _studentData?['exam_code'],
+                },
+                examInfo: {
+                  'test_session': {
+                    'name': widget.examInfo['test_session']['name'],
+                  },
+                  'subject': {
+                    'name': widget.examInfo['subject']['name'],
+                    'code': widget.examInfo['subject']['code'],
+                  },
+                  'room': {
+                    'name': widget.examInfo['room']['name'],
+                    'location': widget.examInfo['room']['facility'],
+                    'shift': {
+                      'name': widget.examInfo['shift']['name'],
+                    },
+                  },
+                },
               ),
             ),
           );
@@ -439,11 +420,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
         );
       }
     } finally {
-      if (mounted) {
-        setState(() {
-          _isSubmitting = false;
-        });
-      }
+      setState(() {
+        _isSubmitting = false;
+      });
     }
   }
 

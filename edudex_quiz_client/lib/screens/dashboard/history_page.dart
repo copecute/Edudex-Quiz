@@ -138,18 +138,19 @@ class _HistoryPageState extends State<HistoryPage> {
         return;
       }
 
-      final bytes = await file.readAsBytes();
-      final encrypted = encrypt.Encrypted(bytes);
-      final decrypted =
-          AppCrypto.encrypter.decrypt(encrypted, iv: AppCrypto.iv);
+      // Đọc file dưới dạng base64
+      final base64Content = await file.readAsString();
+
+      // Giải mã nội dung
+      final decryptedText = AppCrypto.decryptFromBase64(base64Content);
 
       setState(() {
-        _selectedContent = decrypted;
+        _selectedContent = decryptedText;
       });
 
       await _addToRecentFiles(path);
     } catch (e) {
-      log('Error reading file: $e');
+      log('Error reading file: $e', error: e, stackTrace: StackTrace.current);
       if (mounted) {
         showDialog(
           context: context,
@@ -168,138 +169,17 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  Widget _buildFileContent(String jsonContent) {
+  Widget _buildFileContent(String content) {
     try {
-      final data = json.decode(jsonContent);
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Cột bên trái - Thông tin cơ bản
-          Expanded(
-            flex: 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Thông tin thí sinh',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                    'Mã sinh viên: ${data['student_info']['student_code']}'),
-                SelectableText('Họ và tên: ${data['student_info']['name']}'),
-                SelectableText(
-                    'Chuyên ngành: ${data['student_info']['major']}'),
-                SelectableText(
-                    'Số báo danh: ${data['student_info']['exam_code']}'),
-                const SizedBox(height: 16),
-                const Text(
-                  'Thông tin kỳ thi',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                    'Kỳ thi: ${data['exam_info']['test_session']['name']}'),
-                SelectableText(
-                    'Môn thi: ${data['exam_info']['subject']['name']} (${data['exam_info']['subject']['code']})'),
-                SelectableText('Ca thi: ${data['exam_info']['shift']['name']}'),
-                SelectableText(
-                    'Phòng thi: ${data['exam_info']['room']['name']} - ${data['exam_info']['room']['location']}'),
-                const SizedBox(height: 16),
-                const Text(
-                  'Thông tin đề thi',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                    'Tên đề: ${data['exam_info']['test_paper']['name']}'),
-                SelectableText(
-                    'Thời gian làm bài: ${data['exam_info']['test_paper']['duration']} phút'),
-                SelectableText(
-                    'Tổng số câu hỏi: ${data['exam_info']['test_paper']['total_questions']}'),
-              ],
-            ),
-          ),
-
-          // Đường phân cách
-          Container(
-            width: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            color: Colors.grey[30],
-          ),
-
-          // Cột bên phải - Kết quả và chi tiết
-          Expanded(
-            flex: 1,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Kết quả bài thi',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                SelectableText(
-                    'Tổng số câu hỏi: ${data['result']['total_questions']}'),
-                SelectableText(
-                    'Số câu trả lời đúng: ${data['result']['correct_answers']}'),
-                SelectableText('Điểm số: ${data['result']['score']}'),
-                SelectableText(
-                    'Thời gian nộp bài: ${data['result']['submitted_at']}'),
-                SelectableText(
-                  'Kết quả: ${double.parse(data['result']['score'].toString()) >= 5.0 ? "Đạt" : "Không đạt"}',
-                  style: TextStyle(
-                    color:
-                        double.parse(data['result']['score'].toString()) >= 5.0
-                            ? Colors.green
-                            : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Phân bố câu hỏi theo chủ đề',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...data['exam_info']['test_paper']['tags'].map<Widget>((tag) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: SelectableText.rich(
-                      TextSpan(
-                        children: [
-                          TextSpan(
-                            text: '${tag['name']}: ',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          TextSpan(
-                            text: '${tag['total_questions']} câu\n',
-                          ),
-                          const TextSpan(text: 'Độ khó: '),
-                          TextSpan(
-                            text: 'Dễ (${tag['questions_by_level']['easy']}), ',
-                          ),
-                          TextSpan(
-                            text:
-                                'TB (${tag['questions_by_level']['medium']}), ',
-                          ),
-                          TextSpan(
-                            text: 'Khó (${tag['questions_by_level']['hard']})',
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ],
-            ),
-          ),
-        ],
+      // Hiển thị nội dung text thông thường
+      return SelectableText(
+        content,
+        style: const TextStyle(fontFamily: 'Consolas, Courier New, monospace'),
       );
     } catch (e) {
       return Center(
         child: Text(
-          'File không hợp lệ hãy gửi cho cán bộ nhân viên để kiểm tra!',
+          'File không hợp lệ hoặc bị hỏng. Vui lòng liên hệ cán bộ kỹ thuật!',
           style: TextStyle(color: Colors.red),
         ),
       );

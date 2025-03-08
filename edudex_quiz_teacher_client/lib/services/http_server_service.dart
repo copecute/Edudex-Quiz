@@ -129,6 +129,12 @@ class HttpServerService {
             }
             break;
 
+          case '/exam-submissions':
+            if (request.method == 'POST') {
+              await handleExamSubmission(request);
+            }
+            break;
+
           default:
             request.response.statusCode = HttpStatus.notFound;
             request.response.write(json.encode({
@@ -630,6 +636,155 @@ class HttpServerService {
       }));
     } catch (e) {
       print('❌ Lỗi xử lý exam questions: $e');
+      request.response.statusCode = HttpStatus.internalServerError;
+      request.response.write(json.encode({
+        'status': 'error',
+        'message': 'Lỗi server: $e',
+      }));
+    } finally {
+      await request.response.close();
+    }
+  }
+
+  Future<void> handleExamSubmission(HttpRequest request) async {
+    try {
+      // Kiểm tra header Authorization
+      final authHeader = request.headers.value('Authorization');
+      if (authHeader == null || !authHeader.startsWith('copecute ')) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Không có token xác thực',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      final token = authHeader.substring('copecute '.length);
+      print('Xử lý nộp bài:');
+      print('Token: $token');
+
+      // Kiểm tra token trong database
+      final examDb = ExamDatabaseService();
+      final student = await examDb.getStudentByToken(token);
+      print('Student: ${json.encode(student)}');
+
+      if (student == null) {
+        request.response.statusCode = HttpStatus.unauthorized;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Token không hợp lệ hoặc đã hết hạn',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      // Kiểm tra đã nộp bài chưa
+      final hasSubmitted = await examDb.hasSubmittedExam(
+        student['exam_code'],
+        student['student_code'],
+      );
+
+      if (hasSubmitted) {
+        request.response.statusCode = HttpStatus.badRequest;
+        request.response.write(json.encode({
+          'status': 'error',
+          'message': 'Bạn đã nộp bài trước đó không thể nộp lại',
+        }));
+        await request.response.close();
+        return;
+      }
+
+      // Parse request body
+      final body = await utf8.decoder.bind(request).join();
+      final data = json.decode(body);
+      print('Request data: ${json.encode(data)}');
+
+      // Kiểm tra kết quả
+      int totalCorrect = 0;
+      final answers = List<Map<String, dynamic>>.from(data['answers']);
+
+      // Lấy câu hỏi và đáp án đúng
+      final examData = await examDb.getExamData();
+      if (examData == null || examData['questions'] == null) {
+        throw Exception('Không tìm thấy thông tin đề thi');
+      }
+
+      final questions = List<Map<String, dynamic>>.from(examData['questions']);
+      print('Questions count: ${questions.length}');
+
+      // Tạo map câu hỏi -> đáp án đúng
+      final correctAnswers = <int, int>{};
+      for (final q in questions) {
+        try {
+          final answers = List<Map<String, dynamic>>.from(q['answers']);
+          final correctAnswer = answers.firstWhere(
+            (a) => a['is_correct'] == true,
+            orElse: () => <String, dynamic>{},
+          );
+
+          if (correctAnswer.isNotEmpty && correctAnswer['id'] != null) {
+            // Lưu theo dạng question_id -> correct_answer_id
+            correctAnswers[q['id']] = correctAnswer['id'];
+          }
+        } catch (e) {
+          print(
+              'Warning: Không tìm thấy đáp án đúng cho câu hỏi ${q['id']}: $e');
+          continue;
+        }
+      }
+      print('Correct answers map: $correctAnswers');
+
+      // Kiểm tra từng câu trả lời
+      for (final answer in answers) {
+        final questionId = answer['question_id'];
+        final answerId = answer['answer_id'];
+
+        // So sánh answer_id với correct_answer_id
+        if (correctAnswers.containsKey(questionId) &&
+            correctAnswers[questionId] == answerId) {
+          totalCorrect++;
+          print('✅ Câu $questionId đúng (answer: $answerId)');
+        } else {
+          print(
+              '❌ Câu $questionId sai (answer: $answerId, correct: ${correctAnswers[questionId]})');
+        }
+      }
+
+      // Tính điểm
+      final totalQuestions = questions.length;
+      final score = double.parse(
+          ((totalCorrect / totalQuestions) * 10).toStringAsFixed(1));
+
+      print('Score calculation:');
+      print('Total correct: $totalCorrect');
+      print('Total questions: $totalQuestions');
+      print('Score: $score');
+
+      // Lưu kết quả
+      await examDb.saveExamResult(
+        examCode: student['exam_code'],
+        studentCode: student['student_code'],
+        correctAnswers: totalCorrect,
+        totalQuestions: totalQuestions,
+        score: score,
+        logFile: data['submission_file'],
+      );
+
+      // Trả về kết quả
+      request.response.write(json.encode({
+        'status': 'success',
+        'message': 'Nộp bài thành công',
+        'data': {
+          'total_questions': totalQuestions,
+          'correct_answers': totalCorrect,
+          'score': score,
+        }
+      }));
+    } catch (e, stackTrace) {
+      print('❌ Lỗi xử lý nộp bài:');
+      print('Error: $e');
+      print('Stack trace: $stackTrace');
       request.response.statusCode = HttpStatus.internalServerError;
       request.response.write(json.encode({
         'status': 'error',

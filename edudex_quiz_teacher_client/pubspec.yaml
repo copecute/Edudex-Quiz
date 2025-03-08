@@ -30,6 +30,7 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   path: ^1.8.3
   network_info_plus: ^4.1.0
+  encrypt: ^5.0.1
 
 dev_dependencies:
   flutter_test:
