@@ -189,16 +189,16 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
               body: _pages[2],
             ),
             PaneItem(
-              icon: const Icon(FluentIcons.b_i_dashboard),
-              title: const Text('Kết quả'),
-              body: _pages[3],
-            ),
-            PaneItem(
               icon: const Icon(FluentIcons.room),
               title: const Text('Phòng thi'),
               body: ExamRoomScreen(
                 httpService: _httpService,
               ),
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.b_i_dashboard),
+              title: const Text('Kết quả'),
+              body: _pages[3],
             ),
           ],
           footerItems: [

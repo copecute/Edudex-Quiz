@@ -62,12 +62,19 @@ class AuthController extends Controller
             foreach ($examPeriods as $examPeriod) {
                 $proctorId = ExamPeriodProctor::where('exam_period_id', $examPeriod->id)
                     ->where('account_id', $user->id)
-                    ->value('id');
+                    ->first();
+
+                if (!$proctorId) {
+                    return response()->json([
+                        'status' => 'error',
+                        'message' => 'Không tìm thấy thông tin CBCT'
+                    ], 404);
+                }
 
                 $rooms = $examPeriod->examShifts()
                     ->with([
                         'rooms' => function($query) use ($proctorId) {
-                            $query->where('exam_shift_rooms.exam_period_proctor_id', $proctorId);
+                            $query->where('exam_shift_rooms.exam_period_proctor_id', $proctorId->id);
                         },
                         'rooms.room.facility',
                         'subjects.subject',
@@ -150,7 +157,7 @@ class AuthController extends Controller
                 'data' => [
                     'token' => $token,
                     'user' => [
-                        'id' => $user->id,
+                        'id' => $proctorId->id,
                         'username' => $user->username,
                         'email' => $user->email,
                         'role' => $user->role,
