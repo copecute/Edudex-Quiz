@@ -205,6 +205,8 @@ Route::middleware('auth')->group(function () {
             ->name('exam-period-proctors.export');
         Route::get('/template', [ExamPeriodProctorController::class, 'downloadTemplate'])
             ->name('exam-period-proctors.template');
+        Route::delete('/multiple', [ExamPeriodProctorController::class, 'destroyMultiple'])
+            ->name('exam-period-proctors.destroy-multiple');
     });
 
     // các route phòng thi trong kỳ thi

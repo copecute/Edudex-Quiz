@@ -6,6 +6,7 @@ use App\Models\ExamShift;
 use App\Models\ExamPeriod;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Carbon\Carbon;
 
 class ExamShiftController extends Controller
 {
@@ -27,36 +28,33 @@ class ExamShiftController extends Controller
     public function store(Request $request, ExamPeriod $examPeriod)
     {
         $validated = $request->validate([
-            'exam_period_id' => 'required|exists:exam_periods,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_time' => [
-                'required',
-                'date',
-                function ($attribute, $value, $fail) use ($examPeriod) {
-                    if (strtotime($value) < strtotime($examPeriod->start_time)) {
-                        $fail('Thời gian bắt đầu ca thi không được trước thời gian bắt đầu kỳ thi');
-                    }
-                    if (strtotime($value) > strtotime($examPeriod->end_time)) {
-                        $fail('Thời gian bắt đầu ca thi không được sau thời gian kết thúc kỳ thi');
-                    }
-                },
-            ],
-            'end_time' => [
-                'required',
-                'date',
-                'after:start_time',
-                function ($attribute, $value, $fail) use ($examPeriod) {
-                    if (strtotime($value) > strtotime($examPeriod->end_time)) {
-                        $fail('Thời gian kết thúc ca thi không được sau thời gian kết thúc kỳ thi');
-                    }
-                },
-            ],
+            'exam_date' => 'required|date|date_format:Y-m-d',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
 
-        $examPeriod->examShifts()->create($validated);
+        // Kết hợp ngày và giờ
+        $startTime = Carbon::createFromFormat('Y-m-d H:i', $validated['exam_date'] . ' ' . $validated['start_time']);
+        $endTime = Carbon::createFromFormat('Y-m-d H:i', $validated['exam_date'] . ' ' . $validated['end_time']);
 
-        return redirect()->route('exam-shifts.index', $examPeriod)
+        // Kiểm tra thời gian nằm trong kỳ thi
+        if ($startTime->lt($examPeriod->start_time) || $endTime->gt($examPeriod->end_time)) {
+            return back()
+                ->withInput()
+                ->withErrors(['exam_date' => 'Thời gian ca thi phải nằm trong thời gian kỳ thi']);
+        }
+
+        $examPeriod->examShifts()->create([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ]);
+
+        return redirect()
+            ->route('exam-shifts.index', $examPeriod)
             ->with('success', 'Thêm ca thi thành công!');
     }
 
@@ -68,36 +66,33 @@ class ExamShiftController extends Controller
     public function update(Request $request, ExamPeriod $examPeriod, ExamShift $examShift)
     {
         $validated = $request->validate([
-            'exam_period_id' => 'required|exists:exam_periods,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'start_time' => [
-                'required',
-                'date',
-                function ($attribute, $value, $fail) use ($examPeriod) {
-                    if (strtotime($value) < strtotime($examPeriod->start_time)) {
-                        $fail('Thời gian bắt đầu ca thi không được trước thời gian bắt đầu kỳ thi');
-                    }
-                    if (strtotime($value) > strtotime($examPeriod->end_time)) {
-                        $fail('Thời gian bắt đầu ca thi không được sau thời gian kết thúc kỳ thi');
-                    }
-                },
-            ],
-            'end_time' => [
-                'required',
-                'date',
-                'after:start_time',
-                function ($attribute, $value, $fail) use ($examPeriod) {
-                    if (strtotime($value) > strtotime($examPeriod->end_time)) {
-                        $fail('Thời gian kết thúc ca thi không được sau thời gian kết thúc kỳ thi');
-                    }
-                },
-            ],
+            'exam_date' => 'required|date|date_format:Y-m-d',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
         ]);
 
-        $examShift->update($validated);
+        // Kết hợp ngày và giờ
+        $startTime = Carbon::createFromFormat('Y-m-d H:i', $validated['exam_date'] . ' ' . $validated['start_time']);
+        $endTime = Carbon::createFromFormat('Y-m-d H:i', $validated['exam_date'] . ' ' . $validated['end_time']);
 
-        return redirect()->route('exam-shifts.index', $examPeriod)
+        // Kiểm tra thời gian nằm trong kỳ thi
+        if ($startTime->lt($examPeriod->start_time) || $endTime->gt($examPeriod->end_time)) {
+            return back()
+                ->withInput()
+                ->withErrors(['exam_date' => 'Thời gian ca thi phải nằm trong thời gian kỳ thi']);
+        }
+
+        $examShift->update([
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'start_time' => $startTime,
+            'end_time' => $endTime,
+        ]);
+
+        return redirect()
+            ->route('exam-shifts.index', $examPeriod)
             ->with('success', 'Cập nhật ca thi thành công!');
     }
 

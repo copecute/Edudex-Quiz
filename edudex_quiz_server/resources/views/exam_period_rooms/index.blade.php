@@ -2,6 +2,62 @@
 
 @section('title', 'Quản lý phòng thi')
 
+@push('scripts')
+<script src="/js/jquery-3.7.1.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Xác nhận xóa một phòng
+    $('.delete-form').on('submit', function(e) {
+        e.preventDefault();
+        if (confirm('Bạn có chắc chắn muốn xóa?')) {
+            this.submit();
+        }
+    });
+
+    // Chọn tất cả
+    $('#selectAll').on('change', function() {
+        $('.select-item').prop('checked', $(this).prop('checked'));
+        updateDeleteButton();
+    });
+
+    // Cập nhật trạng thái nút xóa
+    $('.select-item').on('change', function() {
+        updateDeleteButton();
+    });
+
+    function updateDeleteButton() {
+        const selectedIds = $('.select-item:checked').map(function() {
+            return $(this).val();
+        }).get();
+
+        if (selectedIds.length > 0) {
+            $('#deleteSelected').show();
+            $('#selectedCount').text(selectedIds.length);
+        } else {
+            $('#deleteSelected').hide();
+        }
+    }
+
+    // Xử lý xóa nhiều
+    $('#deleteSelected').on('click', function() {
+        const selectedIds = $('.select-item:checked').map(function() {
+            return $(this).val();
+        }).get();
+
+        if (selectedIds.length === 0) {
+            alert('Vui lòng chọn ít nhất một phòng thi để xóa');
+            return;
+        }
+
+        if (confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} phòng thi đã chọn?`)) {
+            $('input[name="room_ids"]').val(JSON.stringify(selectedIds));
+            $('#deleteMultipleForm').submit();
+        }
+    });
+});
+</script>
+@endpush
+
 @section('content')
 <div class="container">
     <div class="row">
@@ -69,10 +125,10 @@
 
                     <!-- Form xóa nhiều -->
                     <form id="deleteMultipleForm" action="{{ route('exam-period-rooms.destroy-multiple', $examPeriod) }}" 
-                          method="POST" class="d-none">
+                          method="POST">
                         @csrf
                         @method('DELETE')
-                        <input type="hidden" name="room_ids[]">
+                        <input type="hidden" name="room_ids" value="">
                     </form>
 
                     <div class="table-responsive">
@@ -121,12 +177,10 @@
                         </table>
                     </div>
 
-                    <!-- Nút xóa nhiều (ẩn mặc định) -->
                     <button id="deleteSelected" class="btn btn-danger" style="display: none;">
-                        <i class="fas fa-trash-alt me-1"></i> Xóa đã chọn
+                        <i class="fas fa-trash-alt me-1"></i> Xóa đã chọn (<span id="selectedCount">0</span>)
                     </button>
 
-                    <!-- Phân trang -->
                     <div class="d-flex justify-content-end mt-3">
                         {{ $rooms->links() }}
                     </div>
@@ -135,52 +189,4 @@
         </div>
     </div>
 </div>
-@endsection
-
-@push('scripts')
-<script>
-$(document).ready(function() {
-    // Xác nhận xóa
-    $('.delete-form').on('submit', function(e) {
-        e.preventDefault();
-        if (confirm('Bạn có chắc chắn muốn xóa?')) {
-            this.submit();
-        }
-    });
-
-    // Chọn tất cả
-    $('#selectAll').on('change', function() {
-        $('.select-item').prop('checked', $(this).prop('checked'));
-        updateDeleteButton();
-    });
-
-    // Cập nhật trạng thái nút xóa
-    $('.select-item').on('change', function() {
-        updateDeleteButton();
-    });
-
-    function updateDeleteButton() {
-        const selectedIds = $('.select-item:checked').map(function() {
-            return $(this).val();
-        }).get();
-
-        if (selectedIds.length > 0) {
-            $('#deleteSelected').show();
-        } else {
-            $('#deleteSelected').hide();
-        }
-    }
-
-    // Xử lý xóa nhiều
-    $('#deleteSelected').on('click', function() {
-        if (confirm('Bạn có chắc chắn muốn xóa các phòng thi đã chọn?')) {
-            const selectedIds = $('.select-item:checked').map(function() {
-                return $(this).val();
-            }).get();
-
-            $('input[name="room_ids[]"]').val(selectedIds);
-            $('#deleteMultipleForm').submit();
-        }
-    });
-});
-</script> 
+@endsection 

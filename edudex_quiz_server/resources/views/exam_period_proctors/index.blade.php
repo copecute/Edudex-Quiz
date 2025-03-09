@@ -2,6 +2,62 @@
 
 @section('title', 'Quản lý cán bộ coi thi')
 
+@push('scripts')
+<script src="/js/jquery-3.7.1.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Xác nhận xóa một CBCT
+    $('.delete-form').on('submit', function(e) {
+        e.preventDefault();
+        if (confirm('Bạn có chắc chắn muốn xóa?')) {
+            this.submit();
+        }
+    });
+
+    // Chọn tất cả
+    $('#selectAll').on('change', function() {
+        $('.select-item').prop('checked', $(this).prop('checked'));
+        updateDeleteButton();
+    });
+
+    // Cập nhật trạng thái nút xóa
+    $('.select-item').on('change', function() {
+        updateDeleteButton();
+    });
+
+    function updateDeleteButton() {
+        const selectedIds = $('.select-item:checked').map(function() {
+            return $(this).val();
+        }).get();
+
+        if (selectedIds.length > 0) {
+            $('#deleteSelected').show();
+            $('#selectedCount').text(selectedIds.length);
+        } else {
+            $('#deleteSelected').hide();
+        }
+    }
+
+    // Xử lý xóa nhiều
+    $('#deleteSelected').on('click', function() {
+        const selectedIds = $('.select-item:checked').map(function() {
+            return $(this).val();
+        }).get();
+
+        if (selectedIds.length === 0) {
+            alert('Vui lòng chọn ít nhất một cán bộ coi thi để xóa');
+            return;
+        }
+
+        if (confirm(`Bạn có chắc chắn muốn xóa ${selectedIds.length} cán bộ coi thi đã chọn?`)) {
+            $('input[name="proctor_ids"]').val(JSON.stringify(selectedIds));
+            $('#deleteMultipleForm').submit();
+        }
+    });
+});
+</script>
+@endpush
+
 @section('content')
 <div class="container">
     <div class="row">
@@ -44,11 +100,22 @@
                         </div>
                     </form>
 
+                    <!-- Form xóa nhiều -->
+                    <form id="deleteMultipleForm" action="{{ route('exam-period-proctors.destroy-multiple', $examPeriod) }}" 
+                          method="POST">
+                        @csrf
+                        @method('DELETE')
+                        <input type="hidden" name="proctor_ids" value="">
+                    </form>
+
                     <!-- Table -->
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
                                 <tr>
+                                    <th width="40">
+                                        <input type="checkbox" class="form-check-input" id="selectAll">
+                                    </th>
                                     <th>Username</th>
                                     <th>Họ và tên</th>
                                     <th>Email</th>
@@ -60,6 +127,10 @@
                             <tbody>
                                 @forelse ($proctors as $proctor)
                                 <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input select-item" 
+                                               value="{{ $proctor->id }}">
+                                    </td>
                                     <td>{{ $proctor->username }}</td>
                                     <td>{{ $proctor->fullName }}</td>
                                     <td>{{ $proctor->email }}</td>
@@ -87,12 +158,16 @@
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="5" class="text-center">Không có dữ liệu</td>
+                                    <td colspan="7" class="text-center">Không có dữ liệu</td>
                                 </tr>
                                 @endforelse
                             </tbody>
                         </table>
                     </div>
+
+                    <button id="deleteSelected" class="btn btn-danger" style="display: none;">
+                        <i class="fas fa-trash-alt me-1"></i> Xóa đã chọn (<span id="selectedCount">0</span>)
+                    </button>
 
                     <!-- Pagination -->
                     <div class="d-flex justify-content-end mt-3">
@@ -103,17 +178,4 @@
         </div>
     </div>
 </div>
-@endsection
-
-@push('scripts')
-<script>
-$(document).ready(function() {
-    $('.delete-form').on('submit', function(e) {
-        e.preventDefault();
-        if (confirm('Bạn có chắc chắn muốn xóa?')) {
-            this.submit();
-        }
-    });
-});
-</script>
-@endpush 
+@endsection 

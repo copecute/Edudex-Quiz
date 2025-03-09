@@ -13,7 +13,6 @@
                 </ol>
             </nav>
 
-            <!-- Header Card -->
             <div class="card mb-4">
                 <div class="card-body d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Danh sách kỳ thi</h5>
@@ -28,7 +27,6 @@
                 </div>
             </div>
 
-            <!-- Search Form -->
             <div class="card mb-4">
                 <div class="card-body">
                     <form action="{{ route('exam-periods.index') }}" method="GET">
@@ -77,25 +75,29 @@
                 </div>
             </div>
 
-            <!-- Exam Periods Table -->
             <div class="row g-4">
                 <div class="col-12">
                     <div class="table-responsive">
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
-                                    <th>Tên kỳ thi</th>
-                                    <th>Trạng thái</th>
-                                    <th>Thời gian bắt đầu</th>
-                                    <th>Thời gian kết thúc</th>
-                                    <th>Mô tả</th>
-                                    <th>Thao tác</th>
+                                    <th style="width: 5%">#</th>
+                                    <th style="width: 30%">Tên kỳ thi</th>
+                                    <th style="width: 15%">Thời gian</th>
+                                    <th style="width: 15%">Thời gian diễn ra</th>
+                                    <th style="width: 20%">Mô tả</th>
+                                    <th style="width: 15%">Trạng thái</th>
+                                    <th style="width: 15%">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($examPeriods as $examPeriod)
                                 <tr>
+                                    <td>{{ $loop->iteration }}</td>
                                     <td>{{ $examPeriod->name }}</td>
+                                    <td>{{ $examPeriod->start_time->format('d/m/Y') }} - {{ $examPeriod->end_time->format('d/m/Y') }}</td>
+                                    <td>{{ ceil($examPeriod->start_time->diffInDays($examPeriod->end_time)) }} ngày</td>
+                                    <td>{{ Str::limit($examPeriod->description, 40) }}</td>
                                     <td>
                                         @php
                                             $now = now();
@@ -106,20 +108,22 @@
                                                 $status = 'Đã khóa';
                                                 $statusClass = 'bg-secondary';
                                             } else if ($now->between($examPeriod->start_time, $examPeriod->end_time)) {
-                                                $status = 'Đang diễn ra';
+                                                $daysLeft = $now->floatDiffInDays($examPeriod->end_time);
+                                                if ($daysLeft < 1) {
+                                                    $daysLeft = 1;
+                                                } else {
+                                                    $daysLeft = ceil($daysLeft);
+                                                }
+                                                $status = "Đang diễn ra (còn {$daysLeft} ngày)";
                                                 $statusClass = 'bg-success';
                                             } else if ($now->lt($examPeriod->start_time)) {
-                                                if ($now->format('Y-m-d') === $examPeriod->start_time->format('Y-m-d')) {
-                                                    $status = "Diễn ra hôm nay";
+                                                $daysLeft = $now->floatDiffInDays($examPeriod->start_time);
+                                                if ($daysLeft < 1) {
+                                                    $daysLeft = 1;
                                                 } else {
-                                                    $daysLeft = $now->floatDiffInDays($examPeriod->start_time);
-                                                    if ($daysLeft < 1) {
-                                                        $daysLeft = 1;
-                                                    } else {
-                                                        $daysLeft = ceil($daysLeft);
-                                                    }
-                                                    $status = "Sắp diễn ra (còn {$daysLeft} ngày)";
+                                                    $daysLeft = ceil($daysLeft);
                                                 }
+                                                $status = "Sắp diễn ra (còn {$daysLeft} ngày)";
                                                 $statusClass = 'bg-info text-dark';
                                             } else {
                                                 $status = 'Đã kết thúc';
@@ -128,9 +132,6 @@
                                         @endphp
                                         <span class="badge {{ $statusClass }}">{{ $status }}</span>
                                     </td>
-                                    <td>{{ $examPeriod->start_time->format('d/m/Y') }}</td>
-                                    <td>{{ $examPeriod->end_time->format('d/m/Y') }}</td>
-                                    <td>{{ $examPeriod->description }}</td>
                                     <td>
                                         <div class="d-flex justify-content-center">
                                             <a href="{{ route('exam-periods.dashboard', $examPeriod) }}" class="btn btn-success btn-sm me-2">
