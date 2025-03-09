@@ -27,4 +27,9 @@ class ExamShiftRoom extends Model
     {
         return $this->belongsTo(ExamShift::class);
     }
+
+    public function proctor()
+    {
+        return $this->belongsTo(ExamPeriodProctor::class, 'exam_period_proctor_id');
+    }
 } 

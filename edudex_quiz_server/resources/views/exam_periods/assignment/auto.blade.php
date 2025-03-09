@@ -44,8 +44,8 @@
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Tổng sức chứa
-                            <span class="badge {{ $stats['total_room_capacity'] < $stats['total_students'] ? 'bg-danger' : 'bg-primary' }}">
-                                {{ $stats['total_room_capacity'] }}
+                            <span class="badge {{ ($stats['total_room_capacity'] * $stats['total_shifts']) < $stats['total_students'] ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_room_capacity'] * $stats['total_shifts'] }}
                             </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -109,9 +109,9 @@
                             $errors[] = 'Chưa có thí sinh nào được thêm vào';
                         }
                         
-                        if ($stats['total_room_capacity'] < $stats['total_students']) {
+                        if ($stats['total_room_capacity'] * $stats['total_shifts'] < $stats['total_students']) {
                             $canAutoAssign = false;
-                            $errors[] = 'Tổng sức chứa phòng thi (' . $stats['total_room_capacity'] . ') không đủ cho số thí sinh (' . $stats['total_students'] . ')';
+                            $errors[] = 'Tổng sức chứa phòng thi (' . ($stats['total_room_capacity'] * $stats['total_shifts']) . ') không đủ cho số thí sinh (' . $stats['total_students'] . ')';
                         }
                     @endphp
 

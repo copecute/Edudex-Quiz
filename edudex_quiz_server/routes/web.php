@@ -34,7 +34,7 @@ Route::get('/', function () {
     return redirect()->route('login');
 });
 
-// các route xác thực
+// các route authentication
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
     Route::post('/login', [LoginController::class, 'login']);
@@ -43,29 +43,33 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::middleware('auth')->group(function () {
+
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
-    
+
+
     // trang dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-    
+
+
     // quản lý tài khoản
-    Route::resource('accounts', AccountController::class);
-    
-    // import/export tài khoản
-    Route::get('accounts/tools/import-export', [AccountController::class, 'importExportTools'])
-        ->name('accounts.tools');
-    Route::get('accounts-export', [AccountController::class, 'export'])
-        ->name('accounts.export');
-    Route::post('accounts-import', [AccountController::class, 'import'])
-        ->name('accounts.import');
-    Route::get('accounts-template', [AccountController::class, 'downloadTemplate'])
-        ->name('accounts.template');
+    Route::middleware('admin')->group(function () {
+        Route::resource('accounts', AccountController::class);
+        Route::get('accounts/tools/import-export', [AccountController::class, 'importExportTools'])->name('accounts.tools');
+        Route::get('accounts-export', [AccountController::class, 'export'])->name('accounts.export');
+        Route::post('accounts-import', [AccountController::class, 'import'])->name('accounts.import');
+        Route::get('accounts-template', [AccountController::class, 'downloadTemplate'])->name('accounts.template');
+        Route::put('{account}/toggle-status', [AccountController::class, 'toggleStatus'])
+            ->name('accounts.toggle-status');
+    });
+
+
     // các route profile
     Route::get('/profile', [ProfileController::class, 'show'])->name('profile.show');
     Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
-    // các route test với phân quyền
+
+    // các route test phân quyền
     Route::get('/test/admin', [TestController::class, 'admin'])
         ->middleware('admin')
         ->name('test.admin');
@@ -77,40 +81,41 @@ Route::middleware('auth')->group(function () {
     Route::get('/test/staff', [TestController::class, 'staff'])
         ->name('test.staff'); // tất cả user đều có thể truy cập
 
-    // các route facility
-    Route::resource('facilities', FacilityController::class);
-    Route::put('facilities/{facility}/toggle-status', [FacilityController::class, 'toggleStatus'])
-        ->name('facilities.toggle-status');
-    Route::get('facilities-export', [FacilityController::class, 'export'])
-        ->name('facilities.export');
-    Route::post('facilities-import', [FacilityController::class, 'import'])
-        ->name('facilities.import');
-    Route::get('facilities-template', [FacilityController::class, 'downloadTemplate'])
-        ->name('facilities.template');
 
-    // các route room
-    Route::resource('rooms', RoomController::class);
-    Route::put('rooms/{room}/toggle-status', [RoomController::class, 'toggleStatus'])
-        ->name('rooms.toggle-status');
-    Route::get('rooms-export', [RoomController::class, 'export'])
-        ->name('rooms.export');
-    Route::post('rooms-import', [RoomController::class, 'import'])
-        ->name('rooms.import');
-    Route::get('rooms-template', [RoomController::class, 'downloadTemplate'])
-        ->name('rooms.template');
+    // các route cơ sở
+    Route::middleware('admin')->group(function() {
+        Route::resource('facilities', FacilityController::class);
+        Route::put('facilities/{facility}/toggle-status', [FacilityController::class, 'toggleStatus'])
+            ->name('facilities.toggle-status');
+        Route::get('facilities-export', [FacilityController::class, 'export'])
+            ->name('facilities.export');
+        Route::post('facilities-import', [FacilityController::class, 'import'])
+            ->name('facilities.import');
+        Route::get('facilities-template', [FacilityController::class, 'downloadTemplate'])
+            ->name('facilities.template');
+        Route::get('facilities/tools/import-export', [FacilityController::class, 'importExportTools'])
+            ->name('facilities.tools');
+    });
 
-    // import/export facility
-    Route::get('facilities/tools/import-export', [FacilityController::class, 'importExportTools'])
-        ->name('facilities.tools');
 
-    // import/export room  
-    Route::get('rooms/tools/import-export', [RoomController::class, 'importExportTools'])
-        ->name('rooms.tools');
+    // các route phòng
+    Route::middleware('admin')->group(function() {
+        Route::resource('rooms', RoomController::class);
+        Route::put('rooms/{room}/toggle-status', [RoomController::class, 'toggleStatus'])
+            ->name('rooms.toggle-status');
+        Route::get('rooms-export', [RoomController::class, 'export'])
+            ->name('rooms.export');
+        Route::post('rooms-import', [RoomController::class, 'import'])
+            ->name('rooms.import');
+        Route::get('rooms-template', [RoomController::class, 'downloadTemplate'])
+            ->name('rooms.template');
+        Route::get('rooms/tools/import-export', [RoomController::class, 'importExportTools'])
+            ->name('rooms.tools');
+    });
 
-    // các route account
-    Route::put('accounts/{account}/toggle-status', [AccountController::class, 'toggleStatus'])
-        ->name('accounts.toggle-status');
-
+    
+    // các route khoa
+    Route::middleware('admin')->group(function() {
         Route::resource('faculties', FacultyController::class);
         Route::put('faculties/{faculty}/toggle-status', [FacultyController::class, 'toggleStatus'])
             ->name('faculties.toggle-status');
@@ -122,41 +127,51 @@ Route::middleware('auth')->group(function () {
             ->name('faculties.template');
         Route::get('faculties/tools/import-export', [FacultyController::class, 'importExportTools'])
             ->name('faculties.tools');
-            
-    // các route major
-    Route::resource('majors', MajorController::class);
-    Route::get('majors-export', [MajorController::class, 'export'])->name('majors.export');
-    Route::post('majors-import', [MajorController::class, 'import'])->name('majors.import');
-    Route::get('majors-template', [MajorController::class, 'downloadTemplate'])->name('majors.template');
-    Route::get('majors/tools/import-export', [MajorController::class, 'importExportTools'])->name('majors.tools');
+    });
 
-    // các route subject
-    Route::resource('subjects', SubjectController::class);
-    Route::get('subjects-export', [SubjectController::class, 'export'])->name('subjects.export');
-    Route::post('subjects-import', [SubjectController::class, 'import'])->name('subjects.import');
-    Route::get('subjects-template', [SubjectController::class, 'downloadTemplate'])->name('subjects.template');
-    Route::get('subjects/tools/import-export', [SubjectController::class, 'importExportTools'])->name('subjects.tools');
+    // các route chuyên ngành
+    Route::middleware('admin')->group(function() {
+        Route::resource('majors', MajorController::class);
+        Route::get('majors-export', [MajorController::class, 'export'])->name('majors.export');
+        Route::post('majors-import', [MajorController::class, 'import'])->name('majors.import');
+        Route::get('majors-template', [MajorController::class, 'downloadTemplate'])->name('majors.template');
+        Route::get('majors/tools/import-export', [MajorController::class, 'importExportTools'])->name('majors.tools');
+    });
 
-    // các route question
-    Route::get('questions/tags-by-subject', [QuestionController::class, 'getTagsBySubject'])->name('questions.tags');
-    Route::get('questions/tools/import-export', [QuestionController::class, 'importExportTools'])->name('questions.tools');
-    Route::get('questions-export', [QuestionController::class, 'export'])->name('questions.export');
-    Route::post('questions-import', [QuestionController::class, 'import'])->name('questions.import');
-    Route::get('questions-template', [QuestionController::class, 'downloadTemplate'])->name('questions.template');
-    Route::resource('questions', QuestionController::class);
+    // các route môn học
+    Route::middleware('admin')->group(function() {
+        Route::resource('subjects', SubjectController::class);
+        Route::get('subjects-export', [SubjectController::class, 'export'])->name('subjects.export');
+        Route::post('subjects-import', [SubjectController::class, 'import'])->name('subjects.import');
+        Route::get('subjects-template', [SubjectController::class, 'downloadTemplate'])->name('subjects.template');
+        Route::get('subjects/tools/import-export', [SubjectController::class, 'importExportTools'])->name('subjects.tools');
+    });
 
-    // các route exam
-    Route::resource('exams', ExamController::class);
-    Route::get('exams/tools/import-export', [ExamController::class, 'importExportTools'])->name('exams.tools');
-    Route::get('exams-export', [ExamController::class, 'export'])->name('exams.export');
-    Route::post('exams-import', [ExamController::class, 'import'])->name('exams.import');
-    Route::get('exams-template', [ExamController::class, 'downloadTemplate'])->name('exams.template');
-    Route::get('/exams/by-subject/{subject}', [ExamController::class, 'getBySubject'])
-        ->name('exams.by-subject');
+    // các route ngân hàng câu hỏi
+    Route::middleware('teacher')->group(function() {
+        Route::get('questions/tags-by-subject', [QuestionController::class, 'getTagsBySubject'])->name('questions.tags');
+        Route::get('questions/tools/import-export', [QuestionController::class, 'importExportTools'])->name('questions.tools');
+        Route::get('questions-export', [QuestionController::class, 'export'])->name('questions.export');
+        Route::post('questions-import', [QuestionController::class, 'import'])->name('questions.import');
+        Route::get('questions-template', [QuestionController::class, 'downloadTemplate'])->name('questions.template');
+        Route::resource('questions', QuestionController::class);
+    });
+
+    // các route đề thi
+    Route::middleware('teacher')->group(function() {
+        Route::resource('exams', ExamController::class);
+        Route::get('exams/tools/import-export', [ExamController::class, 'importExportTools'])->name('exams.tools');
+        Route::get('exams-export', [ExamController::class, 'export'])->name('exams.export');
+        Route::post('exams-import', [ExamController::class, 'import'])->name('exams.import');
+        Route::get('exams-template', [ExamController::class, 'downloadTemplate'])->name('exams.template');
+        Route::get('/exams/by-subject/{subject}', [ExamController::class, 'getBySubject'])
+            ->name('exams.by-subject');
+    });
 
     // các route thí sinh trong kỳ thi
     Route::prefix('exam-periods/{examPeriod}/students')
         ->name('students.')
+        ->middleware('admin')
         ->group(function () {
             Route::get('/', [ExamPeriodStudentController::class, 'index'])->name('index');
             Route::get('/create', [ExamPeriodStudentController::class, 'create'])->name('create');
@@ -172,7 +187,7 @@ Route::middleware('auth')->group(function () {
         });
 
     // các route cán bộ coi thi trong kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/proctors')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/proctors')->middleware('admin')->group(function () {
         Route::get('/', [ExamPeriodProctorController::class, 'index'])
             ->name('exam-period-proctors.index');
         Route::get('/assign', [ExamPeriodProctorController::class, 'assign'])
@@ -181,7 +196,6 @@ Route::middleware('auth')->group(function () {
             ->name('exam-period-proctors.store');
         Route::delete('/{proctor}', [ExamPeriodProctorController::class, 'destroy'])
             ->name('exam-period-proctors.destroy');
-        
         // các route import/export
         Route::get('/tools', [ExamPeriodProctorController::class, 'importExportTools'])
             ->name('exam-period-proctors.tools');
@@ -194,7 +208,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route phòng thi trong kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->middleware('admin')->group(function () {
         Route::get('/', [ExamPeriodRoomController::class, 'index'])->name('index');
         Route::get('/assign', [ExamPeriodRoomController::class, 'assign'])->name('assign');
         Route::post('/', [ExamPeriodRoomController::class, 'store'])->name('store');
@@ -207,14 +221,18 @@ Route::middleware('auth')->group(function () {
     });
 
     // phân công kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/assignment')->name('exam-periods.assignment.')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/assignment')->name('exam-periods.assignment.')->middleware('admin')->group(function () {
         // phân công ca thi cho môn thi
         Route::get('/subjects', [ExamPeriodAssignmentController::class, 'subjects'])->name('subjects');
         Route::post('/subjects', [ExamPeriodAssignmentController::class, 'assignSubjects'])->name('subjects.store');
-        
+
         // Tự động phân công
         Route::get('/auto', [ExamPeriodAssignmentController::class, 'autoAssignmentForm'])->name('auto');
         Route::post('/auto', [ExamPeriodAssignmentController::class, 'autoAssign'])->name('auto.store');
+
+        // xóa phân công
+        Route::delete('/clear', [ExamPeriodAssignmentController::class, 'clear'])
+            ->name('clear');
 
         // phân công phòng thi cho ca thi
         Route::get('/rooms', [ExamPeriodAssignmentController::class, 'rooms'])->name('rooms');
@@ -223,18 +241,19 @@ Route::middleware('auth')->group(function () {
         Route::post('/students', [ExamPeriodAssignmentController::class, 'assignStudents'])->name('students');
     });
 
+    // kết quả thi
     Route::get('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'index'])
-        ->name('exam-periods.results');
-    // Thêm route cho phúc khảo
+        ->name('exam-periods.results')
+        ->middleware('admin');
+    // route cho phúc khảo
     Route::post('/exam-periods/{examPeriod}/results/{result}/review', [ExamResultController::class, 'review'])
-        ->name('exam-periods.results.review');
-    // Thêm route xuất kết quả
+        ->name('exam-periods.results.review')
+        ->middleware('admin');
+    // route xuất kết quả
     Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
-        ->name('exam-periods.results.export');
-
-    Route::delete('/exam-periods/{examPeriod}/assignment/clear', [ExamPeriodAssignmentController::class, 'clear'])
-        ->name('exam-periods.assignment.clear');
-});
+        ->name('exam-periods.results.export')
+        ->middleware('admin');
+    });
 
 // quản lý kỳ thi
 Route::middleware(['auth', 'admin'])->group(function () {
@@ -246,7 +265,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
     Route::get('/exam-periods/{examPeriod}/dashboard', [ExamPeriodController::class, 'dashboard'])->name('exam-periods.dashboard');
     Route::resource('exam-periods', ExamPeriodController::class);
 
-    // thay thế route exam-shifts cũ bằng nested route
+    // ca thi
     Route::prefix('exam-periods/{examPeriod}/shifts')->group(function () {
         Route::get('/', [ExamShiftController::class, 'index'])
             ->name('exam-shifts.index');
@@ -264,7 +283,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
             ->name('exam-shifts.toggle-status');
     });
 
-    //  route exam-period-subjects
+    // route môn thi - kỳ thi
     Route::prefix('exam-periods/{examPeriod}/subjects')->group(function () {
         Route::get('/', [ExamPeriodSubjectController::class, 'index'])
             ->name('exam-period-subjects.index');
@@ -284,16 +303,16 @@ Route::middleware(['auth', 'admin'])->group(function () {
 // route này để xử lý avatar
 Route::get('storage/avatars/{filename}', function ($filename) {
     $path = storage_path('app/public/avatars/' . $filename);
-    
+
     if (!File::exists($path)) {
         abort(404);
     }
-    
+
     return response()->file($path);
 })->where('filename', '.*');
 
 if (app()->environment('local')) {
-    // các route xem trước trang lỗi
+    // các route xem trang lỗi trước khi deploy
     Route::get('/400', function () {
         return response()->view('errors.400', [], 400);
     });

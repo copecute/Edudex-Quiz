@@ -23,6 +23,118 @@
     --card-bg: #242729;
     --sidebar-bg: #242729;
     --header-bg: #242729;
+    --bs-body-bg: #1a1d21;
+    --bs-body-color: #e3e3e3;
+    --bs-emphasis-color: #fff;
+}
+
+[data-bs-theme="dark"] .card {
+    --bs-card-bg: #242830;
+    --bs-card-border-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--bs-card-bg);
+}
+
+[data-bs-theme="dark"] .card-header {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-bottom-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .bg-white {
+    background-color: var(--bs-card-bg) !important;
+}
+
+[data-bs-theme="dark"] .bg-light {
+    background-color: #1e2228 !important;
+}
+
+[data-bs-theme="dark"] .text-muted {
+    color: #9ca3af !important;
+}
+
+[data-bs-theme="dark"] .border-0 {
+    border-color: rgba(255, 255, 255, 0.05) !important;
+}
+
+[data-bs-theme="dark"] .nav-menu .nav-link {
+    color: #e3e3e3;
+}
+
+[data-bs-theme="dark"] .nav-menu .nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .nav-icon {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="dark"] .action-card {
+    background-color: var(--bs-card-bg) !important;
+}
+
+[data-bs-theme="dark"] .action-card:hover {
+    background-color: #2d3139 !important;
+}
+
+[data-bs-theme="dark"] .list-group-item {
+    background-color: transparent;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .list-group-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .table {
+    --bs-table-color: var(--bs-body-color);
+    --bs-table-bg: transparent;
+    --bs-table-border-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-bs-theme="dark"] .table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: var(--bs-body-color);
+}
+
+[data-bs-theme="dark"] .alert {
+    background-color: var(--bs-card-bg);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+[data-bs-theme="dark"] footer {
+    background-color: var(--bs-card-bg);
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Gradient backgrounds for dark theme */
+[data-bs-theme="dark"] .bg-gradient-primary {
+    background: linear-gradient(45deg, #1e40af 0%, #3b82f6 100%);
+}
+
+[data-bs-theme="dark"] .bg-primary.bg-gradient {
+    background: linear-gradient(45deg, #1e40af 0%, #3b82f6 100%) !important;
+}
+
+[data-bs-theme="dark"] .bg-success.bg-gradient {
+    background: linear-gradient(45deg, #065f46 0%, #10b981 100%) !important;
+}
+
+[data-bs-theme="dark"] .bg-info.bg-gradient {
+    background: linear-gradient(45deg, #0e7490 0%, #06b6d4 100%) !important;
+}
+
+[data-bs-theme="dark"] .bg-warning.bg-gradient {
+    background: linear-gradient(45deg, #92400e 0%, #f59e0b 100%) !important;
+}
+
+/* Shadow adjustments for dark theme */
+[data-bs-theme="dark"] .shadow-sm {
+    box-shadow: 0 .125rem .25rem rgba(0, 0, 0, 0.15) !important;
+}
+
+[data-bs-theme="dark"] .hover-shadow:hover {
+    box-shadow: 0 .5rem 1rem rgba(0, 0, 0, 0.25) !important;
 }
 
 /* Custom styles */
@@ -441,4 +553,59 @@ footer {
 
 .dropdown-divider {
     border-color: var(--border-color);
+}
+
+/* Menu Customization */
+.menu-link {
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    border-radius: 0;
+    border-left: 3px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.menu-link:hover {
+    background-color: rgba(var(--bs-primary-rgb), 0.05);
+    border-left-color: rgba(var(--bs-primary-rgb), 0.3);
+}
+
+.menu-link.active {
+    background-color: var(--primary-color) !important;
+    color: #fff !important;
+    border-left-color: #fff;
+}
+
+.menu-link.active .nav-icon {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+
+.menu-link.active small {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.menu-link:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* Dark theme adjustments */
+[data-bs-theme="dark"] .menu-link {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+[data-bs-theme="dark"] .menu-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.05);
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .menu-link.active {
+    background-color: var(--primary-color) !important;
+    color: #fff;
+}
+
+[data-bs-theme="dark"] .menu-link.active small {
+    color: rgba(255, 255, 255, 0.7) !important;
 } 
