@@ -10,6 +10,7 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Models\ExamShift;
 use App\Models\ExamPeriodRoom;
+use App\Models\ExamPeriodRoomStudent;
 
 class ExamScheduleController extends Controller
 {
@@ -525,6 +526,48 @@ class ExamScheduleController extends Controller
             return response()->json([
                 'status' => 'error',
                 'message' => 'Có lỗi xảy ra khi lấy thông tin đề thi: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getStudentsByRoom(ExamShift $shift, $room)
+    {
+        try {
+            // Lấy danh sách sinh viên trong phòng thi
+            $students = ExamPeriodRoomStudent::where('exam_shift_id', $shift->id)
+                ->where('exam_period_room_id', $room)
+                ->with([
+                    'student',
+                    'examPeriodSubject.subject'
+                ])
+                ->orderBy('seat_number')
+                ->get()
+                ->map(function ($student) {
+                    return [
+                        'seat_number' => $student->seat_number,
+                        'exam_code' => $student->student->exam_code,
+                        'student_code' => $student->student->student_code,
+                        'full_name' => $student->student->full_name,
+                        'date_of_birth' => $student->student->birthday ? 
+                            Carbon::parse($student->student->birthday)
+                                ->setTimezone('Asia/Ho_Chi_Minh')
+                                ->format('Y-m-d H:i:s') : null,
+                        'gender' => $student->student->gender ? 'Nam' : 'Nữ',
+                        'phone' => $student->student->phone,
+                        'address' => $student->student->address,
+                        'subject_name' => $student->examPeriodSubject->subject->name
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $students
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Có lỗi xảy ra khi lấy danh sách sinh viên: ' . $e->getMessage()
             ], 500);
         }
     }

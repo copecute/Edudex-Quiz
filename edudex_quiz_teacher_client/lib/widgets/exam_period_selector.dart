@@ -36,11 +36,23 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
         _selectedShift = _selectedPeriod!.shifts.first;
         if (_selectedShift!.rooms.length == 1) {
           _selectedRoom = _selectedShift!.rooms.first;
-          // Tự động chọn nếu chỉ có 1 kỳ thi, 1 ca thi và 1 phòng thi
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            widget.onSelected(
-                _selectedPeriod!, _selectedShift!, _selectedRoom!);
-            Navigator.pop(context);
+          // Tự động tải dữ liệu nếu chỉ có 1 kỳ thi, 1 ca thi và 1 phòng thi
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            try {
+              await _loadAndSaveData(
+                _selectedPeriod!,
+                _selectedShift!,
+                _selectedRoom!,
+              );
+              if (mounted) {
+                widget.onSelected(
+                    _selectedPeriod!, _selectedShift!, _selectedRoom!);
+                Navigator.pop(context);
+              }
+            } catch (e) {
+              // Nếu có lỗi, vẫn giữ dialog để người dùng có thể thấy thông báo lỗi
+              print('❌ Lỗi khi tải dữ liệu tự động: $e');
+            }
           });
         }
       }
@@ -76,35 +88,40 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
 
   Future<void> _loadAndSaveData(
       ExamPeriod period, ExamShift shift, ExamRoom room) async {
+    // Tạo BuildContext mới để quản lý dialog
+    late BuildContext dialogContext;
+
     try {
       setState(() => _isLoading = true);
 
-      // Lưu thông tin session trước
       await _onPeriodSelected();
-
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('user_token');
       final serverUrl = prefs.getString('server_url');
 
-      // Hiển thị thông báo đang tải
+      // Hiển thị dialog loading
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => ContentDialog(
-            title: const Text('Đang xử lý'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const ProgressRing(),
-                const SizedBox(height: 16),
-                const Text('Đang tải dữ liệu đề thi và danh sách thí sinh...'),
-              ],
-            ),
-          ),
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            dialogContext = context;
+            return const ContentDialog(
+              title: Text('Đang xử lý'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ProgressRing(),
+                  SizedBox(height: 16),
+                  Text('Đang tải dữ liệu đề thi và danh sách thí sinh...'),
+                ],
+              ),
+            );
+          },
         );
       }
 
-      // Tải dữ liệu đề thi
+      // Tải dữ liệu
       final examResponse = await http.get(
         Uri.parse(
             '$serverUrl/api/exam-schedule/shifts/${shift.id}/rooms/${room.id}/exam'),
@@ -114,7 +131,6 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
         },
       );
 
-      // Tải danh sách thí sinh
       final studentsResponse = await http.get(
         Uri.parse(
             '$serverUrl/api/exam-schedule/shifts/${shift.id}/rooms/${room.id}/students'),
@@ -124,212 +140,239 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
         },
       );
 
-      if (mounted) Navigator.pop(context); // Đóng dialog loading
+      // Đóng dialog loading
+      if (mounted) {
+        Navigator.pop(dialogContext);
+      }
 
+      // Xử lý response
       final examData = json.decode(examResponse.body);
       final studentsData = json.decode(studentsResponse.body);
 
-      if (examData['status'] == 'success' &&
-          studentsData['status'] == 'success') {
+      // Kiểm tra response có data không
+      if (examResponse.statusCode == 200 &&
+          studentsResponse.statusCode == 200 &&
+          examData['data'] != null &&
+          studentsData['data'] != null) {
         // Hiển thị thông báo đang lưu
         if (mounted) {
           showDialog(
             context: context,
-            builder: (context) => ContentDialog(
-              title: const Text('Đang xử lý'),
+            barrierDismissible: false,
+            builder: (context) => const ContentDialog(
+              title: Text('Đang xử lý'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const ProgressRing(),
-                  const SizedBox(height: 16),
-                  const Text('Đang lưu dữ liệu vào bộ nhớ...'),
+                  ProgressRing(),
+                  SizedBox(height: 16),
+                  Text('Đang lưu dữ liệu vào bộ nhớ...'),
                 ],
               ),
             ),
           );
         }
 
-        // Lưu vào database
-        await _examDb.updateExamData(examData['data']);
-        await _examDb.updateStudents(studentsData['data']);
+        try {
+          // Lưu vào database
+          await _examDb.updateExamData(examData['data']);
+          await _examDb.updateStudents(studentsData['data']);
 
-        // Kiểm tra dữ liệu đã lưu
-        final savedExam = await _examDb.getExamData();
-        final savedStudents = await _examDb.getStudents();
+          // Kiểm tra dữ liệu đã lưu
+          final savedExam = await _examDb.getExamData();
+          final savedStudents = await _examDb.getStudents();
 
-        if (savedExam == null || savedStudents.isEmpty) {
-          throw Exception('Không thể lưu dữ liệu vào bộ nhớ');
-        }
+          if (savedExam == null || savedStudents.isEmpty) {
+            throw Exception('Không thể lưu dữ liệu vào bộ nhớ');
+          }
 
-        // Chỉ gọi callback một lần ở đây sau khi mọi thứ đã lưu xong
-        if (mounted) {
-          widget.onSelected(period, shift, room);
+          // Đóng dialog loading và gọi callback
+          if (mounted) {
+            Navigator.pop(context); // Đóng dialog "Đang lưu"
+            widget.onSelected(period, shift, room);
+          }
+        } catch (e) {
+          if (mounted) {
+            Navigator.pop(context); // Đóng dialog "Đang lưu" nếu có lỗi
+            await _showErrorDialog(
+              context,
+              'Lỗi lưu dữ liệu',
+              'Không thể lưu dữ liệu vào bộ nhớ: $e',
+            );
+          }
         }
       } else {
-        throw Exception(
-            'Lỗi từ máy chủ:\n${examData['message'] ?? studentsData['message'] ?? 'Không xác định'}');
+        // Xử lý lỗi từ server
+        String errorTitle = 'Lỗi';
+        String errorMessage = '';
+
+        if (examData['message'] != null) {
+          errorTitle = 'Lỗi tải đề thi';
+          errorMessage = examData['message'];
+        } else if (studentsData['message'] != null) {
+          errorTitle = 'Lỗi tải danh sách thí sinh';
+          errorMessage = studentsData['message'];
+        } else {
+          errorMessage =
+              'Không thể tải dữ liệu từ máy chủ. Vui lòng thử lại sau.';
+        }
+
+        // Hiển thị dialog lỗi
+        if (mounted) {
+          await _showErrorDialog(context, errorTitle, errorMessage);
+        }
       }
     } catch (e) {
+      // Đóng dialog loading nếu có lỗi
       if (mounted) {
-        showDialog(
-          context: context,
-          builder: (context) => ContentDialog(
-            title: const Text('Lỗi'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Không thể tải hoặc lưu dữ liệu:'),
-                const SizedBox(height: 8),
-                Text(
-                  e.toString(),
-                  style: const TextStyle(color: Colors.errorPrimaryColor),
-                ),
-                const SizedBox(height: 16),
-                const Text('Vui lòng thử lại sau hoặc liên hệ hỗ trợ.'),
-              ],
-            ),
-            actions: [
-              Button(
-                child: const Text('Đóng'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
+        Navigator.pop(dialogContext);
+        await _showErrorDialog(
+          context,
+          'Lỗi không mong muốn',
+          'Đã xảy ra lỗi: $e\n\nVui lòng thử lại sau hoặc liên hệ hỗ trợ kỹ thuật.',
         );
       }
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _showErrorDialog(
+      BuildContext context, String title, String message) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => ContentDialog(
+        title: Row(
+          children: [
+            const Icon(FluentIcons.error, color: Colors.errorPrimaryColor),
+            const SizedBox(width: 8),
+            Text(title),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message,
+              style: const TextStyle(height: 1.5),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Vui lòng thử lại sau hoặc liên hệ quản trị viên để được hỗ trợ.',
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Colors.warningPrimaryColor,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Button(
+            child: const Text('Đóng'),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return ContentDialog(
-      constraints: const BoxConstraints(maxWidth: 600),
       title: Row(
-        children: [
-          const Icon(FluentIcons.calendar, size: 24),
-          const SizedBox(width: 8),
-          const Text('Chọn kỳ thi và ca thi'),
+        children: const [
+          Icon(FluentIcons.calendar),
+          SizedBox(width: 8),
+          Text('Chọn ca thi'),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (widget.examPeriods.length > 1) ...[
-            InfoLabel(
-              label: 'Kỳ thi',
-              child: ComboBox<ExamPeriod>(
-                placeholder: const Text('Chọn kỳ thi...'),
-                value: _selectedPeriod,
-                items: widget.examPeriods.map((period) {
-                  return ComboBoxItem<ExamPeriod>(
-                    value: period,
-                    child: Text(period.name),
-                  );
-                }).toList(),
-                onChanged: (period) {
-                  setState(() {
-                    _selectedPeriod = period;
-                    _selectedShift = null;
-                    _selectedRoom = null;
-                  });
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          if (_selectedPeriod != null || widget.examPeriods.length == 1) ...[
-            InfoLabel(
-              label: 'Ca thi',
-              child: Card(
-                padding: const EdgeInsets.all(8),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: (_selectedPeriod ?? widget.examPeriods.first)
-                      .shifts
-                      .length,
-                  separatorBuilder: (context, index) => const Divider(),
-                  itemBuilder: (context, index) {
-                    final shift = (_selectedPeriod ?? widget.examPeriods.first)
-                        .shifts[index];
-                    return RadioButton(
-                      checked: _selectedShift == shift,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedShift = shift;
-                          _selectedRoom = shift.rooms.length == 1
-                              ? shift.rooms.first
-                              : null;
-                        });
-                      },
-                      content: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+          ListView.separated(
+            shrinkWrap: true,
+            itemCount: widget.examPeriods.first.shifts.length,
+            separatorBuilder: (context, index) => const SizedBox(height: 8),
+            itemBuilder: (context, index) {
+              final shift = widget.examPeriods.first.shifts[index];
+
+              return Card(
+                padding: const EdgeInsets.all(12),
+                child: RadioButton(
+                  checked: _selectedShift == shift,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedShift = shift;
+                      _selectedRoom =
+                          shift.rooms.length == 1 ? shift.rooms.first : null;
+                    });
+                  },
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
+                          Icon(
+                            FluentIcons.calendar_day,
+                            size: 16,
+                            color: FluentTheme.of(context).accentColor,
+                          ),
+                          const SizedBox(width: 8),
                           Text(
-                            shift.name,
+                            'Ngày ${shift.startTime.day}/${shift.startTime.month}/${shift.startTime.year}',
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(FluentIcons.clock, size: 12),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${_formatDateTime(shift.startTime)} - ${_formatDateTime(shift.endTime)}',
-                                style:
-                                    FluentTheme.of(context).typography.caption,
-                              ),
-                            ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(FluentIcons.clock, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${shift.startTime.hour}:${shift.startTime.minute.toString().padLeft(2, '0')} - '
+                            '${shift.endTime.hour}:${shift.endTime.minute.toString().padLeft(2, '0')}',
                           ),
-                          if (shift.rooms.length > 1 &&
-                              _selectedShift == shift) ...[
-                            const SizedBox(height: 8),
-                            InfoLabel(
-                              label: 'Chọn phòng thi',
-                              child: Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: shift.rooms.map((room) {
-                                  return ToggleButton(
-                                    checked: _selectedRoom == room,
-                                    onChanged: (value) {
-                                      setState(() {
-                                        _selectedRoom = room;
-                                      });
-                                    },
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(room.name),
-                                          Text(
-                                            '${room.location} - ${room.subject.name}',
-                                            style: FluentTheme.of(context)
-                                                .typography
-                                                .caption,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ] else
-                            for (var room in shift.rooms)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 4),
-                                child: Row(
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Icon(FluentIcons.timer, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            '${shift.endTime.difference(shift.startTime).inMinutes} phút',
+                          ),
+                        ],
+                      ),
+                      if (_selectedShift == shift &&
+                          shift.rooms.length > 1) ...[
+                        const SizedBox(height: 16),
+                        const Text('Chọn phòng thi:',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: shift.rooms.map((room) {
+                            return ToggleButton(
+                              checked: _selectedRoom == room,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedRoom = room;
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.all(8.0),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Icon(FluentIcons.room, size: 12),
-                                    const SizedBox(width: 4),
+                                    Text(room.name),
                                     Text(
-                                      '${room.name} (${room.location}) - ${room.subject.name}',
+                                      '${room.location} - ${room.subject.name}',
                                       style: FluentTheme.of(context)
                                           .typography
                                           .caption,
@@ -337,14 +380,32 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
                                   ],
                                 ),
                               ),
-                        ],
-                      ),
-                    );
-                  },
+                            );
+                          }).toList(),
+                        ),
+                      ] else
+                        for (var room in shift.rooms)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Row(
+                              children: [
+                                const Icon(FluentIcons.room, size: 16),
+                                const SizedBox(width: 8),
+                                Text(
+                                  '${room.name} (${room.location}) - ${room.subject.name}',
+                                  style: FluentTheme.of(context)
+                                      .typography
+                                      .caption,
+                                ),
+                              ],
+                            ),
+                          ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ],
       ),
       actions: [
@@ -353,13 +414,11 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
               (_selectedShift == null || _selectedRoom == null || _isLoading)
                   ? null
                   : () async {
-                      // Lưu thông tin vào database trước
                       await _loadAndSaveData(
-                        _selectedPeriod ?? widget.examPeriods.first,
+                        widget.examPeriods.first,
                         _selectedShift!,
                         _selectedRoom!,
                       );
-
                       if (mounted && !_isLoading) {
                         Navigator.pop(context);
                       }

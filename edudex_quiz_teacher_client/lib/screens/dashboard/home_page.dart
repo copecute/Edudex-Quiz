@@ -398,8 +398,33 @@ class _HomePageState extends State<HomePage> {
                                       _buildInfoTile(
                                         FluentIcons.timer,
                                         'Thời gian',
-                                        '${_formatDateTime(_selectedPeriod!.startDate)} - ${_formatDateTime(_selectedPeriod!.endDate)}',
+                                        '${_selectedPeriod!.startTime.day.toString().padLeft(2, '0')}/${_selectedPeriod!.startTime.month.toString().padLeft(2, '0')}/${_selectedPeriod!.startTime.year} - ${_selectedPeriod!.endTime.day.toString().padLeft(2, '0')}/${_selectedPeriod!.endTime.month.toString().padLeft(2, '0')}/${_selectedPeriod!.endTime.year}',
                                       ),
+                                      // kiểm tra trạng thái kỳ thi
+                                      if (DateTime.now().isBefore(
+                                          _selectedPeriod!.startTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.info,
+                                          'Trạng thái',
+                                          'Sắp diễn ra (còn ${_selectedPeriod!.startTime.difference(DateTime.now()).inDays} ngày)',
+                                        ),
+                                      ] else if (DateTime.now().isAfter(
+                                              _selectedPeriod!.startTime) &&
+                                          DateTime.now().isBefore(
+                                              _selectedPeriod!.endTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.play,
+                                          'Trạng thái',
+                                          'Đang diễn ra (còn ${_selectedPeriod!.endTime.difference(DateTime.now()).inDays} ngày)',
+                                        ),
+                                      ] else if (DateTime.now().isAfter(
+                                          _selectedPeriod!.endTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.check_mark,
+                                          'Trạng thái',
+                                          'Đã kết thúc',
+                                        ),
+                                      ],
                                     ],
                                   ],
                                 ),
@@ -414,10 +439,46 @@ class _HomePageState extends State<HomePage> {
                                         _selectedShift!.name,
                                       ),
                                       _buildInfoTile(
-                                        FluentIcons.clock,
-                                        'Thời gian',
-                                        '${_formatDateTime(_selectedShift!.startTime)} - ${_formatDateTime(_selectedShift!.endTime)}',
+                                        FluentIcons.calendar,
+                                        'Ngày thi',
+                                        _formatDateTime(
+                                            _selectedShift!.startTime),
                                       ),
+                                      _buildInfoTile(
+                                        FluentIcons.clock,
+                                        'Giờ thi',
+                                        '${_selectedShift!.startTime.hour}:${_selectedShift!.startTime.minute.toString().padLeft(2, '0')} - ${_selectedShift!.endTime.hour}:${_selectedShift!.endTime.minute.toString().padLeft(2, '0')}',
+                                      ),
+                                      _buildInfoTile(
+                                        FluentIcons.timer,
+                                        'Thời gian',
+                                        '${_selectedShift!.endTime.difference(_selectedShift!.startTime).inMinutes} phút',
+                                      ),
+                                      // kiểm tra trạng thái ca thi
+                                      if (DateTime.now().isBefore(
+                                          _selectedShift!.startTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.info,
+                                          'Trạng thái',
+                                          'Sắp diễn ra (còn ${_selectedShift!.startTime.difference(DateTime.now()).inMinutes} phút)',
+                                        ),
+                                      ] else if (DateTime.now().isAfter(
+                                              _selectedShift!.startTime) &&
+                                          DateTime.now().isBefore(
+                                              _selectedShift!.endTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.info,
+                                          'Trạng thái',
+                                          'Đang diễn ra (còn ${_selectedShift!.endTime.difference(DateTime.now()).inMinutes} phút)',
+                                        ),
+                                      ] else if (DateTime.now().isAfter(
+                                          _selectedShift!.endTime)) ...[
+                                        _buildInfoTile(
+                                          FluentIcons.info,
+                                          'Trạng thái',
+                                          'Đã kết thúc',
+                                        ),
+                                      ],
                                     ],
                                   ],
                                 ),

@@ -244,7 +244,7 @@ class HttpServerService {
     try {
       final queryParams = request.uri.queryParameters;
       final examCode = queryParams['exam_code'];
-      final studentCode = queryParams['student_code'];
+      final studentCode = queryParams['student_code']?.toUpperCase();
 
       // Kiểm tra tham số
       if (examCode == null || studentCode == null) {

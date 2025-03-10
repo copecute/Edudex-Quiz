@@ -519,8 +519,8 @@ class ExamDatabaseService {
       await txn.insert('test_sessions', {
         'id': period.id,
         'name': period.name,
-        'start_date': period.startDate.toIso8601String(),
-        'end_date': period.endDate.toIso8601String(),
+        'start_date': period.startTime.toIso8601String(),
+        'end_date': period.endTime.toIso8601String(),
       });
 
       // Lưu thông tin ca thi

@@ -29,6 +29,13 @@ bool get isDesktop {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // đoạn này để load accent color của hệ thống
+  if (!kIsWeb &&
+      [TargetPlatform.windows, TargetPlatform.android]
+          .contains(defaultTargetPlatform)) {
+    SystemTheme.accentColor.load();
+  }
+
   // Khởi tạo SQLite cho Windows
   if (Platform.isWindows || Platform.isLinux) {
     // Khởi tạo FFI loader
@@ -57,9 +64,13 @@ void main() async {
       await windowManager.setSkipTaskbar(false);
     });
 
-    SystemTheme.accentColor.load();
+    final appTheme = AppTheme();
+    await appTheme.loadSettings();
 
-    runApp(const MyApp());
+    runApp(ChangeNotifierProvider.value(
+      value: appTheme,
+      child: const MyApp(),
+    ));
   }
 }
 
@@ -68,43 +79,38 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppTheme(),
-      builder: (context, _) {
-        final appTheme = context.watch<AppTheme>();
-        return FluentApp(
-          title: appTitle,
-          themeMode: appTheme.mode,
-          debugShowCheckedModeBanner: false,
-          color: appTheme.color,
-          darkTheme: FluentThemeData(
-            brightness: Brightness.dark,
-            accentColor: appTheme.color,
-            visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen() ? 2.0 : 0.0,
-            ),
+    final appTheme = context.watch<AppTheme>();
+    return FluentApp(
+      title: appTitle,
+      themeMode: appTheme.mode,
+      debugShowCheckedModeBanner: false,
+      color: appTheme.color,
+      darkTheme: FluentThemeData(
+        brightness: Brightness.dark,
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen() ? 2.0 : 0.0,
+        ),
+      ),
+      theme: FluentThemeData(
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen() ? 2.0 : 0.0,
+        ),
+      ),
+      locale: appTheme.locale,
+      builder: (context, child) {
+        return Directionality(
+          textDirection: appTheme.textDirection,
+          child: NavigationPaneTheme(
+            data: const NavigationPaneThemeData(),
+            child: child!,
           ),
-          theme: FluentThemeData(
-            accentColor: appTheme.color,
-            visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen() ? 2.0 : 0.0,
-            ),
-          ),
-          locale: appTheme.locale,
-          builder: (context, child) {
-            return Directionality(
-              textDirection: appTheme.textDirection,
-              child: NavigationPaneTheme(
-                data: const NavigationPaneThemeData(),
-                child: child!,
-              ),
-            );
-          },
-          home: const SplashScreen(),
         );
       },
+      home: const SplashScreen(),
     );
   }
 }

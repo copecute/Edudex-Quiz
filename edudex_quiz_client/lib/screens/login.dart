@@ -7,6 +7,7 @@ import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'settings.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -242,6 +243,20 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
         actions: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            IconButton(
+              icon: const Icon(FluentIcons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  FluentPageRoute(
+                    builder: (context) => const Settings(
+                      showBackButton: true,
+                      showDisconnectButton: false,
+                    ),
+                  ),
+                );
+              },
+            ),
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: Padding(

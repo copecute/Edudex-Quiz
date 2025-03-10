@@ -1,15 +1,15 @@
 class ExamPeriod {
   final int id;
   final String name;
-  final DateTime startDate;
-  final DateTime endDate;
+  final DateTime startTime;
+  final DateTime endTime;
   final List<ExamShift> shifts;
 
   ExamPeriod({
     required this.id,
     required this.name,
-    required this.startDate,
-    required this.endDate,
+    required this.startTime,
+    required this.endTime,
     required this.shifts,
   });
 
@@ -18,10 +18,10 @@ class ExamPeriod {
     return ExamPeriod(
       id: examPeriod['id'],
       name: examPeriod['name']?.toString() ?? 'Không có tên',
-      startDate: DateTime.parse(
-          examPeriod['start_date'] ?? DateTime.now().toIso8601String()),
-      endDate: DateTime.parse(
-          examPeriod['end_date'] ?? DateTime.now().toIso8601String()),
+      startTime: DateTime.parse(
+          examPeriod['start_time'] ?? DateTime.now().toIso8601String()),
+      endTime: DateTime.parse(
+          examPeriod['end_time'] ?? DateTime.now().toIso8601String()),
       shifts: (json['shifts'] as List?)
               ?.map((shift) => ExamShift.fromJson(shift))
               .toList() ??
