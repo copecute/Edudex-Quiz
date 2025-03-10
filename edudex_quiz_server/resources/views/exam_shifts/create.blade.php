@@ -44,25 +44,37 @@
                             @enderror
                         </div>
 
+                        <div class="mb-3">
+                            <label class="form-label">Ngày thi <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control @error('exam_date') is-invalid @enderror" 
+                                   id="exam_date" name="exam_date" 
+                                   value="{{ old('exam_date') }}" required>
+                            @error('exam_date')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">
+                                Thời gian kỳ thi: {{ $examPeriod->start_time->format('d/m/Y') }} - {{ $examPeriod->end_time->format('d/m/Y') }}
+                            </div>
+                        </div>
+
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="start_time" class="form-label">Thời gian bắt đầu <span class="text-danger">*</span></label>
-                                    <input type="datetime-local" class="form-control @error('start_time') is-invalid @enderror" 
-                                           id="start_time" name="start_time" value="{{ old('start_time') }}" required>
+                                    <label for="start_time" class="form-label">Giờ bắt đầu <span class="text-danger">*</span></label>
+                                    <input type="time" class="form-control @error('start_time') is-invalid @enderror" 
+                                           id="start_time" name="start_time" 
+                                           value="{{ old('start_time') }}" required>
                                     @error('start_time')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
-                                    <div class="form-text">
-                                        Thời gian kỳ thi: {{ $examPeriod->start_time->format('d/m/Y H:i') }} - {{ $examPeriod->end_time->format('d/m/Y H:i') }}
-                                    </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label for="end_time" class="form-label">Thời gian kết thúc <span class="text-danger">*</span></label>
-                                    <input type="datetime-local" class="form-control @error('end_time') is-invalid @enderror" 
-                                           id="end_time" name="end_time" value="{{ old('end_time') }}" required>
+                                    <label for="end_time" class="form-label">Giờ kết thúc <span class="text-danger">*</span></label>
+                                    <input type="time" class="form-control @error('end_time') is-invalid @enderror" 
+                                           id="end_time" name="end_time" 
+                                           value="{{ old('end_time') }}" required>
                                     @error('end_time')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
@@ -85,25 +97,23 @@
 @push('scripts')
 <script>
 $(document).ready(function() {
-    // Kiểm tra thời gian kết thúc phải sau thời gian bắt đầu
-    $('#start_time, #end_time').on('change', function() {
+    // Kiểm tra giờ kết thúc phải sau giờ bắt đầu
+    $('#end_time').on('change', function() {
         const startTime = $('#start_time').val();
-        const endTime = $('#end_time').val();
+        const endTime = $(this).val();
         
         if (startTime && endTime && startTime >= endTime) {
-            alert('Thời gian kết thúc phải sau thời gian bắt đầu');
-            $('#end_time').val('');
+            alert('Giờ kết thúc phải sau giờ bắt đầu');
+            $(this).val('');
         }
     });
 
-    // Set min/max cho input thời gian dựa vào thời gian kỳ thi
-    const periodStart = '{{ $examPeriod->start_time->format("Y-m-d\TH:i") }}';
-    const periodEnd = '{{ $examPeriod->end_time->format("Y-m-d\TH:i") }}';
+    // Set min/max cho input ngày dựa vào thời gian kỳ thi
+    const periodStart = '{{ $examPeriod->start_time->format("Y-m-d") }}';
+    const periodEnd = '{{ $examPeriod->end_time->format("Y-m-d") }}';
     
-    $('#start_time').attr('min', periodStart);
-    $('#start_time').attr('max', periodEnd);
-    $('#end_time').attr('min', periodStart);
-    $('#end_time').attr('max', periodEnd);
+    $('#exam_date').attr('min', periodStart);
+    $('#exam_date').attr('max', periodEnd);
 });
 </script>
 @endpush 

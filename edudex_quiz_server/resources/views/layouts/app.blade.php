@@ -17,13 +17,13 @@
 <body>
     @include('layouts.header')
     
-    <main class="py-4" style="margin-top: 60px;">
-        @yield('content')
-    </main>
+    <div class="d-flex flex-column min-vh-100" style="margin-top: 80px;">
+        <main class="flex-grow-1">
+            @yield('content')
+        </main>
+        @include('layouts.footer')
+    </div>
 
-    @include('layouts.footer')
-    
-    <!-- Toast Notifications -->
     @include('components.toast')
 
     <!-- Bootstrap 5 JS -->

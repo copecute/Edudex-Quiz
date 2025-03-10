@@ -205,15 +205,18 @@ class ExamPeriodRoomController extends Controller
 
     public function destroyMultiple(Request $request, ExamPeriod $examPeriod)
     {
-        $roomIds = $request->input('room_ids', []);
-        
         try {
-            // Xóa nhiều bản ghi trong bảng exam_period_rooms
-            ExamPeriodRoom::where('exam_period_id', $examPeriod->id)
-                ->whereIn('room_id', $roomIds)
+            $roomIds = json_decode($request->room_ids);
+            if (!is_array($roomIds) || empty($roomIds)) {
+                return back()->with('error', 'Không có phòng thi nào được chọn để xóa!');
+            }
+
+            // Xóa các bản ghi liên quan trong bảng exam_period_rooms
+            $examPeriod->examPeriodRooms()
+                ->whereIn('id', $roomIds)
                 ->delete();
-                
-            return back()->with('success', 'Xóa các phòng thi đã chọn thành công!');
+
+            return back()->with('success', 'Xóa ' . count($roomIds) . ' phòng thi thành công!');
         } catch (\Exception $e) {
             return back()->with('error', 'Có lỗi xảy ra khi xóa phòng thi!');
         }

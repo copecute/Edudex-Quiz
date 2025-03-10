@@ -19,25 +19,52 @@
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h4 class="mb-0">{{ $examPeriod->name }}</h4>
-                        <span class="badge {{ $examPeriod->is_active ? 'bg-success' : 'bg-danger' }}">
-                            {{ $examPeriod->is_active ? 'Đang hoạt động' : 'Đã khóa' }}
-                        </span>
+                        @php
+                            $now = now();
+                            $status = '';
+                            $statusClass = '';
+                            
+                            if (!$examPeriod->is_active) {
+                                $status = 'Đã khóa';
+                                $statusClass = 'bg-secondary';
+                            } else if ($now->between($examPeriod->start_time, $examPeriod->end_time)) {
+                                $diffInMinutes = $now->diffInMinutes($examPeriod->end_time);
+                                $days = ceil($diffInMinutes / 1440);
+                                $status = "Đang diễn ra (còn {$days} ngày)";
+                                $statusClass = 'bg-success';
+                            } else if ($now->lt($examPeriod->start_time)) {
+                                $diffInMinutes = $now->diffInMinutes($examPeriod->start_time);
+                                $days = ceil($diffInMinutes / 1440);
+                                $status = "Sắp diễn ra (còn {$days} ngày)";
+                                $statusClass = 'bg-primary';
+                            } else {
+                                $status = 'Đã kết thúc';
+                                $statusClass = 'bg-danger';
+                            }
+                        @endphp
+                        <span class="badge {{ $statusClass }}">{{ $status }}</span>
                     </div>
                     <div class="row">
                         <div class="col-md-6">
                             <p class="mb-1">
-                                <i class="fas fa-calendar-alt me-2"></i>
-                                Thời gian bắt đầu: {{ $examPeriod->start_time->format('H:i d/m/Y') }}
-                            </p>
-                            <p class="mb-1">
-                                <i class="fas fa-calendar-alt me-2"></i>
-                                Thời gian kết thúc: {{ $examPeriod->end_time->format('H:i d/m/Y') }}
+                                <span class="description-text" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                                    {{ $examPeriod->description ?? 'Không có mô tả' }}
+                                </span>
+                                @if(strlen($examPeriod->description) > 200)
+                                    <button class="btn btn-link btn-sm p-0 ms-2 show-more">
+                                        <i class="fas fa-chevron-down me-1"></i>Xem thêm
+                                    </button>
+                                @endif
                             </p>
                         </div>
                         <div class="col-md-6">
                             <p class="mb-1">
-                                <i class="fas fa-info-circle me-2"></i>
-                                Mô tả: {{ $examPeriod->description ?? 'Không có mô tả' }}
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Bắt đầu: {{ $examPeriod->start_time->format('d/m/Y') }}
+                            </p>
+                            <p class="mb-1">
+                                <i class="fas fa-calendar-alt me-2"></i>
+                                Kết thúc: {{ $examPeriod->end_time->format('d/m/Y') }}
                             </p>
                         </div>
                     </div>
@@ -90,38 +117,152 @@
 
             <!-- Danh sách ca thi -->
             <div class="card mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Danh sách ca thi</h5>
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Ca thi sắp diễn ra</h5>
+                    <a href="{{ route('exam-shifts.index', $examPeriod) }}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-list me-1"></i>Xem tất cả
+                    </a>
                 </div>
                 <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Ca thi</th>
-                                    <th>Thời gian</th>
-                                    <th>Số môn thi</th>
-                                    <th>Số phòng thi</th>
-                                    <th>Trạng thái</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($examPeriod->examShifts as $shift)
-                                <tr>
-                                    <td>{{ $shift->name }}</td>
-                                    <td>{{ $shift->start_time->format('H:i d/m/Y') }}</td>
-                                    <td>{{ $shift->subjects_count }}</td>
-                                    <td>{{ $shift->rooms_count }}</td>
-                                    <td>
-                                        <span class="badge {{ $shift->is_active ? 'bg-success' : 'bg-danger' }}">
-                                            {{ $shift->is_active ? 'Hoạt động' : 'Đã khóa' }}
-                                        </span>
-                                    </td>
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
+                    @if($examPeriod->examShifts->isEmpty())
+                        <p class="text-muted mb-0">Chưa có ca thi nào</p>
+                    @else
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 5%">#</th>
+                                        <th style="width: 25%">Tên ca thi</th>
+                                        <th style="width: 20%">Ngày thi</th>
+                                        <th style="width: 25%">Thời gian</th>
+                                        <th style="width: 25%">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($examPeriod->examShifts->take(3) as $shift)
+                                        <tr>
+                                            <td>{{ $loop->iteration }}</td>
+                                            <td>{{ $shift->name }}</td>
+                                            <td>{{ $shift->start_time->format('d/m/Y') }}</td>
+                                            <td>
+                                                {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                <div class="small text-muted">
+                                                    ({{ $shift->start_time->diffInMinutes($shift->end_time) }} phút)
+                                                </div>
+                                            </td>
+                                            <td>
+                                                @php
+                                                    $now = now();
+                                                    $status = '';
+                                                    $statusClass = '';
+                                                    
+                                                    if (!$shift->is_active) {
+                                                        $status = 'Đã khóa';
+                                                        $statusClass = 'bg-secondary';
+                                                    } else if ($now->between($shift->start_time, $shift->end_time)) {
+                                                        $minutesLeft = ceil($now->diffInMinutes($shift->end_time));
+                                                        $status = "Đang diễn ra (còn {$minutesLeft} phút)";
+                                                        $statusClass = 'bg-success';
+                                                    } else if ($now->lt($shift->start_time)) {
+                                                        $diffInMinutes = $now->diffInMinutes($shift->start_time);
+                                                        
+                                                        if ($diffInMinutes >= 1440) { // >= 24 giờ
+                                                            $days = floor($diffInMinutes / 1440);
+                                                            $status = "Sắp diễn ra (còn {$days} ngày)";
+                                                        } else if ($diffInMinutes >= 60) { // >= 1 giờ
+                                                            $hours = floor($diffInMinutes / 60);
+                                                            $status = "Sắp diễn ra (còn {$hours} giờ)";
+                                                        } else {
+                                                            $diffInMinutes = ceil($diffInMinutes);
+                                                            $status = "Sắp diễn ra (còn {$diffInMinutes} phút)";
+                                                        }
+                                                        $statusClass = 'bg-primary';
+                                                    } else {
+                                                        $status = 'Đã kết thúc';
+                                                        $statusClass = 'bg-danger';
+                                                    }
+                                                @endphp
+                                                <span class="badge {{ $statusClass }}">{{ $status }}</span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        @if($examPeriod->examShifts->count() > 3)
+                            <div class="collapse" id="moreShifts">
+                                <table class="table table-hover mb-0">
+                                    <tbody>
+                                        @foreach($examPeriod->examShifts->slice(3) as $shift)
+                                            <tr>
+                                                <td style="width: 5%">{{ $loop->iteration + 3 }}</td>
+                                                <td style="width: 25%">{{ $shift->name }}</td>
+                                                <td style="width: 20%">{{ $shift->start_time->format('d/m/Y') }}</td>
+                                                <td style="width: 25%">
+                                                    {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                    <div class="small text-muted">
+                                                        ({{ $shift->start_time->diffInMinutes($shift->end_time) }} phút)
+                                                    </div>
+                                                </td>
+                                                <td style="width: 25%">
+                                                    @php
+                                                        $now = now();
+                                                        $status = '';
+                                                        $statusClass = '';
+                                                        
+                                                        if (!$shift->is_active) {
+                                                            $status = 'Đã khóa';
+                                                            $statusClass = 'bg-secondary';
+                                                        } else if ($now->between($shift->start_time, $shift->end_time)) {
+                                                            $minutesLeft = ceil($now->diffInMinutes($shift->end_time));
+                                                            $status = "Đang diễn ra (còn {$minutesLeft} phút)";
+                                                            $statusClass = 'bg-success';
+                                                        } else if ($now->lt($shift->start_time)) {
+                                                            $diffInMinutes = $now->diffInMinutes($shift->start_time);
+                                                            
+                                                            if ($diffInMinutes >= 1440) { // >= 24 giờ
+                                                                $days = floor($diffInMinutes / 1440);
+                                                                $status = "Sắp diễn ra (còn {$days} ngày)";
+                                                            } else if ($diffInMinutes >= 60) { // >= 1 giờ
+                                                                $hours = floor($diffInMinutes / 60);
+                                                                $status = "Sắp diễn ra (còn {$hours} giờ)";
+                                                            } else {
+                                                                $diffInMinutes = ceil($diffInMinutes);
+                                                                $status = "Sắp diễn ra (còn {$diffInMinutes} phút)";
+                                                            }
+                                                            $statusClass = 'bg-primary';
+                                                        } else {
+                                                            $status = 'Đã kết thúc';
+                                                            $statusClass = 'bg-danger';
+                                                        }
+                                                    @endphp
+                                                    <span class="badge {{ $statusClass }}">{{ $status }}</span>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="text-center mt-3">
+                                <button class="btn btn-link btn-sm" 
+                                        type="button" 
+                                        data-bs-toggle="collapse" 
+                                        data-bs-target="#moreShifts" 
+                                        aria-expanded="false">
+                                    <span class="more-text">
+                                        <i class="fas fa-chevron-down me-1"></i>
+                                        Xem thêm {{ $examPeriod->examShifts->count() - 3 }} ca thi
+                                    </span>
+                                    <span class="less-text d-none">
+                                        <i class="fas fa-chevron-up me-1"></i>
+                                        Thu gọn
+                                    </span>
+                                </button>
+                            </div>
+                        @endif
+                    @endif
                 </div>
             </div>
 
@@ -248,4 +389,61 @@
         </div>
     </div>
 </div>
+
+@push('scripts')
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Xử lý nút xem thêm mô tả
+    const showMoreBtn = document.querySelector('.show-more');
+    if (showMoreBtn) {
+        const descText = document.querySelector('.description-text');
+        let isExpanded = false;
+
+        showMoreBtn.addEventListener('click', function() {
+            if (!isExpanded) {
+                descText.style.display = 'block';
+                descText.style.webkitLineClamp = 'unset';
+                this.innerHTML = '<i class="fas fa-chevron-up me-1"></i>Thu gọn';
+            } else {
+                descText.style.display = '-webkit-box';
+                descText.style.webkitLineClamp = '2';
+                this.innerHTML = '<i class="fas fa-chevron-down me-1"></i>Xem thêm';
+            }
+            isExpanded = !isExpanded;
+        });
+    }
+
+    // Xử lý nút xem thêm ca thi
+    const collapseElement = document.getElementById('moreShifts');
+    if (collapseElement) {
+        collapseElement.addEventListener('show.bs.collapse', function() {
+            const button = document.querySelector('[data-bs-target="#moreShifts"]');
+            button.querySelector('.more-text').classList.add('d-none');
+            button.querySelector('.less-text').classList.remove('d-none');
+        });
+
+        collapseElement.addEventListener('hide.bs.collapse', function() {
+            const button = document.querySelector('[data-bs-target="#moreShifts"]');
+            button.querySelector('.more-text').classList.remove('d-none');
+            button.querySelector('.less-text').classList.add('d-none');
+        });
+    }
+});
+</script>
+
+<style>
+.btn-link {
+    text-decoration: none;
+    color: var(--bs-primary);
+}
+
+.btn-link:hover {
+    color: var(--bs-primary-hover);
+}
+
+.description-text {
+    transition: all 0.3s ease;
+}
+</style>
+@endpush
 @endsection 

@@ -50,18 +50,18 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>#</th>
-                                    <th>Tên ca thi</th>
-                                    <th>Thời gian bắt đầu</th>
-                                    <th>Thời gian kết thúc</th>
-                                    <th>Trạng thái</th>
-                                    <th>Thao tác</th>
+                                    <th style="width: 5%">#</th>
+                                    <th style="width: 25%">Tên ca thi</th>
+                                    <th style="width: 20%">Ngày thi</th>
+                                    <th style="width: 25%">Thời gian</th>
+                                    <th style="width: 15%">Trạng thái</th>
+                                    <th style="width: 10%">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @forelse ($shifts as $examShift)
                                 <tr>
-                                    <td>{{ $examShift->id }}</td>
+                                    <td>{{ $loop->iteration }}</td>
                                     <td>
                                         {{ $examShift->name }}
                                         @if ($examShift->description)
@@ -70,20 +70,60 @@
                                                title="{{ $examShift->description }}"></i>
                                         @endif
                                     </td>
-                                    <td>{{ $examShift->start_time->format('d/m/Y H:i') }}</td>
-                                    <td>{{ $examShift->end_time->format('d/m/Y H:i') }}</td>
+                                    <td>{{ $examShift->start_time->format('d/m/Y') }}</td>
+                                    <td>
+                                        {{ $examShift->start_time->format('H:i') }} - {{ $examShift->end_time->format('H:i') }}
+                                        <div class="small text-muted">
+                                            ({{ $examShift->start_time->diffInMinutes($examShift->end_time) }} phút)
+                                        </div>
+                                    </td>
+                                    <td>
+                                        @php
+                                            $now = now();
+                                            $status = '';
+                                            $statusClass = '';
+                                            
+                                            if (!$examShift->is_active) {
+                                                $status = 'Đã khóa';
+                                                $statusClass = 'bg-secondary';
+                                            } else if ($now->between($examShift->start_time, $examShift->end_time)) {
+                                                $minutesLeft = ceil($now->diffInMinutes($examShift->end_time));
+                                                $status = "Đang diễn ra (còn {$minutesLeft} phút)";
+                                                $statusClass = 'bg-success';
+                                            } else if ($now->lt($examShift->start_time)) {
+                                                $diffInMinutes = $now->diffInMinutes($examShift->start_time);
+                                                
+                                                if ($diffInMinutes >= 1440) { // >= 24 giờ
+                                                    $days = floor($diffInMinutes / 1440);
+                                                    $status = "Sắp diễn ra (còn {$days} ngày)";
+                                                } else if ($diffInMinutes >= 60) { // >= 1 giờ
+                                                    $hours = floor($diffInMinutes / 60);
+                                                    $status = "Sắp diễn ra (còn {$hours} giờ)";
+                                                } else {
+                                                    $diffInMinutes = ceil($diffInMinutes);
+                                                    $status = "Sắp diễn ra (còn {$diffInMinutes} phút)";
+                                                }
+                                                $statusClass = 'bg-primary';
+                                            } else {
+                                                $status = 'Đã kết thúc';
+                                                $statusClass = 'bg-danger';
+                                            }
+                                        @endphp
+                                        <span class="badge {{ $statusClass }}">{{ $status }}</span>
+                                    </td>
                                     <td>
                                         <form action="{{ route('exam-shifts.toggle-status', ['examPeriod' => $examPeriod->id, 'examShift' => $examShift->id]) }}" 
                                               method="POST" class="d-inline">
                                             @csrf
                                             @method('PUT')
-                                            <button type="submit" class="btn btn-sm status-btn 
-                                                {{ $examShift->is_active ? 'btn-success' : 'btn-danger' }}">
-                                                {{ $examShift->is_active ? 'Hoạt động' : 'Khóa' }}
+                                            <button type="submit" class="btn btn-sm status-btn {{ $examShift->is_active ? 'btn-success' : 'btn-danger' }}">
+                                                @if($examShift->is_active)
+                                                    <i class="fas fa-lock-open"></i>
+                                                @else
+                                                    <i class="fas fa-lock"></i>
+                                                @endif
                                             </button>
                                         </form>
-                                    </td>
-                                    <td>
                                         <a href="{{ route('exam-shifts.edit', ['examPeriod' => $examPeriod->id, 'examShift' => $examShift->id]) }}" 
                                            class="btn btn-sm btn-primary">
                                             <i class="fas fa-edit"></i>
@@ -100,7 +140,7 @@
                                 </tr>
                                 @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">Không có dữ liệu</td>
+                                    <td colspan="6" class="text-center">Không có ca thi nào</td>
                                 </tr>
                                 @endforelse
                             </tbody>

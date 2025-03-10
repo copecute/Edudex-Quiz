@@ -44,8 +44,8 @@
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
                             Tổng sức chứa
-                            <span class="badge {{ $stats['total_room_capacity'] < $stats['total_students'] ? 'bg-danger' : 'bg-primary' }}">
-                                {{ $stats['total_room_capacity'] }}
+                            <span class="badge {{ ($stats['total_room_capacity'] * $stats['total_shifts']) < $stats['total_students'] ? 'bg-danger' : 'bg-primary' }}">
+                                {{ $stats['total_room_capacity'] * $stats['total_shifts'] }}
                             </span>
                         </li>
                         <li class="list-group-item d-flex justify-content-between align-items-center">
@@ -109,9 +109,9 @@
                             $errors[] = 'Chưa có thí sinh nào được thêm vào';
                         }
                         
-                        if ($stats['total_room_capacity'] < $stats['total_students']) {
+                        if ($stats['total_room_capacity'] * $stats['total_shifts'] < $stats['total_students']) {
                             $canAutoAssign = false;
-                            $errors[] = 'Tổng sức chứa phòng thi (' . $stats['total_room_capacity'] . ') không đủ cho số thí sinh (' . $stats['total_students'] . ')';
+                            $errors[] = 'Tổng sức chứa phòng thi (' . ($stats['total_room_capacity'] * $stats['total_shifts']) . ') không đủ cho số thí sinh (' . $stats['total_students'] . ')';
                         }
                     @endphp
 
@@ -126,7 +126,18 @@
                         </div>
                     @endif
 
-                    <!-- Nút xóa dữ liệu -->
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Hệ thống sẽ tự động phân công:
+                        <ul class="mb-0">
+                            <li>Phân bổ môn thi vào các ca thi</li>
+                            <li>Phân bổ phòng thi cho từng môn</li>
+                            <li>Phân công CBCT cho các phòng</li>
+                            <li>Sắp xếp thí sinh vào phòng thi</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="text-end" style="display: flex;flex-wrap: wrap;flex-direction: row-reverse;gap: 10px;">
                     <form action="{{ route('exam-periods.assignment.clear', $data['examPeriod']) }}" 
                           method="POST" 
                           class="mb-3"
@@ -138,27 +149,14 @@
                             Xóa dữ liệu phân công
                         </button>
                     </form>
-
-                    <div class="alert alert-info">
-                        <i class="fas fa-info-circle me-2"></i>
-                        Hệ thống sẽ tự động phân công:
-                        <ul class="mb-0">
-                            <li>Phân bổ môn thi vào các ca thi</li>
-                            <li>Phân bổ phòng thi cho từng môn</li>
-                            <li>Phân công CBCT cho các phòng</li>
-                            <li>Sắp xếp thí sinh vào phòng thi</li>
-                        </ul>
-                    </div>
-
                     <form action="{{ route('exam-periods.assignment.auto.store', $data['examPeriod']) }}" method="POST">
                         @csrf
-                        <div class="text-end">
                             <button type="submit" class="btn btn-primary" {{ !$canAutoAssign ? 'disabled' : '' }}>
                                 <i class="fas fa-magic me-1"></i>
                                 Bắt đầu tự động phân công
                             </button>
-                        </div>
-                    </form>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>

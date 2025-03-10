@@ -88,11 +88,14 @@
                             </li>
                         </ul>
                     </li>
+                    @endif
+                    @if(Auth::user()->role == 1 || Auth::user()->role == 2)
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-graduation-cap me-2"></i> Đào tạo
                         </a>
                         <ul class="dropdown-menu">
+                            @if(Auth::user()->role == 2)
                             <li>
                                 <a class="dropdown-item" href="{{ route('faculties.index') }}">
                                     <i class="fas fa-university me-2"></i> Quản lý khoa
@@ -109,6 +112,7 @@
                                 </a>
                             </li>
                             <li><hr class="dropdown-divider"></li>
+                            @endif
                             <li>
                                 <a class="dropdown-item" href="{{ route('questions.index') }}">
                                     <i class="fas fa-question-circle me-2"></i> Ngân hàng câu hỏi
@@ -123,7 +127,7 @@
                     </li>
                     @endif
                     <!-- Quản lý kỳ thi -->
-                    @if(Auth::user()->role === 2)
+                    @if(Auth::user()->role == 2)
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-calendar-alt me-1"></i> Tổ chức kỳ Thi
@@ -181,34 +185,28 @@
                                 </li>
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
+                                    <button class="dropdown-item" onclick="setTheme('light')">
+                                        <i class="fas fa-sun me-2"></i> Giao diện sáng
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" onclick="setTheme('dark')">
+                                        <i class="fas fa-moon me-2"></i> Giao diện tối
+                                    </button>
+                                </li>
+                                <li>
+                                    <button class="dropdown-item" onclick="setTheme('system')">
+                                        <i class="fas fa-laptop me-2"></i> Theo hệ thống
+                                    </button>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
                                     <form action="{{ route('logout') }}" method="POST">
                                         @csrf
                                         <button type="submit" class="dropdown-item text-danger">
                                             <i class="fas fa-sign-out-alt me-2"></i> Đăng xuất
                                         </button>
                                     </form>
-                                </li>
-                            </ul>
-                        </li>
-                        <li class="nav-item dropdown">
-                            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
-                                <i class="fas fa-palette me-2"></i> Giao diện
-                            </a>
-                            <ul class="dropdown-menu">
-                                <li>
-                                    <button class="dropdown-item" onclick="setTheme('light')">
-                                        <i class="fas fa-sun me-2"></i> Sáng
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item" onclick="setTheme('dark')">
-                                        <i class="fas fa-moon me-2"></i> Tối
-                                    </button>
-                                </li>
-                                <li>
-                                    <button class="dropdown-item" onclick="setTheme('system')">
-                                        <i class="fas fa-laptop me-2"></i> Hệ thống
-                                    </button>
                                 </li>
                             </ul>
                         </li>

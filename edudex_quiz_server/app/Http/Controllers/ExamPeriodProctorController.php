@@ -133,4 +133,23 @@ class ExamPeriodProctorController extends Controller
     {
         return Excel::download(new ProctorsTemplateExport, 'mau-nhap-can-bo-coi-thi.xlsx');
     }
+
+    public function destroyMultiple(Request $request, ExamPeriod $examPeriod)
+    {
+        try {
+            $proctorIds = json_decode($request->proctor_ids);
+            if (!is_array($proctorIds) || empty($proctorIds)) {
+                return back()->with('error', 'Không có cán bộ coi thi nào được chọn để xóa!');
+            }
+
+            // Xóa các bản ghi liên quan trong bảng exam_period_proctors
+            $examPeriod->examPeriodProctors()
+                ->whereIn('id', $proctorIds)
+                ->delete();
+
+            return back()->with('success', 'Xóa ' . count($proctorIds) . ' cán bộ coi thi thành công!');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Có lỗi xảy ra khi xóa cán bộ coi thi!');
+        }
+    }
 } 

@@ -112,7 +112,7 @@
                             <form id="assignmentForm"
                                 action="{{ route('exam-periods.assignment.rooms.store', $examPeriod) }}" method="POST">
                                 @csrf
-                                @foreach ($shifts as $shift)
+                                @foreach ($shifts->filter(function($shift) { return $shift->subjects->isNotEmpty(); }) as $shift)
                                     <div class="card mb-4" data-shift-id="{{ $shift->id }}">
                                         <div class="card-header bg-light">
                                             <div class="d-flex justify-content-between align-items-center">
@@ -130,6 +130,7 @@
                                                     </small>
                                                 </div>
                                                 <div>
+                                                    <h6 class="mb-0 text-center">Sắp xếp</h6>
                                                     <select class="form-select form-select-sm assignment-type"
                                                         data-shift-id="{{ $shift->id }}" style="width: 200px;">
                                                         <option value="sequential">Theo thứ tự SBD</option>
@@ -218,10 +219,9 @@
                                     </div>
                                 @endforeach
 
-                                <!-- Hidden inputs container -->
                                 <div id="hiddenInputsContainer"></div>
 
-                                <div class="text-end mt-3">
+                                <div class="text-end mt-3 sticky-bottom bg-white py-3 border-top">
                                     <button type="submit" class="btn btn-primary">
                                         <i class="fas fa-save me-1"></i> Lưu phân công
                                     </button>
