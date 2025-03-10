@@ -98,8 +98,17 @@ class AuthController extends Controller
                     ],
                     'shifts' => []
                 ];
-
                 foreach ($rooms as $shift) {
+                    // kiểm tra ca thi có khoá không
+                    if (!$shift->is_active) {
+                        continue;
+                    }
+
+                    // kiểm tra ca thi có phải hôm nay không
+                    if ($shift->start_time->format('Y-m-d') !== Carbon::now()->format('Y-m-d')) {
+                        continue;
+                    }
+
                     $shiftInfo = [
                         'id' => $shift->id,
                         'name' => $shift->name,
@@ -140,10 +149,10 @@ class AuthController extends Controller
             }
 
             // Kiểm tra nếu không có phân công phòng thi nào
-            if (empty($schedules)) {
+            if (empty($schedules) || empty($schedules[0]['shifts'])) {
                 Auth::logout();
                 return response()->json([
-                    'status' => 'success',
+                    'status' => 'error',
                     'message' => 'Bạn chưa được phân công phòng thi cho kỳ thi nào.'
                 ], Response::HTTP_FORBIDDEN);
             }

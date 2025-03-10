@@ -8,13 +8,14 @@ use App\Models\ExamResult;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
+use App\Models\ExamShift;
 
 class ExamResultController extends Controller
 {
     public function store(Request $request, ExamPeriod $examPeriod)
     {
         try {
-            // Validate essential fields only
+            // xác thực các trường cần thiết
             $validated = $request->validate([
                 'shift_id' => 'required|integer',
                 'room_code' => 'required|string',
@@ -27,7 +28,7 @@ class ExamResultController extends Controller
                 'note' => 'nullable|string'
             ]);
 
-            // Find student and related info
+            // tìm kiếm thí sinh và thông tin liên quan
             $student = DB::table('exam_period_subject_students as epss')
                 ->join('exam_period_subjects as eps', 'epss.exam_period_subject_id', '=', 'eps.id')
                 ->join('exam_shift_rooms as esr', function($join) use ($validated) {
@@ -66,7 +67,16 @@ class ExamResultController extends Controller
                 ], 404);
             }
 
-            // Kiểm tra xem thí sinh đã nộp bài chưa
+            // Kiểm tra xem ca thi có phải hôm nay không
+            $shift = ExamShift::find($validated['shift_id']);
+            if (!$shift || $shift->start_time->format('Y-m-d') !== now()->format('Y-m-d')) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Bạn chỉ có thể nộp bài trong ngày thi.'
+                ], 403);
+            }
+
+            // kiểm tra xem thí sinh đã nộp bài chưa
             $existingResult = ExamResult::where([
                 'exam_period_id' => $examPeriod->id,
                 'exam_period_subject_id' => $student->subject_id,
@@ -86,7 +96,7 @@ class ExamResultController extends Controller
                 ], 409); // HTTP 409 Conflict
             }
 
-            // Create exam result
+            // tạo kết quả thi
             ExamResult::create([
                 'exam_period_id' => $examPeriod->id,
                 'exam_shift_id' => $validated['shift_id'],
@@ -96,7 +106,6 @@ class ExamResultController extends Controller
                 'exam_period_proctor_id' => $student->proctor_id,
                 'exam_period_subject_student_id' => $student->id,
                 
-                // Thêm các trường code
                 'exam_period_code' => $examPeriod->id,
                 'exam_shift_code' => $validated['shift_id'],
                 'exam_subject_code' => $student->subject_code,

@@ -649,11 +649,11 @@
                                                                 <h6 class="mb-2">Đề thi</h6>
                                                                 <p class="text-muted small mb-0">Quản lý đề thi
                                                                 </p>
-                                                            </div>
-                                                        </div>
-                                                    </a>
-                                                </div>
-                                            @endif
+                                    </div>
+                                </div>
+                            </a>
+                        </div>
+                        @endif
 
                         <div class="col-md-3">
                             <a href="{{ route('profile.show') }}" class="text-decoration-none">
@@ -730,7 +730,7 @@
                                                             class="btn btn-outline-info btn-sm">
                                                         Truy cập
                                                     </a>
-                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

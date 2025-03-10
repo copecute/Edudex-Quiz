@@ -24,9 +24,6 @@ String? initialFile;
 final _appMutex = Mutex();
 bool _hasLock = false;
 
-// Thêm service cho kết nối TCP
-final _connectionService = ConnectionService();
-
 bool get isDesktop {
   if (kIsWeb) return false;
   return [
@@ -51,13 +48,6 @@ void main(List<String> args) async {
       }
       exit(0);
     }
-  }
-
-  // Khởi tạo connection service
-  try {
-    await _connectionService.startServer();
-  } catch (e) {
-    print('❌ Lỗi khởi tạo connection service: $e');
   }
 
   await SharedPreferences.getInstance();

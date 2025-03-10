@@ -512,14 +512,14 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                                 children: [
                                   const Icon(FluentIcons.globe, size: 16),
                                   const SizedBox(width: 8),
-                                  Text('$_teacherIp:8689'),
+                                  Text('$_teacherIp'),
                                   const SizedBox(width: 8),
                                   IconButton(
                                     icon:
                                         const Icon(FluentIcons.copy, size: 16),
                                     onPressed: () async {
                                       await Clipboard.setData(
-                                        ClipboardData(text: '$_teacherIp:8689'),
+                                        ClipboardData(text: '$_teacherIp'),
                                       );
                                       if (!mounted) return;
                                       displayInfoBar(
@@ -527,7 +527,7 @@ class _ExamRoomScreenState extends State<ExamRoomScreen>
                                         builder: (context, close) {
                                           return InfoBar(
                                             title: Text(
-                                              'Đã sao chép IP: $_teacherIp:8689',
+                                              'Đã sao chép IP: $_teacherIp',
                                             ),
                                             severity: InfoBarSeverity.success,
                                             onClose: close,

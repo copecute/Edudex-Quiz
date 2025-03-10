@@ -8,7 +8,6 @@ import 'dart:convert';
 
 import '../../theme.dart';
 import 'home_page.dart';
-import 'quiz_page.dart';
 import 'history_page.dart';
 import '../settings.dart';
 import '../login.dart';
@@ -39,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
     super.initState();
     _pages = [
       const HomePage(),
-      const QuizMenuPage(),
       HistoryPage(initialFile: widget.fileToOpen),
       const Settings(),
     ];
@@ -56,52 +54,17 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
 
   Future<void> _logout() async {
     try {
+      // xoá thông tin đăng nhập đã lưu
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
-      final serverUrl = prefs.getString('server_url');
+      await prefs.remove('token'); // xoá token đã lưu
+      await prefs.remove('student_data'); // xoá thông tin sinh viên đã lưu
 
-      if (token == null || serverUrl == null) {
-        throw Exception('Không tìm thấy thông tin đăng nhập');
-      }
-
-      final response = await http.post(
-        Uri.parse('$serverUrl/api/student/logout'),
-        headers: {
-          'Authorization': 'copecute $token',
-          'Accept': 'application/json',
-        },
-      );
-
-      final data = json.decode(response.body);
-
-      if (response.statusCode == 200 && data['success'] == true) {
-        // Xóa thông tin đăng nhập
-        await prefs.clear();
-
-        if (mounted) {
-          // Chuyển về màn hình đăng nhập
-          Navigator.of(context).pushAndRemoveUntil(
-            FluentPageRoute(builder: (context) => const LoginScreen()),
-            (route) => false,
-          );
-        }
-      } else {
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => ContentDialog(
-              title: const Text('Lỗi'),
-              content: Text(data['message'] ??
-                  'Không thể đăng xuất. Vui lòng thử lại sau.'),
-              actions: [
-                Button(
-                  child: const Text('Đóng'),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          );
-        }
+      if (mounted) {
+        // chuyển về màn hình đăng nhập
+        Navigator.of(context).pushAndRemoveUntil(
+          FluentPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -166,18 +129,13 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
         items: [
           PaneItem(
             icon: const Icon(FluentIcons.home),
-            title: const Text('Trang chủ'),
+            title: const Text('Tổng quan'),
             body: _pages[0],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.account_activity),
-            title: const Text('Đề bài'),
-            body: _pages[1],
           ),
           PaneItem(
             icon: const Icon(FluentIcons.history),
             title: const Text('Lịch sử'),
-            body: _pages[2],
+            body: _pages[1],
           ),
         ],
         footerItems: [
@@ -185,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
           PaneItem(
             icon: const Icon(FluentIcons.settings),
             title: const Text('Cài đặt'),
-            body: _pages[3],
+            body: _pages[2],
           ),
           PaneItem(
             icon: const Icon(FluentIcons.sign_out),

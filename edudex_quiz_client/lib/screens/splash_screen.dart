@@ -10,6 +10,8 @@ import 'package:network_info_plus/network_info_plus.dart';
 import '../services/connection_service.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'settings.dart';
+import 'package:flutter/services.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -23,6 +25,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
   final TextEditingController _soMayController = TextEditingController();
   bool _isLoading = false;
   static const String TEACHER_IP_KEY = 'teacher_ip';
+  static const String MAY_SO_KEY = 'may_so';
   static const int STUDENT_PORT = 8688; // Port cho student
   static const int TEACHER_PORT = 8689; // Port của teacher
   bool _isSearching = false;
@@ -45,13 +48,18 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     });
 
     try {
-      final commonSubnets = [
-        '192.168.1',
-        '192.168.0',
-        '10.0.0',
-        '10.0.1',
-        '172.16.0'
-      ];
+      // Lấy IP của máy hiện tại
+      final interfaces = await NetworkInterface.list();
+      final localIP = interfaces
+          .expand((interface) => interface.addresses)
+          .firstWhere((addr) => addr.type == InternetAddressType.IPv4)
+          .address;
+
+      print('🖥️ IP máy hiện tại: $localIP');
+
+      // Lấy subnet từ IP hiện tại (vd: 192.168.1)
+      final subnet = localIP.substring(0, localIP.lastIndexOf('.'));
+      final currentLastOctet = int.parse(localIP.split('.').last);
 
       showDialog(
         context: context,
@@ -68,31 +76,25 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text('Đang quét mạng $subnet.*'),
+              const SizedBox(height: 8),
               Text('Vui lòng chờ...'),
             ],
           ),
         ),
       );
 
-      print('🔍 Đang tìm kiếm teacher...');
+      print('🔍 Đang quét subnet: $subnet.*');
 
-      for (final subnet in commonSubnets) {
-        final futures = <Future>[];
-        for (int i = 1; i < 20; i++) {
-          final ip = '$subnet.$i';
-          futures.add(_checkTeacherClient(ip));
-        }
-        await Future.wait(futures);
-
-        // Nếu tìm thấy teacher, kết nối ngay
-        if (_foundTeachers.isNotEmpty) {
-          Navigator.pop(context); // Đóng dialog tìm kiếm
-          final teacherIp = _foundTeachers.first;
-          _ipController.text = teacherIp;
-          await _handleConnect();
-          return;
-        }
+      // Quét từ 1-255, bỏ qua IP của máy hiện tại
+      final futures = <Future>[];
+      for (int i = 1; i <= 255; i++) {
+        final ip = '$subnet.$i';
+        futures.add(_checkTeacherClient(ip));
       }
+
+      // Đợi tất cả các request hoàn thành
+      await Future.wait(futures);
 
       Navigator.pop(context); // Đóng dialog tìm kiếm
 
@@ -106,8 +108,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
               'Không tìm thấy máy giáo viên trong mạng.\n'
               'Vui lòng kiểm tra:\n'
               '• Máy giáo viên đã bật chưa\n'
-              '• Máy giáo viên có trong cùng mạng LAN không\n'
-              '• Phần mềm giáo viên đã chạy chưa',
+              '• Máy giáo viên có trong cùng mạng LAN không',
               style: TextStyle(height: 1.5),
             ),
             actions: [
@@ -125,6 +126,11 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
             ],
           ),
         );
+      } else {
+        // Nếu tìm thấy teacher, kết nối ngay với IP đầu tiên
+        final teacherIp = _foundTeachers.first;
+        _ipController.text = teacherIp;
+        await _handleConnect();
       }
     } catch (e) {
       Navigator.pop(context); // Đóng dialog tìm kiếm
@@ -150,16 +156,30 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
 
   Future<bool> _checkTeacherClient(String ip) async {
     try {
+      // lấy số máy đã lưu
+      final prefs = await SharedPreferences.getInstance();
+      final maySo = prefs.getString(MAY_SO_KEY);
+
+      if (maySo == null) {
+        print('❌ Chưa có thông tin số máy');
+        return false;
+      }
+
+      print('🔍 Kiểm tra teacher tại: $ip với số máy: $maySo');
+
       final response = await http.post(
-        Uri.parse('http://$ip:8689/is-teacher').replace(
-          queryParameters: {'may': _soMayController.text},
+        Uri.parse('http://$ip:$TEACHER_PORT/is-teacher').replace(
+          queryParameters: {'may': maySo},
         ),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 2));
 
+      print('📥 Response từ $ip: ${response.statusCode} - ${response.body}');
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'success') {
+          print('✅ Tìm thấy teacher tại: $ip');
           setState(() {
             if (!_foundTeachers.contains(ip)) {
               _foundTeachers.add(ip);
@@ -167,20 +187,22 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
           });
           return true;
         }
-      } else if (response.statusCode == 409) {
-        print('⚠️ Máy tính đã được đăng ký với số máy khác tại IP: $ip');
       }
       return false;
     } catch (e) {
-      print('❌ Lỗi khi kiểm tra teacher tại $ip: $e');
+      // Bỏ qua lỗi timeout và connection refused
+      if (e is TimeoutException || e is SocketException) {
+        return false;
+      }
+      print('❌ Lỗi khi kiểm tra $ip: $e');
       return false;
     }
   }
 
   Future<void> _handleConnect() async {
-    if (_ipController.text.isEmpty || _soMayController.text.isEmpty) {
+    if (_ipController.text.isEmpty) {
       setState(() {
-        _errorMessage = 'Vui lòng nhập đầy đủ thông tin!';
+        _errorMessage = 'Vui lòng nhập địa chỉ IP của giáo viên!';
       });
       return;
     }
@@ -191,11 +213,28 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     });
 
     try {
+      // lấy số máy đã lưu
+      final prefs = await SharedPreferences.getInstance();
+      final maySo = prefs.getString(MAY_SO_KEY);
+
+      if (maySo == null) {
+        throw Exception('Không tìm thấy thông tin số máy');
+      }
+
+      final teacherIp = _ipController.text.trim();
+      final url = 'http://$teacherIp:$TEACHER_PORT/is-teacher';
+      print('🔄 Đang kết nối tới: $url');
+
       final response = await http.post(
-        Uri.parse('http://${_ipController.text}:8689/is-teacher').replace(
-          queryParameters: {'may': _soMayController.text},
+        Uri.parse(url).replace(
+          queryParameters: {'may': maySo},
         ),
         headers: {'Content-Type': 'application/json'},
+      ).timeout(
+        const Duration(seconds: 5), // thêm timeout 5 giây
+        onTimeout: () {
+          throw TimeoutException('Kết nối tới máy giáo viên quá thời gian chờ');
+        },
       );
 
       print('📥 Status code: ${response.statusCode}');
@@ -205,8 +244,7 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
 
       if (response.statusCode == 200 && data['status'] == 'success') {
         // Lưu thông tin kết nối
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(TEACHER_IP_KEY, _ipController.text);
+        await prefs.setString(TEACHER_IP_KEY, teacherIp);
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -214,33 +252,27 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
             FluentPageRoute(builder: (context) => const LoginScreen()),
           );
         }
-      } else if (response.statusCode == 409) {
-        // Xử lý trường hợp máy đã được đăng ký
-        showDialog(
-          context: context,
-          builder: (context) => ContentDialog(
-            title: const Text('Lỗi đăng ký'),
-            content: const Text(
-              'Máy tính này đã được đăng ký với một số máy khác. '
-              'Vui lòng liên hệ giáo viên để được hỗ trợ.',
-            ),
-            actions: [
-              Button(
-                child: const Text('Đóng'),
-                onPressed: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-        setState(() {
-          _errorMessage = 'Máy tính đã được đăng ký với số máy khác';
-        });
       } else {
         setState(() {
           _errorMessage =
               data['message'] ?? 'Không thể kết nối tới máy giáo viên';
         });
       }
+    } on SocketException catch (e) {
+      print('❌ Socket Exception: $e');
+      setState(() {
+        _errorMessage =
+            'Không thể kết nối tới máy giáo viên. Vui lòng kiểm tra:\n'
+            '• Địa chỉ IP đã đúng chưa\n'
+            '• Máy giáo viên đã bật chưa\n'
+            '• Máy giáo viên có trong cùng mạng LAN không';
+      });
+    } on TimeoutException catch (e) {
+      print('❌ Timeout Exception: $e');
+      setState(() {
+        _errorMessage = 'Kết nối tới máy giáo viên quá thời gian chờ.\n'
+            'Vui lòng thử lại sau.';
+      });
     } catch (e) {
       print('❌ Exception: $e');
       setState(() {
@@ -257,35 +289,45 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     try {
       setState(() => _isInitializing = true);
 
-      // 1. Khởi tạo TCP server trước
+      // 1. Kiểm tra xem đã có số máy chưa
+      final prefs = await SharedPreferences.getInstance();
+      final savedMaySo = prefs.getString(MAY_SO_KEY);
+
+      if (savedMaySo == null) {
+        // Nếu chưa có số máy, hiển thị form nhập số máy
+        setState(() => _isInitializing = false);
+        return;
+      }
+
+      // Nếu đã có số máy, tiếp tục khởi tạo
+      _soMayController.text = savedMaySo;
+
+      // 2. Khởi tạo TCP server
       await _connectionService.startServer();
       print('✅ Đã khởi tạo TCP server');
 
-      // 2. Load saved IP
-      final prefs = await SharedPreferences.getInstance();
+      // 3. Load saved IP
       final savedIP = prefs.getString(TEACHER_IP_KEY);
 
-      // 3. Delay cho splash screen
+      // 4. Delay cho splash screen
       await Future.delayed(const Duration(seconds: 2));
 
-      // 4. Nếu có saved IP thì thử kết nối
+      // 5. Nếu có saved IP thì thử kết nối
       if (savedIP != null) {
         _ipController.text = savedIP;
         print('🔄 Tìm thấy IP teacher đã lưu: $savedIP');
         try {
           await _handleConnect();
-          return; // Kết nối thành công thì return luôn
+          return;
         } catch (e) {
           print('❌ Không thể kết nối tới IP đã lưu: $e');
-          // Kết nối thất bại thì tiếp tục tìm kiếm
         }
       }
 
-      // 5. Tự động tìm kiếm teacher
+      // 6. Tự động tìm kiếm teacher
       if (mounted) {
-        setState(() =>
-            _isInitializing = false); // Tắt loading để hiện giao diện tìm kiếm
-        await _searchTeachers(); // Tự động tìm kiếm
+        setState(() => _isInitializing = false);
+        await _searchTeachers();
       }
     } catch (e) {
       print('❌ Lỗi khởi tạo: $e');
@@ -311,8 +353,104 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
     }
   }
 
+  // Thêm hàm lưu số máy
+  Future<void> _saveMaySo() async {
+    if (_soMayController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Vui lòng nhập số máy!';
+      });
+      return;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(MAY_SO_KEY, _soMayController.text);
+
+      // Sau khi lưu số máy, tiếp tục khởi tạo
+      await _initialize();
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Lỗi khi lưu số máy: ${e.toString()}';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final appTheme = context.watch<AppTheme>();
+
+    // Màn hình nhập số máy
+    if (!_isInitializing && !_soMayController.text.isNotEmpty) {
+      return NavigationView(
+        appBar: NavigationAppBar(
+          automaticallyImplyLeading: false,
+          title: const DragToMoveArea(
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+            ),
+          ),
+          actions: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: const [WindowButtons()],
+          ),
+        ),
+        content: ScaffoldPage(
+          padding: EdgeInsets.zero,
+          content: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset(
+                  'assets/logo.png',
+                  width: 200,
+                  height: 200,
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Nhập số máy của bạn',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: 300,
+                  child: TextBox(
+                    controller: _soMayController,
+                    placeholder: 'Nhập số máy',
+                    onSubmitted: (_) => _saveMaySo(),
+                    // chỉ cho phép nhập số từ 1-99
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                    ],
+                    onChanged: (value) {
+                      if (value.isNotEmpty) {
+                        final number = int.tryParse(value);
+                        if (number == null || number < 1 || number > 99) {
+                          _soMayController.text = '';
+                        }
+                      }
+                    },
+                  ),
+                ),
+                if (_errorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    _errorMessage!,
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ],
+                const SizedBox(height: 20),
+                FilledButton(
+                  onPressed: _saveMaySo,
+                  child: const Text('Xác nhận'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_isInitializing) {
       return NavigationView(
         content: ScaffoldPage(
@@ -345,8 +483,6 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
       );
     }
 
-    final appTheme = context.watch<AppTheme>();
-
     return NavigationView(
       appBar: NavigationAppBar(
         automaticallyImplyLeading: false,
@@ -358,6 +494,20 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
         actions: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            IconButton(
+              icon: const Icon(FluentIcons.settings),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  FluentPageRoute(
+                    builder: (context) => const Settings(
+                      showBackButton: true,
+                      showDisconnectButton: false,
+                    ),
+                  ),
+                );
+              },
+            ),
             Align(
               alignment: AlignmentDirectional.centerEnd,
               child: Padding(
@@ -398,14 +548,13 @@ class _SplashScreenState extends State<SplashScreen> with WindowListener {
                   placeholder: 'Nhập địa chỉ IP của giáo viên',
                 ),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: 300,
-                child: TextBox(
-                  controller: _soMayController,
-                  placeholder: 'Nhập mã số máy',
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.red),
                 ),
-              ),
+              ],
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,

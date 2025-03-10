@@ -1,3 +1,4 @@
+import 'package:edudex_quiz_teacher_client/screens/dashboard/history_page.dart';
 import 'package:fluent_ui/fluent_ui.dart' hide Page;
 import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
@@ -19,7 +20,14 @@ import '../../services/http_server_service.dart';
 import '../../services/exam_database_service.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final int? initialPage;
+  final String? fileToOpen;
+
+  const DashboardScreen({
+    super.key,
+    this.initialPage,
+    this.fileToOpen,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -28,26 +36,29 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
   bool value = false;
   final viewKey = GlobalKey(debugLabel: 'dashboard_view_key');
-  int _selectedIndex = 0;
-
-  final List<Widget> _pages = const [
-    HomePage(),
-    QuizManagementPage(),
-    StudentManagementPage(),
-    ResultsPage(),
-    Settings(),
-  ];
-
-  final _pageStorageBucket = PageStorageBucket();
-  final _httpService = HttpServerService();
-  final _examDb = ExamDatabaseService();
+  int _currentIndex = 0;
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     windowManager.addListener(this);
     super.initState();
-    _loadData();
+    _pages = [
+      const HomePage(),
+      const QuizManagementPage(),
+      const StudentManagementPage(),
+      const ResultsPage(),
+      HistoryPage(initialFile: widget.fileToOpen),
+      const Settings(),
+    ];
+    if (widget.initialPage != null) {
+      _currentIndex = widget.initialPage!;
+    }
   }
+
+  final _pageStorageBucket = PageStorageBucket();
+  final _httpService = HttpServerService();
+  final _examDb = ExamDatabaseService();
 
   @override
   void dispose() {
@@ -170,8 +181,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
           ),
         ),
         pane: NavigationPane(
-          selected: _selectedIndex,
-          onChanged: (index) => setState(() => _selectedIndex = index),
+          selected: _currentIndex,
+          onChanged: (index) => setState(() => _currentIndex = index),
           items: [
             PaneItem(
               icon: const Icon(FluentIcons.home),
@@ -190,15 +201,20 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             ),
             PaneItem(
               icon: const Icon(FluentIcons.room),
-              title: const Text('Phòng thi'),
+              title: const Text('Quản lý phòng thi'),
               body: ExamRoomScreen(
                 httpService: _httpService,
               ),
             ),
             PaneItem(
               icon: const Icon(FluentIcons.b_i_dashboard),
-              title: const Text('Kết quả'),
+              title: const Text('Kết quả bài thi'),
               body: _pages[3],
+            ),
+            PaneItem(
+              icon: const Icon(FluentIcons.fabric_data_connection_library),
+              title: const Text('Lịch sử bài thi'),
+              body: _pages[4],
             ),
           ],
           footerItems: [
@@ -206,7 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             PaneItem(
               icon: const Icon(FluentIcons.settings),
               title: const Text('Cài đặt'),
-              body: _pages[4],
+              body: _pages[5],
             ),
             PaneItem(
               icon: const Icon(FluentIcons.sign_out),
@@ -232,7 +248,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
                         onPressed: () {
                           Navigator.pop(context);
                           setState(() {
-                            _selectedIndex = 0;
+                            _currentIndex = 0;
                           });
                         },
                       ),

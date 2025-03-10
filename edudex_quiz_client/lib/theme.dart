@@ -32,17 +32,40 @@ class AppTheme extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> _saveAccentColor(AccentColor color) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      String colorName;
+
+      if (color == systemAccentColor) {
+        colorName = 'System';
+      } else {
+        final colorIndex = Colors.accentColors.indexOf(color);
+        if (colorIndex == -1) {
+          colorName = 'System';
+        } else {
+          colorName = accentColorNames[colorIndex + 1];
+        }
+      }
+
+      await prefs.setString(COLOR_KEY, colorName);
+      print('💾 Đã lưu màu chủ đề: $colorName');
+    } catch (e) {
+      print('🎨 Lỗi khi lưu màu chủ đề: $e');
+    }
+  }
+
   Future<void> loadSavedColor() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedColorName = prefs.getString(COLOR_KEY);
 
       if (savedColorName != null) {
-        if (savedColorName == 'system') {
+        if (savedColorName == 'System') {
           _color = systemAccentColor;
         } else {
           final colorIndex = accentColorNames.indexOf(savedColorName) - 1;
-          if (colorIndex >= 0) {
+          if (colorIndex >= 0 && colorIndex < Colors.accentColors.length) {
             _color = Colors.accentColors[colorIndex];
           }
         }
@@ -50,25 +73,6 @@ class AppTheme extends ChangeNotifier {
       }
     } catch (e) {
       print('🎨 Lỗi khi load màu chủ đề: $e');
-    }
-  }
-
-  Future<void> _saveAccentColor(AccentColor color) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      String colorName;
-
-      if (color == systemAccentColor) {
-        colorName = 'system';
-      } else {
-        final colorIndex = Colors.accentColors.indexOf(color);
-        colorName = accentColorNames[colorIndex + 1];
-      }
-
-      await prefs.setString(COLOR_KEY, colorName);
-      print('💾 Đã lưu màu chủ đề: $colorName');
-    } catch (e) {
-      print('🎨 Lỗi khi lưu màu chủ đề: $e');
     }
   }
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:fluent_ui/fluent_ui.dart' hide Page;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_acrylic/flutter_acrylic.dart' as flutter_acrylic;
@@ -8,14 +9,24 @@ import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:mutex/mutex.dart';
 
 import 'screens/splash_screen.dart';
 import 'theme.dart';
 import 'services/database_service.dart';
 import 'services/api_service.dart';
 import 'providers/student_provider.dart';
+import 'screens/dashboard/dashboard_screen.dart';
+import 'screens/history_screen.dart';
 
 const String appTitle = 'EduDex Quiz';
+
+// Thêm biến global để lưu file cần mở
+String? initialFile;
+
+// Mutex toàn cục cho ứng dụng
+final _appMutex = Mutex();
+bool _hasLock = false;
 
 bool get isDesktop {
   if (kIsWeb) return false;
@@ -26,53 +37,85 @@ bool get isDesktop {
   ].contains(defaultTargetPlatform);
 }
 
-void main() async {
+void main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Khởi tạo SQLite cho Windows
-  if (Platform.isWindows || Platform.isLinux) {
-    // Khởi tạo FFI loader
-    sqfliteFfiInit();
-    // Thay đổi databaseFactory mặc định
-    databaseFactory = databaseFactoryFfi;
+  // Nếu mở file .edudex, bỏ qua kiểm tra mutex
+  final isOpeningFile = args.isNotEmpty && args[0].endsWith('.edudex');
+
+  if (!isOpeningFile) {
+    await _initializeSingleInstance();
+    if (!_hasLock) {
+      if (Platform.isWindows) {
+        await windowManager.show();
+        await windowManager.focus();
+      }
+      exit(0);
+    }
+    // Khởi tạo SQLite cho Windows
+    if (Platform.isWindows || Platform.isLinux) {
+      // Khởi tạo FFI loader
+      sqfliteFfiInit();
+      // Thay đổi databaseFactory mặc định
+      databaseFactory = databaseFactoryFfi;
+    }
   }
 
-  if (kIsWeb) {
-    runApp(const MyApp());
-  } else {
-    await flutter_acrylic.Window.initialize();
-    await WindowManager.instance.ensureInitialized();
+// Thêm đoạn này để load accent color của hệ thống
+  if (!kIsWeb &&
+      [TargetPlatform.windows, TargetPlatform.android]
+          .contains(defaultTargetPlatform)) {
+    SystemTheme.accentColor.load();
+  }
 
+  if (!kIsWeb && isDesktop) {
+    await flutter_acrylic.Window.initialize();
+    if (defaultTargetPlatform == TargetPlatform.windows) {
+      await flutter_acrylic.Window.hideWindowControls();
+    }
+    await WindowManager.instance.ensureInitialized();
     windowManager.waitUntilReadyToShow().then((_) async {
       await windowManager.setTitleBarStyle(
         TitleBarStyle.hidden,
         windowButtonVisibility: false,
       );
       await windowManager.setMinimumSize(const Size(500, 600));
-      await windowManager.setSize(const Size(1280, 720));
+      await windowManager.setSize(const Size(1000, 700));
       await windowManager.center();
       await windowManager.maximize();
       await windowManager.show();
       await windowManager.setPreventClose(true);
       await windowManager.setSkipTaskbar(false);
+
+      // Thêm handler khi đóng cửa sổ
+      await windowManager.setPreventClose(true);
+      // windowManager.addListener(WindowListener(
+      //   onWindowClose: () async {
+      //     await _connectionService.dispose();
+      //     if (await windowManager.isPreventClose()) {
+      //       // ... existing close confirmation code ...
+      //     }
+      //   },
+      // ));
     });
-
-    SystemTheme.accentColor.load();
-
-    runApp(const MyApp());
   }
-}
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  SystemTheme.accentColor.load();
 
-  @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AppTheme(),
-      builder: (context, _) {
-        final appTheme = context.watch<AppTheme>();
-        return FluentApp(
+  final appTheme = AppTheme();
+  await appTheme.loadSettings();
+
+  // Lưu đường dẫn file nếu có
+  if (isOpeningFile) {
+    initialFile = args[0];
+  }
+
+  // Nếu mở file .edudex, hiển thị trực tiếp HistoryScreen
+  if (isOpeningFile) {
+    runApp(
+      ChangeNotifierProvider.value(
+        value: appTheme,
+        child: FluentApp(
           title: appTitle,
           themeMode: appTheme.mode,
           debugShowCheckedModeBanner: false,
@@ -81,35 +124,103 @@ class MyApp extends StatelessWidget {
             brightness: Brightness.dark,
             accentColor: appTheme.color,
             visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen() ? 2.0 : 0.0,
+            focusTheme: const FocusThemeData(
+              glowFactor: 0.0,
             ),
           ),
           theme: FluentThemeData(
             accentColor: appTheme.color,
             visualDensity: VisualDensity.standard,
-            focusTheme: FocusThemeData(
-              glowFactor: is10footScreen() ? 2.0 : 0.0,
+            focusTheme: const FocusThemeData(
+              glowFactor: 0.0,
             ),
           ),
-          locale: appTheme.locale,
-          builder: (context, child) {
-            return Directionality(
-              textDirection: appTheme.textDirection,
-              child: NavigationPaneTheme(
-                data: const NavigationPaneThemeData(),
-                child: child!,
-              ),
-            );
-          },
-          home: const SplashScreen(),
-        );
-      },
+          home: HistoryScreen(initialFile: args[0]),
+        ),
+      ),
     );
+    return;
+  }
+
+  // Khởi chạy ứng dụng
+  runApp(ChangeNotifierProvider.value(
+    value: appTheme,
+    child: const MyApp(),
+  ));
+}
+
+Future<void> _initializeSingleInstance() async {
+  try {
+    // Thử acquire lock
+    _hasLock = await _appMutex.protect(() async {
+      final prefs = await SharedPreferences.getInstance();
+      final lastPing = prefs.getInt('app_last_ping') ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      // Nếu ping cuối cùng > 5 giây, coi như instance cũ đã đóng
+      if (now - lastPing > 5000) {
+        // Lưu thời gian ping mới
+        await prefs.setInt('app_last_ping', now);
+        return true;
+      }
+      return false;
+    });
+
+    // Nếu có lock, bắt đầu ping định kỳ
+    if (_hasLock) {
+      Timer.periodic(const Duration(seconds: 3), (timer) async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setInt(
+            'app_last_ping', DateTime.now().millisecondsSinceEpoch);
+      });
+    }
+  } catch (e) {
+    stderr.writeln('Lỗi khi khởi tạo single instance: $e');
+    _hasLock = false;
   }
 }
 
-bool is10footScreen() {
-  if (kIsWeb) return false;
-  return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final appTheme = context.watch<AppTheme>();
+    return FluentApp(
+      title: appTitle,
+      themeMode: appTheme.mode,
+      debugShowCheckedModeBanner: false,
+      color: appTheme.color,
+      darkTheme: FluentThemeData(
+        brightness: Brightness.dark,
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen(context) ? 2.0 : 0.0,
+        ),
+      ),
+      theme: FluentThemeData(
+        accentColor: appTheme.color,
+        visualDensity: VisualDensity.standard,
+        focusTheme: FocusThemeData(
+          glowFactor: is10footScreen(context) ? 2.0 : 0.0,
+        ),
+      ),
+      locale: appTheme.locale,
+      builder: (context, child) {
+        return Directionality(
+          textDirection: appTheme.textDirection,
+          child: NavigationPaneTheme(
+            data: const NavigationPaneThemeData(),
+            child: child!,
+          ),
+        );
+      },
+      home: initialFile != null
+          ? DashboardScreen(
+              initialPage: 4,
+              fileToOpen: initialFile) // 2 là index của HistoryPage
+          : const SplashScreen(),
+    );
+  }
 }

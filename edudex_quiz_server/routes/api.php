@@ -46,6 +46,7 @@ Route::middleware(APITokenAuthentication::class)->group(function () {
     Route::post('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'store']);
     
     // Lấy danh sách thí sinh và đề thi
-    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/students', [ExamScheduleController::class, 'students']);
+    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/students', [ExamScheduleController::class, 'getStudentsByRoom'])
+        ->name('api.exam-schedule.students');
     Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/exam', [ExamScheduleController::class, 'exam']);
 });

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'result_screen.dart';
 import 'package:window_manager/window_manager.dart';
-import 'dart:io' show Platform;
+import 'dart:io' show Platform, File;
 import 'package:provider/provider.dart';
 import '../theme.dart';
 import 'dart:convert';
@@ -13,6 +13,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:http/http.dart' as http;
 import 'package:edudex_quiz_client/utils/crypto.dart';
 import 'package:intl/intl.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:edudex_quiz_client/screens/dashboard/dashboard_screen.dart';
 
 class QuizScreen extends StatefulWidget {
   final Map<String, dynamic> examInfo;
@@ -72,6 +74,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
   // Thêm biến lưu log
   final List<String> _actionLogs = [];
+
+  // Biến để lưu nội dung
+  String submissionContent = '';
 
   // Hàm thêm log
   void _addLog(String action) {
@@ -279,11 +284,11 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   }
 
   Future<void> _submitTest() async {
-    try {
-      setState(() {
-        _isSubmitting = true;
-      });
+    setState(() {
+      _isLoading = true;
+    });
 
+    try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token');
       final teacherIp = prefs.getString('teacher_ip');
@@ -342,7 +347,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
       }
 
       // Mã hóa nội dung file và chuyển sang base64
-      final base64Data = AppCrypto.encryptToBase64(buffer.toString());
+      final String base64Data = AppCrypto.encryptToBase64(buffer.toString());
 
       // Gửi request nộp bài với format mới
       final response = await http.post(
@@ -409,20 +414,184 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
           context: context,
           builder: (context) => ContentDialog(
             title: const Text('Lỗi'),
-            content: Text(e.toString()),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Lỗi khi nộp bài: ${e.toString()}'),
+                const SizedBox(height: 12),
+                const Text(
+                  'Bạn có thể thử nộp lại hoặc lưu kết quả vào file để nộp sau.',
+                  style: TextStyle(fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
             actions: [
               Button(
-                child: const Text('Đóng'),
-                onPressed: () => Navigator.pop(context),
+                child: const Text('Thử lại'),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _submitTest();
+                },
+              ),
+              FilledButton(
+                child: const Text('Lưu file kết quả và đóng'),
+                onPressed: () async {
+                  try {
+                    // Tắt tạm thời always on top
+                    await windowManager.setAlwaysOnTop(false);
+
+                    final prefs = await SharedPreferences.getInstance();
+                    final token = prefs.getString('token');
+                    final teacherIp = prefs.getString('teacher_ip');
+
+                    if (token == null || teacherIp == null) {
+                      throw Exception('Không tìm thấy thông tin cần thiết');
+                    }
+
+                    // Tạo danh sách câu trả lời
+                    final answers = _userAnswers.entries
+                        .map((e) => {
+                              'question_id': _questions[e.key]['id'],
+                              'answer_id': e.value != null
+                                  ? _questions[e.key]['answers'][e.value]['id']
+                                  : null,
+                            })
+                        .toList();
+
+                    // Tạo nội dung file log
+                    final buffer = StringBuffer();
+                    buffer.writeln('Thông tin thí sinh:');
+                    buffer.writeln(
+                        'Mã sinh viên: ${_studentData?['student_code'] ?? ''}');
+                    buffer.writeln(
+                        'Họ và tên: ${_studentData?['full_name'] ?? ''}');
+                    buffer.writeln(
+                        'Số báo danh: ${_studentData?['exam_code'] ?? ''}');
+                    buffer.writeln();
+
+                    buffer.writeln(
+                        '===============================================');
+                    buffer.writeln('Chi tiết đề thi:');
+                    buffer.writeln(
+                        'Môn thi: ${widget.examInfo['subject']['name']} (${widget.examInfo['subject']['code'] ?? ''}');
+                    buffer.writeln(
+                        'Tên đề thi: ${widget.examInfo['exam']['name'] ?? ''}');
+                    buffer.writeln(
+                        'Thời gian: ${widget.examInfo['exam']['duration'] ?? ''} phút');
+                    buffer.writeln(
+                        'Số câu hỏi: ${widget.examInfo['exam']['total_questions'] ?? ''} câu');
+                    buffer.writeln(
+                        'Phòng thi: ${widget.examInfo['room']['name'] ?? ''} - ${widget.examInfo['room']['facility'] ?? ''}');
+                    buffer.writeln(
+                        'Ca thi: ${widget.examInfo['shift']['name'] ?? ''}');
+                    buffer.writeln();
+
+                    buffer.writeln(
+                        '===============================================');
+                    buffer.writeln('Chi tiết bài làm:');
+                    buffer.writeln(
+                        'Thời gian bắt đầu: ${_startedAt.toIso8601String()}');
+                    buffer.writeln(
+                        'Thời gian nộp bài: ${DateTime.now().toIso8601String()}');
+                    buffer.writeln('Câu trả lời:');
+                    for (final answer in answers) {
+                      buffer.writeln(
+                          '- Câu ${answer['question_id'] ?? ''} : ${answer['answer_id'] ?? ''}');
+                    }
+                    buffer.writeln();
+
+                    buffer.writeln(
+                        '===============================================');
+                    buffer.writeln('Log:');
+                    for (final log in _actionLogs) {
+                      buffer.writeln(log);
+                    }
+                    // Mã hóa nội dung file và chuyển thành bytes
+                    final submissionFile = base64Decode(
+                        AppCrypto.encryptToBase64(buffer.toString()));
+
+                    // Lưu file
+                    final now = DateTime.now();
+                    final formatter = DateFormat('dd-MM-yyyy_HH-mm');
+                    final fileName =
+                        'ket_qua_thi_${_studentData?['student_code'] ?? 'unknown'}_${formatter.format(now)}.edudex';
+
+                    final filePicker = await FilePicker.platform.saveFile(
+                      dialogTitle: 'Lưu kết quả bài thi',
+                      fileName: fileName,
+                      allowedExtensions: ['edudex'],
+                      type: FileType.custom,
+                    );
+
+                    if (filePicker != null) {
+                      await File(filePicker).writeAsBytes(submissionFile);
+
+                      if (!mounted) return;
+                      showDialog(
+                        context: context,
+                        builder: (context) => ContentDialog(
+                          title: const Text('Thành công'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Đã lưu kết quả bài thi vào file:'),
+                              const SizedBox(height: 8),
+                              Text(filePicker,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 12),
+                              const Text('Vui lòng nộp file này cho giám thị.'),
+                            ],
+                          ),
+                          actions: [
+                            FilledButton(
+                              child: const Text('Đóng'),
+                              onPressed: () {
+                                Navigator.pushAndRemoveUntil(
+                                  context,
+                                  FluentPageRoute(
+                                      builder: (context) =>
+                                          const DashboardScreen()),
+                                  (route) => false,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    showDialog(
+                      context: context,
+                      builder: (context) => ContentDialog(
+                        title: const Text('Lỗi'),
+                        content: Text('Không thể lưu file: ${e.toString()}'),
+                        actions: [
+                          Button(
+                            child: const Text('Đóng'),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ],
+                      ),
+                    );
+                  } finally {
+                    // Bật lại chế độ "always on top"
+                    await windowManager.setAlwaysOnTop(true);
+                  }
+                },
               ),
             ],
           ),
         );
       }
     } finally {
-      setState(() {
-        _isSubmitting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
