@@ -222,7 +222,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
             PaneItem(
               icon: const Icon(FluentIcons.settings),
               title: const Text('Cài đặt'),
-              body: _pages[4],
+              body: _pages[5],
             ),
             PaneItem(
               icon: const Icon(FluentIcons.sign_out),

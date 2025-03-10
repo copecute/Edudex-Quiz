@@ -227,10 +227,12 @@ class _SettingsState extends State<Settings> with PageMixin {
             child: Text('Cài đặt'),
           ),
         ),
-        actions: const Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [WindowButtons()],
-        ),
+        actions: widget.showBackButton
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [WindowButtons()],
+              )
+            : null,
       ),
       content: ScaffoldPage.scrollable(
         children: [
