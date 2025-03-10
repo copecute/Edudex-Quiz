@@ -52,7 +52,7 @@ Route::middleware('auth')->group(function () {
 
 
     // quản lý tài khoản
-    Route::middleware('admin')->group(function () {
+    Route::middleware(['auth', 'admin'])->group(function () {
         Route::resource('accounts', AccountController::class);
         Route::get('accounts/tools/import-export', [AccountController::class, 'importExportTools'])->name('accounts.tools');
         Route::get('accounts-export', [AccountController::class, 'export'])->name('accounts.export');
@@ -83,7 +83,7 @@ Route::middleware('auth')->group(function () {
 
 
     // các route cơ sở
-    Route::middleware('admin')->group(function() {
+    Route::middleware(['auth', 'admin'])->group(function() {
         Route::resource('facilities', FacilityController::class);
         Route::put('facilities/{facility}/toggle-status', [FacilityController::class, 'toggleStatus'])
             ->name('facilities.toggle-status');
@@ -99,7 +99,7 @@ Route::middleware('auth')->group(function () {
 
 
     // các route phòng
-    Route::middleware('admin')->group(function() {
+    Route::middleware(['auth', 'admin'])->group(function() {
         Route::resource('rooms', RoomController::class);
         Route::put('rooms/{room}/toggle-status', [RoomController::class, 'toggleStatus'])
             ->name('rooms.toggle-status');
@@ -115,7 +115,7 @@ Route::middleware('auth')->group(function () {
 
     
     // các route khoa
-    Route::middleware('admin')->group(function() {
+    Route::middleware(['auth', 'admin'])->group(function() {
         Route::resource('faculties', FacultyController::class);
         Route::put('faculties/{faculty}/toggle-status', [FacultyController::class, 'toggleStatus'])
             ->name('faculties.toggle-status');
@@ -130,7 +130,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route chuyên ngành
-    Route::middleware('admin')->group(function() {
+    Route::middleware(['auth', 'admin'])->group(function() {
         Route::resource('majors', MajorController::class);
         Route::get('majors-export', [MajorController::class, 'export'])->name('majors.export');
         Route::post('majors-import', [MajorController::class, 'import'])->name('majors.import');
@@ -139,7 +139,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route môn học
-    Route::middleware('admin')->group(function() {
+    Route::middleware(['auth', 'admin'])->group(function() {
         Route::resource('subjects', SubjectController::class);
         Route::get('subjects-export', [SubjectController::class, 'export'])->name('subjects.export');
         Route::post('subjects-import', [SubjectController::class, 'import'])->name('subjects.import');
@@ -148,7 +148,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route ngân hàng câu hỏi
-    Route::middleware('teacher')->group(function() {
+    Route::middleware(['auth', 'teacher'])->group(function() {
         Route::get('questions/tags-by-subject', [QuestionController::class, 'getTagsBySubject'])->name('questions.tags');
         Route::get('questions/tools/import-export', [QuestionController::class, 'importExportTools'])->name('questions.tools');
         Route::get('questions-export', [QuestionController::class, 'export'])->name('questions.export');
@@ -158,7 +158,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route đề thi
-    Route::middleware('teacher')->group(function() {
+    Route::middleware(['auth', 'teacher'])->group(function() {
         Route::resource('exams', ExamController::class);
         Route::get('exams/tools/import-export', [ExamController::class, 'importExportTools'])->name('exams.tools');
         Route::get('exams-export', [ExamController::class, 'export'])->name('exams.export');
@@ -171,7 +171,7 @@ Route::middleware('auth')->group(function () {
     // các route thí sinh trong kỳ thi
     Route::prefix('exam-periods/{examPeriod}/students')
         ->name('students.')
-        ->middleware('admin')
+        ->middleware(['auth', 'admin'])
         ->group(function () {
             Route::get('/', [ExamPeriodStudentController::class, 'index'])->name('index');
             Route::get('/create', [ExamPeriodStudentController::class, 'create'])->name('create');
@@ -187,7 +187,7 @@ Route::middleware('auth')->group(function () {
         });
 
     // các route cán bộ coi thi trong kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/proctors')->middleware('admin')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/proctors')->middleware(['auth', 'admin'])->group(function () {
         Route::get('/', [ExamPeriodProctorController::class, 'index'])
             ->name('exam-period-proctors.index');
         Route::get('/assign', [ExamPeriodProctorController::class, 'assign'])
@@ -210,7 +210,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // các route phòng thi trong kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->middleware('admin')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/rooms')->name('exam-period-rooms.')->middleware(['auth', 'admin'])->group(function () {
         Route::get('/', [ExamPeriodRoomController::class, 'index'])->name('index');
         Route::get('/assign', [ExamPeriodRoomController::class, 'assign'])->name('assign');
         Route::post('/', [ExamPeriodRoomController::class, 'store'])->name('store');
@@ -223,7 +223,7 @@ Route::middleware('auth')->group(function () {
     });
 
     // phân công kỳ thi
-    Route::prefix('exam-periods/{examPeriod}/assignment')->name('exam-periods.assignment.')->middleware('admin')->group(function () {
+    Route::prefix('exam-periods/{examPeriod}/assignment')->name('exam-periods.assignment.')->middleware(['auth', 'admin'])->group(function () {
         // phân công ca thi cho môn thi
         Route::get('/subjects', [ExamPeriodAssignmentController::class, 'subjects'])->name('subjects');
         Route::post('/subjects', [ExamPeriodAssignmentController::class, 'assignSubjects'])->name('subjects.store');
@@ -243,18 +243,23 @@ Route::middleware('auth')->group(function () {
         Route::post('/students', [ExamPeriodAssignmentController::class, 'assignStudents'])->name('students');
     });
 
+    // xuất danh sách thí sinh trong ca thi (đặt ngoài này để user có thể truy cập)
+    Route::get('/exam-shifts/{shift}/rooms/{room}/export-students', [ExamShiftController::class, 'exportStudents'])
+        ->name('exam-shifts.export-students')
+        ->middleware(['auth']);
+
     // kết quả thi
     Route::get('/exam-periods/{examPeriod}/results', [ExamResultController::class, 'index'])
         ->name('exam-periods.results')
-        ->middleware('admin');
+        ->middleware(['auth', 'admin']);
     // route cho phúc khảo
     Route::post('/exam-periods/{examPeriod}/results/{result}/review', [ExamResultController::class, 'review'])
         ->name('exam-periods.results.review')
-        ->middleware('admin');
+        ->middleware(['auth', 'admin']);
     // route xuất kết quả
     Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
         ->name('exam-periods.results.export')
-        ->middleware('admin');
+        ->middleware(['auth', 'admin']);
     });
 
 // quản lý kỳ thi

@@ -145,131 +145,198 @@
                         <div class="card shadow-sm">
                             <div class="card-header bg-white py-3">
                                 <h5 class="mb-0 fw-bold">Lịch phân công coi thi</h5>
-                            </div>
-                            <div class="card-body bg-light">
+        </div>
+                <div class="card-body">
                                 @php
-                                    $examPeriods = \App\Models\ExamPeriod::whereHas('proctors', function ($query) {
-                                        $query->where('account_id', Auth::id());
-                                    })
-                                        ->where(function ($query) {
-                                            $now = now();
-                                            $query->where('is_active', true)->where('end_time', '>=', $now);
-                                        })
+                                    $examPeriods = \App\Models\ExamPeriod::select('exam_periods.*')
+                                        ->join('exam_shifts', 'exam_shifts.exam_period_id', '=', 'exam_periods.id')
+                                        ->join('exam_shift_rooms', 'exam_shift_rooms.exam_shift_id', '=', 'exam_shifts.id')
+                                        ->join('exam_period_rooms', 'exam_period_rooms.id', '=', 'exam_shift_rooms.exam_period_room_id')
+                                        ->join('rooms', 'rooms.id', '=', 'exam_period_rooms.room_id')
+                                        ->join('facilities', 'facilities.id', '=', 'rooms.facility_id')
+                                        ->join('exam_period_proctors', 'exam_period_proctors.id', '=', 'exam_shift_rooms.exam_period_proctor_id')
+                                        ->leftJoin('exam_period_subjects', 'exam_period_subjects.id', '=', 'exam_shift_rooms.exam_period_subject_id')
+                                        ->leftJoin('subjects', 'subjects.id', '=', 'exam_period_subjects.subject_id')
+                                        ->join('accounts', 'accounts.id', '=', 'exam_period_proctors.account_id')
+                                        ->join('account_infos', 'account_infos.account_id', '=', 'accounts.id')
+                                        ->where('exam_period_proctors.account_id', Auth::id())
+                                        ->where('exam_periods.is_active', 1)
+                                        ->where('exam_shifts.is_active', 1)
+                                        ->where('exam_periods.end_time', '>=', now())
                                         ->with([
-                                            'examShifts' => function ($query) {
-                                                $query
-                                                    ->where('is_active', true)
-                                                    ->whereHas('rooms.examShiftRooms', function ($q) {
-                                                        $q->where('exam_period_proctor_id', function ($sq) {
-                                                            $sq->select('id')
-                                                                ->from('exam_period_proctors')
-                                                                ->where('account_id', Auth::id())
-                                                                ->limit(1);
-                                                        });
-                                                    })
-                                                    ->orderBy('start_time');
-                                            },
-                                            'examShifts.rooms' => function ($query) {
-                                                $query->whereHas('examShiftRooms', function ($q) {
-                                                    $q->where('exam_period_proctor_id', function ($sq) {
-                                                        $sq->select('id')
-                                                            ->from('exam_period_proctors')
-                                                            ->where('account_id', Auth::id())
-                                                            ->limit(1);
-                                                    });
-                                                });
+                                            'examShifts' => function($query) {
+                                                $query->select([
+                                                    'exam_shifts.*',
+                                                    'rooms.name as room_name',
+                                                    'facilities.name as facility_name',
+                                                    'subjects.name as subject_name',
+                                                    'accounts.username as proctor_username',
+                                                    'account_infos.fullName as proctor_name'
+                                                ])
+                                                ->join('exam_shift_rooms', 'exam_shift_rooms.exam_shift_id', '=', 'exam_shifts.id')
+                                                ->join('exam_period_rooms', 'exam_period_rooms.id', '=', 'exam_shift_rooms.exam_period_room_id')
+                                                ->join('rooms', 'rooms.id', '=', 'exam_period_rooms.room_id')
+                                                ->join('facilities', 'facilities.id', '=', 'rooms.facility_id')
+                                                ->join('exam_period_proctors', 'exam_period_proctors.id', '=', 'exam_shift_rooms.exam_period_proctor_id')
+                                                ->leftJoin('exam_period_subjects', 'exam_period_subjects.id', '=', 'exam_shift_rooms.exam_period_subject_id')
+                                                ->leftJoin('subjects', 'subjects.id', '=', 'exam_period_subjects.subject_id')
+                                                ->join('accounts', 'accounts.id', '=', 'exam_period_proctors.account_id')
+                                                ->join('account_infos', 'account_infos.account_id', '=', 'accounts.id')
+                                                ->where('exam_period_proctors.account_id', Auth::id())
+                                                ->where('exam_shifts.is_active', 1)
+                                                ->orderBy('exam_shifts.start_time');
                                             },
                                             'examShifts.rooms.room.facility',
-                                            'examShifts.rooms.examShiftRooms' => function ($query) {
-                                                $query->where('exam_period_proctor_id', function ($sq) {
-                                                    $sq->select('id')
-                                                        ->from('exam_period_proctors')
-                                                        ->where('account_id', Auth::id())
-                                                        ->limit(1);
-                                                });
-                                            },
                                             'examShifts.rooms.examShiftRooms.examPeriodSubject.subject',
+                                            'examShifts.rooms.examShiftRooms.proctor.account.accountInfo'
                                         ])
-                                        ->orderBy('start_time')
+                                        ->orderBy('exam_periods.start_time')
+                                        ->distinct()
                                         ->get();
                                 @endphp
 
                                 @forelse($examPeriods as $period)
                                     <div class="mb-4">
-                                        <div class="d-flex align-items-center mb-3">
-                                            <h6 class="mb-0 flex-grow-1 fw-bold">{{ $period->name }}</h6>
-                                            <span
-                                                class="badge {{ $period->start_time->isFuture() ? 'bg-warning' : 'bg-success' }} bg-gradient">
-                                                {{ $period->start_time->isFuture() ? 'Sắp diễn ra' : 'Đang diễn ra' }}
-                                            </span>
+                                        <div class="alert alert-light">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0 fw-bold">{{ $period->name }}</h6>
+                                                <span class="badge {{ $period->start_time->isFuture() ? 'bg-info' : 'bg-success' }}">
+                                                    @if($period->start_time->isFuture())
+                                                        Sắp diễn ra (còn {{ abs(round($period->start_time->diffInDays())) }} ngày)
+                                                    @else
+                                                        Đang diễn ra (còn {{ abs(round($period->end_time->diffInDays())) }} ngày)
+                                                    @endif
+                                                </span>
+                                            </div>
                                         </div>
 
                                         @if ($period->examShifts->isEmpty())
-                                            <div class="alert alert-warning bg-warning bg-opacity-10 border-warning">
-                                                <i class="fas fa-exclamation-triangle me-2 text-warning"></i>
+                                            <div class="alert alert-warning">
+                                                <i class="fas fa-exclamation-triangle me-2"></i>
                                                 Bạn chưa được phân công phòng thi nào trong kỳ thi này.
                                             </div>
                                         @else
-                                            <div class="row g-3">
-                                                @foreach ($period->examShifts as $shift)
-                                                    @if ($shift->rooms->isEmpty())
-                                                        <div class="col-12">
-                                                            <div
-                                                                class="alert alert-warning bg-warning bg-opacity-10 border-warning">
-                                                                <i
-                                                                    class="fas fa-exclamation-triangle me-2 text-warning"></i>
-                                                                Bạn chưa được phân công phòng thi nào trong ca thi
-                                                                {{ $shift->name }}.
-                                                            </div>
-                </div>
-                                                    @else
-                                                        @foreach ($shift->rooms as $room)
-                                                            @php
-                                                                $shiftRoom = $room->examShiftRooms->first();
-                                                            @endphp
-                                                            <div class="col-md-6 col-xl-4">
-                                                                <div class="card h-100 border-0 shadow-sm hover-shadow">
-                                                                    <div class="card-header bg-white border-0 py-3">
-                                                                        <div
-                                                                            class="d-flex justify-content-between align-items-center">
-                                                                            <span class="badge bg-primary bg-gradient">
-                                                                                <i class="far fa-clock me-1"></i>
-                                                                                {{ $shift->start_time->format('H:i') }} -
-                                                                                {{ $shift->end_time->format('H:i') }}
-                                                                            </span>
-                                                                            <span class="badge bg-secondary bg-gradient">
-                                                                                <i class="far fa-calendar-alt me-1"></i>
-                                                                                {{ $shift->start_time->format('d/m/Y') }}
-                                                                            </span>
-            </div>
-        </div>
-                <div class="card-body">
-                                                                        <h6 class="card-title text-primary mb-2 fw-bold">
-                                                                            <i class="fas fa-door-open me-1"></i>
-                                                                            {{ $room->room->name }}
-                                                                        </h6>
-                                                                        <p class="card-text small mb-1">
-                                                                            <i class="fas fa-building me-1"></i>
-                                                                            {{ $room->room->facility->name }}
-                                                                        </p>
-                                                                        @if ($shiftRoom && $shiftRoom->examPeriodSubject)
-                                                                            <p class="card-text small mb-0 text-success">
-                                                                                <i class="fas fa-book me-1"></i>
-                                                                                {{ $shiftRoom->examPeriodSubject->subject->name }}
-                                                                            </p>
+                                            <div class="table-responsive">
+                                                <table class="table table-hover">
+                                                    <thead>
+                                                        <tr>
+                                                            <th style="width: 50px">STT</th>
+                                                            <th>Ca thi</th>
+                                                            <th>Thời gian</th>
+                                                            <th>Phòng thi</th>
+                                                            <th>Môn thi</th>
+                                                            <th>CBCT</th>
+                                                            <th>Trạng thái</th>
+                                                            <th style="width: 100px">Thao tác</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @php $stt = 1; @endphp
+                                                        @foreach($period->examShifts as $shift)
+                                                            @foreach($shift->rooms as $room)
+                                                                @php
+                                                                    $proctorId = DB::table('exam_period_proctors')
+                                                                        ->where('exam_period_id', $period->id)
+                                                                        ->where('account_id', Auth::id())
+                                                                        ->value('id');
+                                                                    
+                                                                    $shiftRoom = $room->examShiftRooms
+                                                                        ->where('exam_period_proctor_id', $proctorId)
+                                                                        ->first();
+                                                                @endphp
+                                                                @if($shiftRoom && $shiftRoom->examPeriodRoom && $shiftRoom->examPeriodRoom->room)
+                                                                <tr>
+                                                                    <td class="text-center">{{ $stt++ }}</td>
+                                                                    <td>{{ $shift->name }}</td>
+                                                                    <td>
+                                                                        <div class="small">
+                                                                            <i class="far fa-calendar me-1"></i>
+                                                                            {{ $shift->start_time->format('d/m/Y') }}
+                                                                        </div>
+                                                                        <div class="small text-muted">
+                                                                            <i class="far fa-clock me-1"></i>
+                                                                            {{ $shift->start_time->format('H:i') }} - {{ $shift->end_time->format('H:i') }}
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        <div class="d-flex align-items-center">
+                                                                            <div>
+                                                                                <div>{{ $shiftRoom->examPeriodRoom->room->name }}</div>
+                                                                                <div class="small text-muted">
+                                                                                    <i class="fas fa-map-marker-alt me-1"></i>
+                                                                                    {{ $shiftRoom->examPeriodRoom->room->facility->name }}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        @if($shiftRoom->examPeriodSubject)
+                                                                            {{ $shiftRoom->examPeriodSubject->subject->name }}
+                                                                        @else
+                                                                            <span class="text-muted">Chưa phân công</span>
                                                                         @endif
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                                    </td>
+                                                                    <td>
+                                                                        @if($shiftRoom->proctor && $shiftRoom->proctor->account)
+                                                                            <div data-id="{{ $shiftRoom->proctor->id }}">{{ $shiftRoom->proctor->account->accountInfo->fullName }}</div>
+                                                                            <div class="small text-muted">
+                                                                                <i class="fas fa-phone me-1"></i>
+                                                                                {{ $shiftRoom->proctor->account->accountInfo->phoneNumber }}
+                                                                            </div>
+                                                                        @else
+                                                                            <span class="text-muted">Chưa phân công</span>
+                                                                        @endif
+                                                                    </td>
+                                                                    <td>
+                                                                        @php
+                                                                            $now = now();
+                                                                            $status = '';
+                                                                            $statusClass = '';
+                                                                            
+                                                                            if ($shift->start_time->isFuture()) {
+                                                                                $diff = $now->diffInMinutes($shift->start_time);
+                                                                                if ($diff >= 1440) { // >= 24 giờ
+                                                                                    $days = round($diff / 1440);
+                                                                                    $status = "Sắp diễn ra (còn $days ngày)";
+                                                                                } elseif ($diff >= 60) { // >= 1 giờ
+                                                                                    $hours = round($diff / 60);
+                                                                                    $status = "Sắp diễn ra (còn $hours giờ)";
+                                                                                } else {
+                                                                                    $status = "Sắp diễn ra (còn $diff phút)";
+                                                                                }
+                                                                                $statusClass = 'bg-info';
+                                                                            } elseif ($shift->end_time->isPast()) {
+                                                                                $status = 'Đã kết thúc';
+                                                                                $statusClass = 'bg-secondary';
+                                                                            } else {
+                                                                                $remainingMins = round($now->diffInMinutes($shift->end_time));
+                                                                                $status = "Đang diễn ra (còn $remainingMins phút)";
+                                                                                $statusClass = 'bg-success';
+                                                                            }
+                                                                        @endphp
+                                                                        <span class="badge {{ $statusClass }}">{{ $status }}</span>
+                                                                    </td>
+                                                                    <td>
+                                                                        <button type="button" 
+                                                                                class="btn btn-sm btn-outline-primary" 
+                                                                                data-bs-toggle="modal" 
+                                                                                data-bs-target="#studentListModal{{ $shiftRoom->id }}">
+                                                                            <i class="fas fa-list me-1"></i> 
+                                                                            Chi tiết
+                                                                        </button>
+                                                                    </td>
+                                                                </tr>
+                                                                @endif
+                                                            @endforeach
                                                         @endforeach
-                                                    @endif
-                                                @endforeach
+                                                    </tbody>
+                                                </table>
                                             </div>
                                         @endif
                                     </div>
                                 @empty
-                                    <div class="alert alert-info bg-info bg-opacity-10 border-info">
-                                        <i class="fas fa-info-circle me-2 text-info"></i>
+                                    <div class="alert alert-info">
+                                        <i class="fas fa-info-circle me-2"></i>
                                         Bạn chưa được phân công coi thi cho kỳ thi nào.
                                     </div>
                                 @endforelse
@@ -557,11 +624,13 @@
 
                                             @if (Auth::user()->role == 1)
                                                 <div class="col-md-3">
-                                                    <a href="{{ route('questions.index') }}" class="text-decoration-none">
+                                                    <a href="{{ route('questions.index') }}"
+                                                        class="text-decoration-none">
                                                         <div class="card action-card bg-light border-0 h-100">
                                                             <div class="card-body text-center p-4">
                                                                 <div class="action-icon mb-3">
-                                                                    <i class="fas fa-question-circle fa-2x text-primary"></i>
+                                                                    <i
+                                                                        class="fas fa-question-circle fa-2x text-primary"></i>
                                                                 </div>
                                                                 <h6 class="mb-2">Ngân hàng câu hỏi</h6>
                                                                 <p class="text-muted small mb-0">Quản lý ngân hàng câu hỏi
@@ -580,11 +649,11 @@
                                                                 <h6 class="mb-2">Đề thi</h6>
                                                                 <p class="text-muted small mb-0">Quản lý đề thi
                                                                 </p>
-                                    </div>
-                                </div>
-                            </a>
-                        </div>
-                        @endif
+                                                            </div>
+                                                        </div>
+                                                    </a>
+                                                </div>
+                                            @endif
 
                         <div class="col-md-3">
                             <a href="{{ route('profile.show') }}" class="text-decoration-none">
@@ -661,7 +730,7 @@
                                                             class="btn btn-outline-info btn-sm">
                                                         Truy cập
                                                     </a>
-                                                </div>
+                                                    </div>
                                             </div>
                                         </div>
                                     </div>
@@ -764,4 +833,99 @@
         </div>
     </div>
 </div>
+
+<!-- Modal Danh Sách Thí Sinh -->
+@foreach($examPeriods as $period)
+    @foreach($period->examShifts as $shift)
+        @foreach($shift->rooms as $room)
+            @php
+                $proctorId = DB::table('exam_period_proctors')
+                    ->where('exam_period_id', $period->id)
+                    ->where('account_id', Auth::id())
+                    ->value('id');
+                
+                $shiftRoom = $room->examShiftRooms
+                    ->where('exam_period_proctor_id', $proctorId)
+                    ->first();
+            @endphp
+            @if($shiftRoom && $shiftRoom->examPeriodRoom && $shiftRoom->examPeriodRoom->room)
+            <div class="modal fade" id="studentListModal{{ $shiftRoom->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title">
+                                Danh sách thí sinh - Phòng {{ $shiftRoom->examPeriodRoom->room->name }}
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            @php
+                            $students = \App\Models\ExamPeriodRoomStudent::where('exam_shift_id', $shift->id)
+                                ->where('exam_period_room_id', $shiftRoom->examPeriodRoom->id)
+                                ->with(['student', 'examPeriodSubject.subject'])
+                                ->orderBy('seat_number')
+                                ->get();
+                            @endphp
+
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Số ghế</th>
+                                            <th>SBD</th>
+                                            <th>Mã SV</th>
+                                            <th>Họ và tên</th>
+                                            <th>Môn thi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($students as $student)
+                                        <tr>
+                                            <td>{{ $student->seat_number }}</td>
+                                            <td>{{ $student->student->exam_code }}</td>
+                                            <td>{{ $student->student->student_code }}</td>
+                                            <td>{{ $student->student->full_name }}</td>
+                                            <td>{{ $student->examPeriodSubject->subject->name }}</td>
+                                        </tr>
+                                        @empty
+                                        <tr>
+                                            <td colspan="5" class="text-center">
+                                                Chưa có thí sinh nào trong phòng này
+                                            </td>
+                                        </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <a href="{{ route('exam-shifts.export-students', ['shift' => $shift->id, 'room' => $shiftRoom->examPeriodRoom->id]) }}" 
+                               class="btn btn-success">
+                                <i class="fas fa-file-excel me-1"></i> Xuất Excel
+                            </a>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Đóng</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+        @endforeach
+    @endforeach
+@endforeach
+@endsection
+
+@section('styles')
+<style>
+.modal-lg {
+    max-width: 900px;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+.table td, .table th {
+    vertical-align: middle;
+}
+</style>
 @endsection 

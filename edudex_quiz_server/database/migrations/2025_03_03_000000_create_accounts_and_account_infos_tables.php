@@ -18,6 +18,7 @@ return new class extends Migration {
             $table->string('email')->unique()->comment('Địa chỉ email');
             $table->string('password')->comment('Mật khẩu');
             $table->boolean('is_active')->default(true);
+            $table->string('remember_token')->nullable();
             $table->tinyInteger('role')->default(0)->comment('0: CBCT, 1: Giáo viên, 2: Admin');
             $table->timestamps();  // Thời gian tạo và cập nhật tự động
         });
@@ -41,6 +42,7 @@ return new class extends Migration {
             'email' => 'admin@minhgiang.pro',
             'password' => bcrypt('123456'),
             'role' => 2,
+            'is_active' => true,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
