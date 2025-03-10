@@ -199,6 +199,7 @@ class ExamDatabaseService {
             correct_answers INTEGER,
             total_questions INTEGER,
             score REAL,
+            note TEXT,
             submitted_at TEXT,
             log_file TEXT
           )
@@ -218,6 +219,7 @@ class ExamDatabaseService {
               correct_answers INTEGER,
               total_questions INTEGER,
               score REAL,
+              note TEXT,
               submitted_at TEXT,
               log_file TEXT
             )
@@ -566,9 +568,10 @@ class ExamDatabaseService {
     required double score,
     required String logFile,
     String? note,
+    required DateTime submittedAt,
+    required String fullName,
   }) async {
     final db = await database;
-
     await db.insert('exam_results', {
       'exam_code': examCode,
       'student_code': studentCode,
@@ -577,7 +580,8 @@ class ExamDatabaseService {
       'score': score,
       'log_file': logFile,
       'note': note,
-      'submitted_at': DateTime.now().toIso8601String(),
+      'submitted_at': submittedAt.toIso8601String(),
+      'full_name': fullName,
     });
   }
 
@@ -667,6 +671,7 @@ class ExamDatabaseService {
               correct_answers INTEGER,
               total_questions INTEGER,
               score REAL,
+              note TEXT,
               submitted_at TEXT,
               log_file TEXT
             )

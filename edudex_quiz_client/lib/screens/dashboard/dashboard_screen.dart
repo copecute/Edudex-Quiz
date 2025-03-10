@@ -8,7 +8,6 @@ import 'dart:convert';
 
 import '../../theme.dart';
 import 'home_page.dart';
-import 'quiz_page.dart';
 import 'history_page.dart';
 import '../settings.dart';
 import '../login.dart';
@@ -39,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
     super.initState();
     _pages = [
       const HomePage(),
-      const QuizMenuPage(),
       HistoryPage(initialFile: widget.fileToOpen),
       const Settings(),
     ];
@@ -131,18 +129,13 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
         items: [
           PaneItem(
             icon: const Icon(FluentIcons.home),
-            title: const Text('Trang chủ'),
+            title: const Text('Tổng quan'),
             body: _pages[0],
-          ),
-          PaneItem(
-            icon: const Icon(FluentIcons.account_activity),
-            title: const Text('Đề bài'),
-            body: _pages[1],
           ),
           PaneItem(
             icon: const Icon(FluentIcons.history),
             title: const Text('Lịch sử'),
-            body: _pages[2],
+            body: _pages[1],
           ),
         ],
         footerItems: [
@@ -150,7 +143,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WindowListener {
           PaneItem(
             icon: const Icon(FluentIcons.settings),
             title: const Text('Cài đặt'),
-            body: _pages[3],
+            body: _pages[2],
           ),
           PaneItem(
             icon: const Icon(FluentIcons.sign_out),

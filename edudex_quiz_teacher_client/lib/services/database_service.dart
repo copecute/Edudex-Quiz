@@ -65,6 +65,22 @@ class DatabaseService {
             submitted_at TEXT NOT NULL
           )
         ''');
+
+        // Bảng exam_results
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS exam_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            exam_code TEXT NOT NULL,
+            student_code TEXT NOT NULL,
+            correct_answers INTEGER NOT NULL,
+            total_questions INTEGER NOT NULL,
+            score REAL NOT NULL,
+            log_file TEXT NOT NULL,
+            note TEXT,
+            submitted_at TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          )
+        ''');
       },
     );
   }

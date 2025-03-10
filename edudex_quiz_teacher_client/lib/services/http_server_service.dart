@@ -769,6 +769,9 @@ class HttpServerService {
         totalQuestions: totalQuestions,
         score: score,
         logFile: data['submission_file'],
+        note: null,
+        submittedAt: DateTime.now(),
+        fullName: student['full_name'],
       );
 
       // Trả về kết quả
