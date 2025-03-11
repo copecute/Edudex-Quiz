@@ -88,7 +88,43 @@
                                     <td>{{ $exam->name }}</td>
                                     <td>{{ $exam->subject->name }}</td>
                                     <td>{{ $exam->duration }} phút</td>
-                                    <td>{{ $exam->total_questions }} câu</td>
+                                    <td>
+                                        {{ $exam->total_questions }} câu
+                                        @php
+                                            $hasSufficientQuestions = collect($exam->availableQuestions)->every->is_sufficient;
+                                        @endphp
+                                        <span class="ms-2" 
+                                              data-bs-toggle="tooltip" 
+                                              data-bs-html="true"
+                                              title="@if(!$hasSufficientQuestions)
+                                                     @foreach($exam->availableQuestions as $questionInfo)
+                                                         @if(!$questionInfo['is_sufficient'])
+                                                             @if($questionInfo['tag'])
+                                                                 Tag '{{ $questionInfo['tag'] }}':
+                                                             @else
+                                                                 Tổng số câu hỏi:
+                                                             @endif
+                                                             @if($questionInfo['available']['easy'] < $questionInfo['required']['easy'])
+                                                                 <br>- Thiếu {{ $questionInfo['required']['easy'] - $questionInfo['available']['easy'] }} câu dễ
+                                                             @endif
+                                                             @if($questionInfo['available']['medium'] < $questionInfo['required']['medium'])
+                                                                 <br>- Thiếu {{ $questionInfo['required']['medium'] - $questionInfo['available']['medium'] }} câu trung bình
+                                                             @endif
+                                                             @if($questionInfo['available']['hard'] < $questionInfo['required']['hard'])
+                                                                 <br>- Thiếu {{ $questionInfo['required']['hard'] - $questionInfo['available']['hard'] }} câu khó
+                                                             @endif<br>
+                                                         @endif
+                                                     @endforeach
+                                                     @else
+                                                     Đã đủ số lượng câu hỏi theo yêu cầu
+                                                     @endif">
+                                            @if(!$hasSufficientQuestions)
+                                                <i class="fas fa-exclamation-triangle text-danger"></i>
+                                            @else
+                                                <i class="fas fa-check-circle text-success"></i>
+                                            @endif
+                                        </span>
+                                    </td>
                                     <td>
                                         <small>
                                             Dễ: {{ $exam->easy_rate }}% ({{ round($exam->total_questions * $exam->easy_rate / 100) }} câu)<br>
@@ -137,4 +173,18 @@
         </div>
     </div>
 </div>
-@endsection 
+@endsection
+
+@push('scripts')
+<script>
+$(document).ready(function() {
+    // Khởi tạo tooltip
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl, {
+            html: true
+        })
+    });
+});
+</script>
+@endpush 
