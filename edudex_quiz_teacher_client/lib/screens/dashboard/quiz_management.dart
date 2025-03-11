@@ -27,6 +27,8 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
   List<String> _selectedTags = [];
   String? _selectedDifficulty;
   List<dynamic> _filteredQuestions = [];
+  bool _isChecking = false;
+  bool _checkSuccess = false;
 
   @override
   void initState() {
@@ -53,13 +55,19 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
     }
   }
 
-  // Hàm kiểm tra đề thi
   Future<void> _checkExam() async {
+    setState(() {
+      _isChecking = true;
+      _examErrors.clear();
+      _checkSuccess = false;
+    });
+
+    await Future.delayed(const Duration(seconds: 1));
+
     final db = await _examDb.database;
-    _examErrors.clear();
+    bool hasError = false;
 
     try {
-      // 1. Kiểm tra số lượng câu hỏi
       final examQuery = await db.query('exams', limit: 1);
       if (examQuery.isEmpty) throw Exception('Không tìm thấy thông tin đề thi');
       final exam = examQuery.first;
@@ -72,9 +80,9 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
         _examErrors['total'] = [
           'Thiếu ${totalQuestions - questionCount} câu hỏi'
         ];
+        hasError = true;
       }
 
-      // 2. Kiểm tra câu hỏi trùng lặp
       final duplicateQuestions = await db.rawQuery('''
         SELECT content, COUNT(*) as count 
         FROM questions 
@@ -86,11 +94,12 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
         _examErrors['duplicate'] = duplicateQuestions
             .map((q) => 'Câu hỏi "${q['content']}" xuất hiện ${q['count']} lần')
             .toList();
+        hasError = true;
       }
 
-      // 3. Kiểm tra số lượng câu hỏi theo tag và độ khó
       final tagRates = await db.query('tag_difficulty_rates');
       final List<String> tagErrors = [];
+      final List<String> tagWarnings = [];
 
       for (final rate in tagRates) {
         final tagId = rate['tag_id'];
@@ -115,31 +124,8 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
 
           tagErrors.add(
               'Tag "${tag['name']}" - ${difficulty}: còn thiếu ${requiredCount - actualCount} câu');
-        }
-      }
-
-      if (tagErrors.isNotEmpty) {
-        _examErrors['tags'] = tagErrors;
-      }
-
-      // Kiểm tra số câu hỏi thừa theo tag và độ khó
-      final List<String> tagWarnings = [];
-      final Map<String, int> excessByDifficulty =
-          {}; // Lưu số câu thừa theo độ khó
-
-      for (final rate in tagRates) {
-        final tagId = rate['tag_id'];
-        final difficulty = rate['difficulty'].toString();
-        final requiredCount = rate['questions'] as int;
-
-        final actualCount = Sqflite.firstIntValue(await db.rawQuery('''
-          SELECT COUNT(*) FROM questions q
-          JOIN question_tags qt ON q.id = qt.question_id
-          JOIN tags t ON qt.tag_name = t.name
-          WHERE t.id = ? AND q.type = ?
-        ''', [tagId, difficulty]));
-
-        if (actualCount! > requiredCount) {
+          hasError = true;
+        } else if (actualCount > requiredCount + 5) {
           final tag = (await db.query(
             'tags',
             where: 'id = ?',
@@ -148,40 +134,28 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
           ))
               .first;
 
-          final excess = actualCount - requiredCount;
-          excessByDifficulty[difficulty] =
-              (excessByDifficulty[difficulty] ?? 0) + excess;
-
           tagWarnings.add(
-              'Tag "${tag['name']}" - ${difficulty}: thừa $excess câu ($actualCount/$requiredCount câu)');
+              'Tag "${tag['name']}" - ${difficulty}: thừa ${actualCount - requiredCount} câu (vượt quá 5 câu)');
+          hasError = true;
         }
       }
 
-      // Kiểm tra số câu random theo độ khó
-      final examDifficultyRates = await db.query('exam_difficulty_rates');
-      for (final rate in examDifficultyRates) {
-        final difficulty = rate['difficulty'].toString();
-        final randomQuestions = rate['random_questions'] as int;
-
-        if (excessByDifficulty.containsKey(difficulty)) {
-          final excess = excessByDifficulty[difficulty]!;
-          final remainingExcess = excess - randomQuestions;
-
-          if (remainingExcess > 0) {
-            tagWarnings.add(
-                '${difficulty}: Vẫn thừa $remainingExcess câu sau khi trừ ${randomQuestions} câu random');
-          }
-        }
+      if (tagErrors.isNotEmpty) {
+        _examErrors['tags'] = tagErrors;
       }
-
       if (tagWarnings.isNotEmpty) {
         _examErrors['tag_warnings'] = tagWarnings;
       }
 
-      setState(() {});
+      _checkSuccess = !hasError;
     } catch (e) {
       print('❌ Lỗi kiểm tra đề thi: $e');
       _examErrors['error'] = ['Lỗi kiểm tra đề thi: $e'];
+      _checkSuccess = false;
+    } finally {
+      setState(() {
+        _isChecking = false;
+      });
     }
   }
 
@@ -600,11 +574,31 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
                 ),
                 const Spacer(),
                 FilledButton(
-                  child: const Text('Kiểm tra'),
-                  onPressed: _checkExam,
+                  onPressed: _isChecking ? null : _checkExam,
+                  child: _isChecking
+                      ? const Row(
+                          children: [
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: ProgressRing(),
+                            ),
+                            SizedBox(width: 8),
+                            Text('Đang kiểm tra...'),
+                          ],
+                        )
+                      : const Text('Kiểm tra'),
                 ),
               ],
             ),
+            if (_checkSuccess && _examErrors.isEmpty) ...[
+              const SizedBox(height: 16),
+              const InfoBar(
+                title: Text('Đề thi hợp lệ'),
+                content: Text('Tất cả các tiêu chí đều đạt yêu cầu'),
+                severity: InfoBarSeverity.success,
+              ),
+            ],
             if (_examErrors.isNotEmpty) ...[
               const SizedBox(height: 16),
               for (final entry in _examErrors.entries) ...[
