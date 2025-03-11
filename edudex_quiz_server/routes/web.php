@@ -25,6 +25,7 @@ use App\Http\Controllers\ExamPeriodRoomController;
 use App\Http\Controllers\ExamPeriodAssignmentController;
 use App\Http\Controllers\ExamPeriodStudentController;
 use App\Http\Controllers\ExamResultController;
+use App\Http\Controllers\EdudexFileController;
 
 // chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -50,6 +51,13 @@ Route::middleware('auth')->group(function () {
     // trang dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
+    // đọc file .edudex
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/edudex-files', [EdudexFileController::class, 'index'])
+            ->name('edudex-files.index');
+        Route::post('/edudex-files/read', [EdudexFileController::class, 'read'])->name('edudex-files.read');
+    });
+    
 
     // quản lý tài khoản
     Route::middleware(['auth', 'admin'])->group(function () {
@@ -260,7 +268,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
         ->name('exam-periods.results.export')
         ->middleware(['auth', 'admin']);
-    });
+});
 
 // quản lý kỳ thi
 Route::middleware(['auth', 'admin'])->group(function () {
@@ -306,6 +314,7 @@ Route::middleware(['auth', 'admin'])->group(function () {
             ->name('exam-period-subjects.destroy');
     });
 });
+
 
 // route này để xử lý avatar
 Route::get('storage/avatars/{filename}', function ($filename) {
