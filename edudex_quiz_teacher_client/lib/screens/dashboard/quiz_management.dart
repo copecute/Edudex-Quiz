@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../services/exam_database_service.dart';
+import 'package:sqflite/sqflite.dart';
 
 class QuizManagementPage extends StatefulWidget {
   const QuizManagementPage({super.key});
@@ -20,11 +21,18 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
   Map<String, dynamic>? _examData;
   String? _errorMessage;
   bool _isLoading = true;
+  bool _showQuestions = false;
+  Map<String, List<String>> _examErrors = {};
+  final _searchController = TextEditingController();
+  List<String> _selectedTags = [];
+  String? _selectedDifficulty;
+  List<dynamic> _filteredQuestions = [];
 
   @override
   void initState() {
     super.initState();
     _loadExamData();
+    _searchController.addListener(_filterQuestions);
   }
 
   Future<void> _loadExamData() async {
@@ -45,9 +53,167 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
     }
   }
 
+  // Hàm kiểm tra đề thi
+  Future<void> _checkExam() async {
+    final db = await _examDb.database;
+    _examErrors.clear();
+
+    try {
+      // 1. Kiểm tra số lượng câu hỏi
+      final examQuery = await db.query('exams', limit: 1);
+      if (examQuery.isEmpty) throw Exception('Không tìm thấy thông tin đề thi');
+      final exam = examQuery.first;
+      final totalQuestions = exam['total_questions'] as int;
+
+      final questionCount = Sqflite.firstIntValue(
+          await db.rawQuery('SELECT COUNT(*) FROM questions'));
+
+      if (questionCount! < totalQuestions) {
+        _examErrors['total'] = [
+          'Thiếu ${totalQuestions - questionCount} câu hỏi'
+        ];
+      }
+
+      // 2. Kiểm tra câu hỏi trùng lặp
+      final duplicateQuestions = await db.rawQuery('''
+        SELECT content, COUNT(*) as count 
+        FROM questions 
+        GROUP BY content 
+        HAVING count > 1
+      ''');
+
+      if (duplicateQuestions.isNotEmpty) {
+        _examErrors['duplicate'] = duplicateQuestions
+            .map((q) => 'Câu hỏi "${q['content']}" xuất hiện ${q['count']} lần')
+            .toList();
+      }
+
+      // 3. Kiểm tra số lượng câu hỏi theo tag và độ khó
+      final tagRates = await db.query('tag_difficulty_rates');
+      final List<String> tagErrors = [];
+
+      for (final rate in tagRates) {
+        final tagId = rate['tag_id'];
+        final difficulty = rate['difficulty'].toString();
+        final requiredCount = rate['questions'] as int;
+
+        final actualCount = Sqflite.firstIntValue(await db.rawQuery('''
+          SELECT COUNT(*) FROM questions q
+          JOIN question_tags qt ON q.id = qt.question_id
+          JOIN tags t ON qt.tag_name = t.name
+          WHERE t.id = ? AND q.type = ?
+        ''', [tagId, difficulty]));
+
+        if (actualCount! < requiredCount) {
+          final tag = (await db.query(
+            'tags',
+            where: 'id = ?',
+            whereArgs: [tagId],
+            limit: 1,
+          ))
+              .first;
+
+          tagErrors.add(
+              'Tag "${tag['name']}" - ${difficulty}: còn thiếu ${requiredCount - actualCount} câu');
+        }
+      }
+
+      if (tagErrors.isNotEmpty) {
+        _examErrors['tags'] = tagErrors;
+      }
+
+      // Kiểm tra số câu hỏi thừa theo tag và độ khó
+      final List<String> tagWarnings = [];
+      final Map<String, int> excessByDifficulty =
+          {}; // Lưu số câu thừa theo độ khó
+
+      for (final rate in tagRates) {
+        final tagId = rate['tag_id'];
+        final difficulty = rate['difficulty'].toString();
+        final requiredCount = rate['questions'] as int;
+
+        final actualCount = Sqflite.firstIntValue(await db.rawQuery('''
+          SELECT COUNT(*) FROM questions q
+          JOIN question_tags qt ON q.id = qt.question_id
+          JOIN tags t ON qt.tag_name = t.name
+          WHERE t.id = ? AND q.type = ?
+        ''', [tagId, difficulty]));
+
+        if (actualCount! > requiredCount) {
+          final tag = (await db.query(
+            'tags',
+            where: 'id = ?',
+            whereArgs: [tagId],
+            limit: 1,
+          ))
+              .first;
+
+          final excess = actualCount - requiredCount;
+          excessByDifficulty[difficulty] =
+              (excessByDifficulty[difficulty] ?? 0) + excess;
+
+          tagWarnings.add(
+              'Tag "${tag['name']}" - ${difficulty}: thừa $excess câu ($actualCount/$requiredCount câu)');
+        }
+      }
+
+      // Kiểm tra số câu random theo độ khó
+      final examDifficultyRates = await db.query('exam_difficulty_rates');
+      for (final rate in examDifficultyRates) {
+        final difficulty = rate['difficulty'].toString();
+        final randomQuestions = rate['random_questions'] as int;
+
+        if (excessByDifficulty.containsKey(difficulty)) {
+          final excess = excessByDifficulty[difficulty]!;
+          final remainingExcess = excess - randomQuestions;
+
+          if (remainingExcess > 0) {
+            tagWarnings.add(
+                '${difficulty}: Vẫn thừa $remainingExcess câu sau khi trừ ${randomQuestions} câu random');
+          }
+        }
+      }
+
+      if (tagWarnings.isNotEmpty) {
+        _examErrors['tag_warnings'] = tagWarnings;
+      }
+
+      setState(() {});
+    } catch (e) {
+      print('❌ Lỗi kiểm tra đề thi: $e');
+      _examErrors['error'] = ['Lỗi kiểm tra đề thi: $e'];
+    }
+  }
+
+  void _filterQuestions() {
+    if (_examData == null) return;
+
+    final questions = _examData!['questions'] as List;
+    final searchTerm = _searchController.text.toLowerCase();
+
+    setState(() {
+      _filteredQuestions = questions.where((question) {
+        bool matchesSearch = searchTerm.isEmpty ||
+            question['content'].toString().toLowerCase().contains(searchTerm);
+
+        bool matchesTags = _selectedTags.isEmpty ||
+            (question['tags'] as List)
+                .any((tag) => _selectedTags.contains(tag.toString()));
+
+        bool matchesDifficulty = _selectedDifficulty == null ||
+            question['type'].toString().toLowerCase() ==
+                _selectedDifficulty!.toLowerCase();
+
+        return matchesSearch && matchesTags && matchesDifficulty;
+      }).toList();
+    });
+  }
+
   @override
   void dispose() {
     _examIdController.dispose();
+    _searchController.removeListener(_filterQuestions);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -79,6 +245,11 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
 
                         const SizedBox(height: 24),
 
+                        // Card kiểm tra đề thi
+                        _buildExamCheck(),
+
+                        const SizedBox(height: 24),
+
                         // Danh sách chủ đề
                         if (_examData != null) ...[
                           Text(
@@ -93,11 +264,6 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
 
                         // Danh sách câu hỏi
                         if (_examData != null) ...[
-                          Text(
-                            'Danh sách câu hỏi',
-                            style: FluentTheme.of(context).typography.subtitle,
-                          ),
-                          const SizedBox(height: 16),
                           _buildQuestionsList(),
                         ],
                       ],
@@ -211,91 +377,195 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
   }
 
   Widget _buildQuestionsList() {
-    final questions = _examData!['questions'] as List;
-    return ListView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: questions.length,
-      itemBuilder: (context, index) {
-        final question = questions[index];
-        final answers = question['answers'] as List;
-        final tags = question['tags'] as List;
+    if (_examData == null) return const SizedBox.shrink();
 
-        return Card(
-          padding: const EdgeInsets.all(16),
-          margin: const EdgeInsets.only(bottom: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+    final questions = _examData!['questions'] as List;
+    final allTags = _getAllTags();
+
+    // Khởi tạo _filteredQuestions nếu chưa có
+    if (_filteredQuestions.isEmpty && !_searchController.text.isNotEmpty) {
+      _filteredQuestions = List.from(questions);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header với nút ẩn/hiện
+        Row(
+          children: [
+            GestureDetector(
+              onTap: () => setState(() => _showQuestions = !_showQuestions),
+              child: Row(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'Câu ${index + 1}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: _getDifficultyColor(question['type']),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      question['type'].toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Text(
-                    'Chủ đề: ${tags.join(", ")}',
-                    style: const TextStyle(color: Colors.grey),
+                    'Danh sách câu hỏi (${_filteredQuestions.length}/${questions.length})',
+                    style: FluentTheme.of(context).typography.subtitle,
                   ),
+                  const SizedBox(width: 8),
+                  Icon(_showQuestions
+                      ? FluentIcons.chevron_up
+                      : FluentIcons.chevron_down),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(question['content']),
-              const SizedBox(height: 8),
-              ...answers.map((answer) {
-                final isCorrect = answer['is_correct'] as bool;
-                return Padding(
-                  padding: const EdgeInsets.only(left: 16, bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isCorrect
-                            ? FluentIcons.check_mark
-                            : FluentIcons.circle_ring,
-                        color: isCorrect ? Colors.green : Colors.grey,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(child: Text(answer['content'])),
-                    ],
+            ),
+          ],
+        ),
+
+        if (_showQuestions) ...[
+          const SizedBox(height: 16),
+
+          // Thanh tìm kiếm và bộ lọc
+          Row(
+            children: [
+              // Ô tìm kiếm
+              Expanded(
+                child: TextBox(
+                  controller: _searchController,
+                  placeholder: 'Tìm kiếm câu hỏi...',
+                  prefix: const Padding(
+                    padding: EdgeInsets.all(8.0),
+                    child: Icon(FluentIcons.search),
                   ),
-                );
-              }).toList(),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // Dropdown chọn độ khó
+              ComboBox<String>(
+                value: _selectedDifficulty,
+                items: [
+                  const ComboBoxItem(
+                    value: 'Tất cả độ khó',
+                    child: Text('Tất cả độ khó'),
+                  ),
+                  ...['Easy', 'Medium', 'Hard'].map((type) => ComboBoxItem(
+                        value: type,
+                        child: Text(type),
+                      )),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _selectedDifficulty = value;
+                    _filterQuestions();
+                  });
+                },
+              ),
             ],
           ),
-        );
-      },
+          const SizedBox(height: 8),
+
+          // Chọn chủ đề
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: allTags.map((tag) {
+              final isSelected = _selectedTags.contains(tag);
+              return ToggleButton(
+                checked: isSelected,
+                onChanged: (value) {
+                  setState(() {
+                    if (value) {
+                      _selectedTags.add(tag);
+                    } else {
+                      _selectedTags.remove(tag);
+                    }
+                    _filterQuestions();
+                  });
+                },
+                child: Text(tag),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+
+          // Danh sách câu hỏi đã lọc
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: _filteredQuestions.length,
+            itemBuilder: (context, index) {
+              final question = _filteredQuestions[index];
+              final answers = question['answers'] as List;
+              final tags = question['tags'] as List;
+
+              return Card(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'Câu ${index + 1}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: _getDifficultyColor(question['type']),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            question['type'].toUpperCase(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Chủ đề: ${tags.join(", ")}',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(question['content']),
+                    const SizedBox(height: 8),
+                    ...answers.map((answer) {
+                      final isCorrect = answer['is_correct'] as bool;
+                      return Padding(
+                        padding: const EdgeInsets.only(left: 16, bottom: 4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isCorrect
+                                  ? FluentIcons.check_mark
+                                  : FluentIcons.circle_ring,
+                              color: isCorrect ? Colors.green : Colors.grey,
+                              size: 16,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(answer['content'])),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ],
     );
   }
 
@@ -310,5 +580,80 @@ class _QuizManagementPageState extends State<QuizManagementPage> {
       default:
         return Colors.grey;
     }
+  }
+
+  // Widget hiển thị kết quả kiểm tra
+  Widget _buildExamCheck() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(FluentIcons.diagnostic),
+                const SizedBox(width: 8),
+                Text(
+                  'Kiểm tra đề thi',
+                  style: FluentTheme.of(context).typography.subtitle,
+                ),
+                const Spacer(),
+                FilledButton(
+                  child: const Text('Kiểm tra'),
+                  onPressed: _checkExam,
+                ),
+              ],
+            ),
+            if (_examErrors.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              for (final entry in _examErrors.entries) ...[
+                InfoBar(
+                  title: Text(_getErrorTitle(entry.key)),
+                  content: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children:
+                        entry.value.map((error) => Text('• $error')).toList(),
+                  ),
+                  severity: entry.key == 'tag_warnings'
+                      ? InfoBarSeverity.warning
+                      : InfoBarSeverity.error,
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getErrorTitle(String key) {
+    switch (key) {
+      case 'total':
+        return 'Số lượng câu hỏi không đủ';
+      case 'duplicate':
+        return 'Phát hiện câu hỏi trùng lặp';
+      case 'tags':
+        return 'Thiếu câu hỏi theo chủ đề/độ khó';
+      case 'tag_warnings':
+        return 'Thừa câu hỏi theo chủ đề/độ khó';
+      default:
+        return 'Lỗi kiểm tra';
+    }
+  }
+
+  // Hàm lấy tất cả các tag có trong đề thi
+  List<String> _getAllTags() {
+    if (_examData == null) return [];
+
+    final Set<String> tags = {};
+    final questions = _examData!['questions'] as List;
+
+    for (final question in questions) {
+      tags.addAll((question['tags'] as List).map((t) => t.toString()));
+    }
+
+    return tags.toList()..sort();
   }
 }
