@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Exam;
 use App\Models\Subject;
 use App\Models\Tag;
+use App\Models\Question;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Exports\ExamsExport;
@@ -16,27 +17,95 @@ class ExamController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Exam::with(['subject', 'tags']);
-
-        // Tìm kiếm
-        if ($request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhereHas('subject', function($q) use ($search) {
-                      $q->where('name', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        // Lọc theo môn học
-        if ($request->subject_code) {
-            $query->where('subject_code', $request->subject_code);
-        }
-
-        $exams = $query->latest()->paginate(10);
         $subjects = Subject::all();
+        
+        $exams = Exam::with(['subject', 'tags'])
+            ->when($request->search, function($query, $search) {
+                $query->where('name', 'like', "%{$search}%");
+            })
+            ->when($request->subject_code, function($query, $subject_code) {
+                $query->where('subject_code', $subject_code);
+            })
+            ->paginate(10);
+
+        // Thêm kiểm tra số lượng câu hỏi cho mỗi đề thi
+        foreach($exams as $exam) {
+            $availableQuestions = [];
+            
+            // Nếu có tags
+            if($exam->tags->isNotEmpty()) {
+                foreach($exam->tags as $tag) {
+                    $pivot = $tag->pivot;
+                    
+                    // Đếm số câu hỏi theo tag và độ khó
+                    $questionCounts = Question::whereHas('tags', function($query) use ($tag) {
+                        $query->where('tags.id', $tag->id);
+                    })
+                    ->where('subject_code', $exam->subject_code)
+                    ->selectRaw("
+                        SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) as easy_count,
+                        SUM(CASE WHEN difficulty = 'medium' THEN 1 ELSE 0 END) as medium_count,
+                        SUM(CASE WHEN difficulty = 'hard' THEN 1 ELSE 0 END) as hard_count
+                    ")
+                    ->first();
+
+                    $requiredEasy = round($pivot->num_questions * $pivot->easy_rate / 100);
+                    $requiredMedium = round($pivot->num_questions * $pivot->medium_rate / 100);
+                    $requiredHard = round($pivot->num_questions * $pivot->hard_rate / 100);
+
+                    $availableQuestions[] = [
+                        'tag' => $tag->name,
+                        'required' => [
+                            'easy' => $requiredEasy,
+                            'medium' => $requiredMedium,
+                            'hard' => $requiredHard
+                        ],
+                        'available' => [
+                            'easy' => $questionCounts->easy_count,
+                            'medium' => $questionCounts->medium_count,
+                            'hard' => $questionCounts->hard_count
+                        ],
+                        'is_sufficient' => 
+                            $questionCounts->easy_count >= $requiredEasy &&
+                            $questionCounts->medium_count >= $requiredMedium &&
+                            $questionCounts->hard_count >= $requiredHard
+                    ];
+                }
+            } else {
+                // Nếu không có tags, kiểm tra tổng số câu hỏi theo độ khó
+                $questionCounts = Question::where('subject_code', $exam->subject_code)
+                    ->selectRaw("
+                        SUM(CASE WHEN difficulty = 'easy' THEN 1 ELSE 0 END) as easy_count,
+                        SUM(CASE WHEN difficulty = 'medium' THEN 1 ELSE 0 END) as medium_count,
+                        SUM(CASE WHEN difficulty = 'hard' THEN 1 ELSE 0 END) as hard_count
+                    ")
+                    ->first();
+
+                $requiredEasy = round($exam->total_questions * $exam->easy_rate / 100);
+                $requiredMedium = round($exam->total_questions * $exam->medium_rate / 100);
+                $requiredHard = round($exam->total_questions * $exam->hard_rate / 100);
+
+                $availableQuestions[] = [
+                    'tag' => null,
+                    'required' => [
+                        'easy' => $requiredEasy,
+                        'medium' => $requiredMedium,
+                        'hard' => $requiredHard
+                    ],
+                    'available' => [
+                        'easy' => $questionCounts->easy_count,
+                        'medium' => $questionCounts->medium_count,
+                        'hard' => $questionCounts->hard_count
+                    ],
+                    'is_sufficient' => 
+                        $questionCounts->easy_count >= $requiredEasy &&
+                        $questionCounts->medium_count >= $requiredMedium &&
+                        $questionCounts->hard_count >= $requiredHard
+                ];
+            }
+            
+            $exam->availableQuestions = $availableQuestions;
+        }
 
         return view('exams.index', compact('exams', 'subjects'));
     }

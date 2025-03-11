@@ -3,7 +3,7 @@ import 'dart:developer';
 import 'dart:convert';
 import 'dart:typed_data' show Uint8List;
 
-// Key và IV cố định cho toàn bộ ứng dụng - phải giống với client
+// Key và IV cố định cho toàn bộ ứng dụng
 class AppCrypto {
   static final key = encrypt.Key.fromBase64(
       'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXoxMjM0NTY='); // base64 của 32 bytes

@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Middleware\APITokenAuthentication;
 use App\Http\Controllers\Api\ExamResultController;
 use App\Http\Controllers\Api\ExamScheduleController;
+use App\Http\Controllers\Api\ExamGeneratorController;
 
 // routes không cần xác thực
 
@@ -48,5 +49,5 @@ Route::middleware(APITokenAuthentication::class)->group(function () {
     // Lấy danh sách thí sinh và đề thi
     Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/students', [ExamScheduleController::class, 'getStudentsByRoom'])
         ->name('api.exam-schedule.students');
-    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/exam', [ExamScheduleController::class, 'exam']);
+    Route::get('/exam-schedule/shifts/{shift}/rooms/{room}/exam', [ExamGeneratorController::class, 'generateExam']);
 });

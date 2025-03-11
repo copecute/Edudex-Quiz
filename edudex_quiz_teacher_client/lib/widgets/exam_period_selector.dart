@@ -9,11 +9,13 @@ import '../screens/dashboard/dashboard_screen.dart';
 class ExamPeriodSelector extends StatefulWidget {
   final List<ExamPeriod> examPeriods;
   final Function(ExamPeriod, ExamShift, ExamRoom) onSelected;
+  final Function(int) onError;
 
   const ExamPeriodSelector({
     super.key,
     required this.examPeriods,
     required this.onSelected,
+    required this.onError,
   });
 
   @override
@@ -86,40 +88,60 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
     }
   }
 
+  void _showErrorDialog(String title, String message) {
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      showDialog(
+        context: context,
+        builder: (context) => ContentDialog(
+          title: Text(title),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  FluentIcons.warning,
+                  color: Colors.warningPrimaryColor,
+                  size: 24,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: const TextStyle(height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Vui lòng liên hệ quản trị viên để được hỗ trợ.',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.warningPrimaryColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            Button(
+              child: const Text('Đóng'),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
   Future<void> _loadAndSaveData(
       ExamPeriod period, ExamShift shift, ExamRoom room) async {
-    // Tạo BuildContext mới để quản lý dialog
-    late BuildContext dialogContext;
-
     try {
       setState(() => _isLoading = true);
-
       await _onPeriodSelected();
+
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('user_token');
       final serverUrl = prefs.getString('server_url');
-
-      // Hiển thị dialog loading
-      if (mounted) {
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (BuildContext context) {
-            dialogContext = context;
-            return const ContentDialog(
-              title: Text('Đang xử lý'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ProgressRing(),
-                  SizedBox(height: 16),
-                  Text('Đang tải dữ liệu đề thi và danh sách thí sinh...'),
-                ],
-              ),
-            );
-          },
-        );
-      }
 
       // Tải dữ liệu
       final examResponse = await http.get(
@@ -140,37 +162,23 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
         },
       );
 
-      // Đóng dialog loading
-      if (mounted) {
-        Navigator.pop(dialogContext);
-      }
-
       // Xử lý response
       final examData = json.decode(examResponse.body);
       final studentsData = json.decode(studentsResponse.body);
 
-      // Kiểm tra response có data không
+      // Kiểm tra response
       if (examResponse.statusCode == 200 &&
-          studentsResponse.statusCode == 200 &&
-          examData['data'] != null &&
-          studentsData['data'] != null) {
-        // Hiển thị thông báo đang lưu
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const ContentDialog(
-              title: Text('Đang xử lý'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ProgressRing(),
-                  SizedBox(height: 16),
-                  Text('Đang lưu dữ liệu vào bộ nhớ...'),
-                ],
-              ),
-            ),
-          );
+          studentsResponse.statusCode == 200) {
+        // Kiểm tra status error từ server
+        if (examData['status'] == 'error' ||
+            studentsData['status'] == 'error') {
+          widget.onError(1);
+          _showErrorDialog(
+              'Lỗi tải dữ liệu',
+              examData['message'] ??
+                  studentsData['message'] ??
+                  'Không thể tải dữ liệu từ máy chủ');
+          return;
         }
 
         try {
@@ -178,104 +186,51 @@ class _ExamPeriodSelectorState extends State<ExamPeriodSelector> {
           await _examDb.updateExamData(examData['data']);
           await _examDb.updateStudents(studentsData['data']);
 
-          // Kiểm tra dữ liệu đã lưu
-          final savedExam = await _examDb.getExamData();
-          final savedStudents = await _examDb.getStudents();
-
-          if (savedExam == null || savedStudents.isEmpty) {
-            throw Exception('Không thể lưu dữ liệu vào bộ nhớ');
-          }
-
-          // Đóng dialog loading và gọi callback
           if (mounted) {
-            Navigator.pop(context); // Đóng dialog "Đang lưu"
             widget.onSelected(period, shift, room);
           }
         } catch (e) {
-          if (mounted) {
-            Navigator.pop(context); // Đóng dialog "Đang lưu" nếu có lỗi
-            await _showErrorDialog(
-              context,
-              'Lỗi lưu dữ liệu',
-              'Không thể lưu dữ liệu vào bộ nhớ: $e',
-            );
-          }
+          print('❌ Lỗi lưu dữ liệu: $e');
+          widget.onError(1);
+          _showErrorDialog('Lỗi lưu dữ liệu', 'Không thể lưu dữ liệu: $e');
         }
       } else {
-        // Xử lý lỗi từ server
-        String errorTitle = 'Lỗi';
-        String errorMessage = '';
+        // Xử lý lỗi HTTP status
+        widget.onError(1);
+        String message = '';
 
-        if (examData['message'] != null) {
-          errorTitle = 'Lỗi tải đề thi';
-          errorMessage = examData['message'];
-        } else if (studentsData['message'] != null) {
-          errorTitle = 'Lỗi tải danh sách thí sinh';
-          errorMessage = studentsData['message'];
-        } else {
-          errorMessage =
-              'Không thể tải dữ liệu từ máy chủ. Vui lòng thử lại sau.';
+        if (examResponse.statusCode != 200) {
+          try {
+            final errorData = json.decode(examResponse.body);
+            message =
+                'Lỗi tải đề thi: ${errorData['message'] ?? 'Không thể tải đề thi'}';
+          } catch (e) {
+            message = 'Không thể tải đề thi';
+          }
         }
 
-        // Hiển thị dialog lỗi
-        if (mounted) {
-          await _showErrorDialog(context, errorTitle, errorMessage);
+        if (studentsResponse.statusCode != 200) {
+          try {
+            final errorData = json.decode(studentsResponse.body);
+            message += message.isNotEmpty ? '\n\n' : '';
+            message +=
+                'Lỗi tải danh sách thí sinh: ${errorData['message'] ?? 'Không thể tải danh sách thí sinh'}';
+          } catch (e) {
+            message += message.isNotEmpty ? '\n\n' : '';
+            message += 'Không thể tải danh sách thí sinh';
+          }
         }
+
+        _showErrorDialog('Lỗi tải dữ liệu', message);
       }
     } catch (e) {
-      // Đóng dialog loading nếu có lỗi
-      if (mounted) {
-        Navigator.pop(dialogContext);
-        await _showErrorDialog(
-          context,
-          'Lỗi không mong muốn',
-          'Đã xảy ra lỗi: $e\n\nVui lòng thử lại sau hoặc liên hệ hỗ trợ kỹ thuật.',
-        );
-      }
+      print('❌ Lỗi khi tải dữ liệu: $e');
+      widget.onError(1);
+      _showErrorDialog('Lỗi không mong muốn',
+          'Đã xảy ra lỗi: $e\n\nVui lòng thử lại sau hoặc liên hệ hỗ trợ kỹ thuật.');
     } finally {
       setState(() => _isLoading = false);
     }
-  }
-
-  Future<void> _showErrorDialog(
-      BuildContext context, String title, String message) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => ContentDialog(
-        title: Row(
-          children: [
-            const Icon(FluentIcons.error, color: Colors.errorPrimaryColor),
-            const SizedBox(width: 8),
-            Text(title),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              message,
-              style: const TextStyle(height: 1.5),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Vui lòng thử lại sau hoặc liên hệ quản trị viên để được hỗ trợ.',
-              style: TextStyle(
-                fontStyle: FontStyle.italic,
-                color: Colors.warningPrimaryColor,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          Button(
-            child: const Text('Đóng'),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
   }
 
   @override

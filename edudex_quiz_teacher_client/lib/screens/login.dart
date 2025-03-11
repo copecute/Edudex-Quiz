@@ -34,6 +34,7 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
   static const String SERVER_URL_KEY = 'server_url';
   bool _isLoading = false;
   bool _obscurePassword = true;
+  int _errorCount = 0;
 
   // Define the constants for SharedPreferences keys
   static const String SELECTED_PERIOD_ID = 'selected_period_id';
@@ -69,6 +70,7 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
     setState(() {
       _errorMessage = null;
       _isLoading = true;
+      _errorCount = 0;
     });
 
     try {
@@ -138,15 +140,23 @@ class _LoginScreenState extends State<LoginScreen> with WindowListener {
               if (room.subject.exam?.id != null) {
                 await prefs.setInt(SELECTED_EXAM_ID, room.subject.exam!.id!);
               }
-
-              if (!mounted) return;
-              Navigator.pushReplacement(
-                context,
-                FluentPageRoute(builder: (context) => const DashboardScreen()),
-              );
+            },
+            onError: (count) {
+              setState(() {
+                _errorCount += count;
+              });
             },
           ),
         );
+
+        // Chỉ chuyển hướng nếu không có lỗi
+        if (!mounted) return;
+        if (_errorCount == 0) {
+          Navigator.pushReplacement(
+            context,
+            FluentPageRoute(builder: (context) => const DashboardScreen()),
+          );
+        }
       } else {
         setState(() {
           _errorMessage = data['message'] ?? 'Đăng nhập thất bại';

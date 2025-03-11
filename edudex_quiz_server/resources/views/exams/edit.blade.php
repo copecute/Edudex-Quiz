@@ -27,6 +27,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-danger tag-questions-error" style="display: none;"></div>
                     <form action="{{ route('exams.update', $exam) }}" method="POST" id="examForm">
                         @csrf
                         @method('PUT')
@@ -615,6 +616,43 @@ $(document).ready(function() {
 
     // Gọi hàm kiểm tra khi load trang
     checkDuration();
+
+    // Thêm hàm kiểm tra tổng số câu hỏi trong các tag
+    function validateTotalQuestions() {
+        const totalQuestions = parseInt($('#total_questions').val()) || 0;
+        let tagTotalQuestions = 0;
+        
+        // Tính tổng số câu hỏi từ tất cả các tag
+        $('.tag-item').each(function() {
+            const numQuestions = parseInt($(this).find('input[name$="[num_questions]"]').val()) || 0;
+            tagTotalQuestions += numQuestions;
+        });
+        
+        // Kiểm tra nếu tổng số câu hỏi trong tag vượt quá tổng số câu đề thi
+        if (tagTotalQuestions > totalQuestions) {
+            $('.tag-questions-error').text('Tổng số câu hỏi trong các tag (' + tagTotalQuestions + ') không được vượt quá tổng số câu hỏi đề thi (' + totalQuestions + ')').show();
+            return false;
+        }
+        
+        $('.tag-questions-error').hide();
+        return true;
+    }
+
+    // Thêm validation khi submit form
+    $('#examForm').on('submit', function(e) {
+        // Kiểm tra tổng số câu hỏi trong tag
+        if (!validateTotalQuestions()) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // ... các validation khác giữ nguyên ...
+    });
+
+    // Thêm sự kiện kiểm tra khi thay đổi số câu hỏi
+    $('#total_questions, .tag-item input[name$="[num_questions]"]').on('input', function() {
+        validateTotalQuestions();
+    });
 });
 </script>
 @endpush 

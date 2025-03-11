@@ -132,8 +132,13 @@ class HomePage extends StatelessWidget {
 
                     if (snapshot.hasError) {
                       return InfoBar(
-                        title: Text('Đã có lỗi xảy ra: ${snapshot.error}'),
+                        title: const Text('Lỗi kết nối'),
+                        content: Text(
+                          snapshot.error.toString(),
+                          style: const TextStyle(height: 1.5),
+                        ),
                         severity: InfoBarSeverity.error,
+                        isLong: true,
                       );
                     }
 
@@ -308,7 +313,21 @@ class HomePage extends StatelessWidget {
         throw Exception(data['message'] ?? 'Không thể tải thông tin đề thi');
       }
     } catch (e) {
-      throw Exception('Đã có lỗi xảy ra: ${e.toString()}');
+      String errorMessage = 'Đã có lỗi xảy ra';
+
+      // xử lý các loại lỗi
+      if (e.toString().contains('SocketException')) {
+        errorMessage = 'Không thể kết nối đến máy chủ. Vui lòng kiểm tra:\n'
+            '• Máy chủ đã được bật chưa\n'
+            '• Kết nối mạng có ổn định không\n'
+            '• Địa chỉ IP máy chủ có chính xác không';
+      } else if (e.toString().contains('refused')) {
+        errorMessage = 'Máy chủ từ chối kết nối. Vui lòng:\n'
+            '• Kiểm tra phần mềm máy chủ có đang chạy không\n'
+            '• Liên hệ cán bộ kỹ thuật để được hỗ trợ';
+      }
+
+      return Future.error(errorMessage);
     }
   }
 }

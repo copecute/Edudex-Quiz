@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
+import 'dart:io';
 
 class ResultsPage extends StatefulWidget {
   const ResultsPage({super.key});
@@ -425,7 +427,11 @@ class _ResultsPageState extends State<ResultsPage> {
                                       children: [
                                         // Header
                                         Container(
-                                          color: Colors.grey[20],
+                                          color: FluentTheme.of(context)
+                                                      .brightness ==
+                                                  Brightness.light
+                                              ? Colors.grey[30]
+                                              : Colors.grey[130],
                                           child: Row(
                                             children: [
                                               Padding(
@@ -737,6 +743,70 @@ class _ResultsPageState extends State<ResultsPage> {
     return Colors.green;
   }
 
+  Future<void> _saveLogFile(Map<String, dynamic> result) async {
+    try {
+      // Tạo tên file từ thông tin bài thi
+      final submittedAt = DateTime.parse(result['submitted_at']);
+      final fileName = 'ket_qua_thi_${result['student_code']}_'
+          '${submittedAt.day.toString().padLeft(2, '0')}-'
+          '${submittedAt.month.toString().padLeft(2, '0')}-'
+          '${submittedAt.year}_'
+          '${submittedAt.hour.toString().padLeft(2, '0')}-'
+          '${submittedAt.minute.toString().padLeft(2, '0')}'
+          '.edudex';
+
+      // Mở dialog chọn vị trí lưu file
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Chọn vị trí lưu file',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['edudex'],
+      );
+
+      if (path != null) {
+        // Chuyển base64 thành bytes
+        final bytes = base64.decode(result['log_file']);
+
+        // Lưu file
+        final file = File(path);
+        await file.writeAsBytes(bytes);
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => ContentDialog(
+              title: const Text('Thành công'),
+              content: Text('Đã lưu file tại:\n$path'),
+              actions: [
+                Button(
+                  child: const Text('Đóng'),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Lỗi khi lưu file: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => ContentDialog(
+            title: const Text('Lỗi'),
+            content: Text('Không thể lưu file: ${e.toString()}'),
+            actions: [
+              Button(
+                child: const Text('Đóng'),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
   void _showResultDetails(Map<String, dynamic> result) {
     showDialog(
       context: context,
@@ -746,14 +816,6 @@ class _ResultsPageState extends State<ResultsPage> {
             const Icon(FluentIcons.test_plan),
             const SizedBox(width: 8),
             const Text('Chi tiết kết quả'),
-            const Spacer(),
-            IconButton(
-              icon: const Icon(FluentIcons.edit),
-              onPressed: () {
-                Navigator.pop(context);
-                _showNoteDialog(result);
-              },
-            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -808,6 +870,29 @@ class _ResultsPageState extends State<ResultsPage> {
           ),
         ),
         actions: [
+          Button(
+            child: const Row(
+              children: [
+                Icon(FluentIcons.save, size: 16),
+                SizedBox(width: 8),
+                Text('Lưu file'),
+              ],
+            ),
+            onPressed: () => _saveLogFile(result),
+          ),
+          Button(
+            child: const Row(
+              children: [
+                Icon(FluentIcons.edit, size: 16),
+                SizedBox(width: 8),
+                Text('Ghi chú'),
+              ],
+            ),
+            onPressed: () {
+              Navigator.pop(context);
+              _showNoteDialog(result);
+            },
+          ),
           Button(
             child: const Text('Đóng'),
             onPressed: () => Navigator.pop(context),

@@ -27,6 +27,7 @@
                     </h5>
                 </div>
                 <div class="card-body">
+                    <div class="alert alert-danger tag-questions-error" style="display: none;"></div>
                     <form action="{{ route('exams.store') }}" method="POST" id="examForm">
                         @csrf
                         <!-- Thông tin cơ bản -->
@@ -521,36 +522,46 @@ $(document).ready(function() {
         }
     });
 
-    // Validate form trước khi submit
-    $('#examForm').on('submit', function(e) {
-        if ($('.tag-item').length === 0) {
-            // Validate tỷ lệ độ khó chung khi không có tag
-            const easyRate = parseInt($('input[name="easy_rate"]').val()) || 0;
-            const mediumRate = parseInt($('input[name="medium_rate"]').val()) || 0;
-            const hardRate = parseInt($('input[name="hard_rate"]').val()) || 0;
-            
-            if (easyRate + mediumRate + hardRate !== 100) {
-                e.preventDefault();
-                $('.difficulty-rate-error').text('Tổng tỷ lệ độ khó phải bằng 100%').show();
-                $('input[name="easy_rate"], input[name="medium_rate"], input[name="hard_rate"]').addClass('is-invalid');
-                return false;
-            }
-        } else {
-            // Validate tỷ lệ độ khó của từng tag
-            let isValid = true;
-            $('.tag-item').each(function() {
-                if (!validateTagDifficultyRates(this)) {
-                    isValid = false;
-                    return false;
-                }
-            });
-
-            if (!isValid) {
-                e.preventDefault();
-                return false;
-            }
+    // Thêm hàm kiểm tra tổng số câu hỏi trong các tag
+    function validateTotalQuestions() {
+        const totalQuestions = parseInt($('#total_questions').val()) || 0;
+        let tagTotalQuestions = 0;
+        
+        // Tính tổng số câu hỏi từ tất cả các tag
+        $('.tag-item').each(function() {
+            const numQuestions = parseInt($(this).find('input[name$="[num_questions]"]').val()) || 0;
+            tagTotalQuestions += numQuestions;
+        });
+        
+        // Kiểm tra nếu tổng số câu hỏi trong tag vượt quá tổng số câu đề thi
+        if (tagTotalQuestions > totalQuestions) {
+            $('.tag-questions-error').text('Tổng số câu hỏi trong các tag (' + tagTotalQuestions + ') không được vượt quá tổng số câu hỏi đề thi (' + totalQuestions + ')').show();
+            return false;
         }
+        
+        $('.tag-questions-error').hide();
+        return true;
+    }
+
+    // Thêm validation khi submit form
+    $('#examForm').on('submit', function(e) {
+        // Kiểm tra tổng số câu hỏi trong tag
+        if (!validateTotalQuestions()) {
+            e.preventDefault();
+            return false;
+        }
+        
+        // ... các validation khác giữ nguyên ...
     });
+
+    // Thêm sự kiện kiểm tra khi thay đổi số câu hỏi
+    $('#total_questions, .tag-item input[name$="[num_questions]"]').on('input', function() {
+        validateTotalQuestions();
+    });
+
+    // Gọi hàm kiểm tra khi load trang
+    calculateOverallDifficulty();
+    updateQuestionCounts();
 
     // Hàm kiểm tra thời gian làm bài
     function checkDuration() {
