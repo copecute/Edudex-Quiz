@@ -43,7 +43,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   // biến trạng thái đang nộp bài
   bool _isSubmitting = false;
 
-  // cỡ chữ hiện tại
+  // cỡ chữ
   double _fontSize = 16.0;
 
   // biến lưu danh sách câu hỏi từ file json
@@ -59,7 +59,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   final ScrollController _scrollController = ScrollController();
 
   // biến chiều cao ước tính cho mỗi câu hỏi
-  final double _questionHeight = 250;
+  final double _questionHeight = 300;
 
   Map<String, dynamic>? _studentData;
   List<dynamic>? _examsData;
@@ -78,6 +78,9 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
   // Biến để lưu nội dung
   String submissionContent = '';
 
+  // Thêm map để lưu key cho từng câu hỏi
+  final Map<int, GlobalKey> _questionKeys = {};
+
   // Hàm thêm log
   void _addLog(String action) {
     final now = DateTime.now();
@@ -87,12 +90,21 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
 
   // hàm cuộn đến câu hỏi được chọn
   void _scrollToQuestion(int index) {
-    final double offset = index * _questionHeight;
-    _scrollController.animateTo(
-      offset,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
+    if (_scrollController.hasClients && _questionKeys.containsKey(index)) {
+      // Lấy vị trí hiện tại của câu hỏi được chọn
+      final RenderBox renderBox =
+          _questionKeys[index]!.currentContext!.findRenderObject() as RenderBox;
+      final position = renderBox.localToGlobal(Offset.zero);
+
+      // Scroll đến vị trí của câu hỏi
+      _scrollController.animateTo(
+        _scrollController.offset +
+            position.dy -
+            250, // trừ 250 kích thước của header
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
@@ -763,6 +775,7 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                 ),
                 child: Row(
                   children: [
+                    // Ảnh và thông tin thí sinh
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -776,26 +789,25 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                             'Số báo danh: ${_studentData?['exam_code'] ?? ''}'),
                       ],
                     ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Thông tin bài thi',
-                              style: TextStyle(fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 8),
-                          Text(
-                              'Môn thi: ${widget.examInfo['subject']['name']} (${widget.examInfo['subject']['code']})'),
-                          Text(
-                              'Tên đề thi: ${widget.examInfo['exam']['name']}'),
-                          Text(
-                              'Thời gian: ${widget.examInfo['exam']['duration']} phút'),
-                          Text(
-                              'Số câu hỏi: ${widget.examInfo['exam']['total_questions']} câu'),
-                          Text(
-                              'Phòng thi: ${widget.examInfo['room']['name']} - ${widget.examInfo['room']['facility']}'),
-                          Text('Ca thi: ${widget.examInfo['shift']['name']}'),
-                        ],
-                      ),
+                    const Spacer(),
+                    // Thông tin bài thi
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Thông tin bài thi',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(
+                            'Môn thi: ${widget.examInfo['subject']['name']} (${widget.examInfo['subject']['code']})'),
+                        Text('Tên đề thi: ${widget.examInfo['exam']['name']}'),
+                        Text(
+                            'Thời gian: ${widget.examInfo['exam']['duration']} phút'),
+                        Text(
+                            'Số câu hỏi: ${widget.examInfo['exam']['total_questions']} câu'),
+                        Text(
+                            'Phòng thi: ${widget.examInfo['room']['name']} - ${widget.examInfo['room']['facility']}'),
+                        Text('Ca thi: ${widget.examInfo['shift']['name']}'),
+                      ],
                     ),
                   ],
                 ),
@@ -819,51 +831,65 @@ class _QuizScreenState extends State<QuizScreen> with WindowListener {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: List.generate(
                               _questions.length,
-                              (questionIndex) => Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'CÂU ${questionIndex + 1}:',
-                                    style: const TextStyle(
-                                      color: Color(0xFFD83B01),
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(_questions[questionIndex]['content'],
-                                      style: TextStyle(fontSize: _fontSize)),
-                                  const SizedBox(height: 24),
-                                  ...List.generate(
-                                    _questions[questionIndex]['answers'].length,
-                                    (answerIndex) => Padding(
-                                      padding:
-                                          const EdgeInsets.only(bottom: 16),
-                                      child: RadioButton(
-                                        checked: questionIndex ==
-                                                    _currentQuestionIndex &&
-                                                _selectedAnswerIndex ==
-                                                    answerIndex ||
-                                            _userAnswers[questionIndex] ==
-                                                answerIndex,
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _currentQuestionIndex =
-                                                questionIndex;
-                                            _selectedAnswerIndex = answerIndex;
-                                            _userAnswers[questionIndex] =
-                                                answerIndex;
-                                          });
-                                        },
-                                        content: Text(
-                                          '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]['content']}',
-                                          style: TextStyle(
-                                              fontSize: _fontSize - 2),
+                              (questionIndex) {
+                                // Tạo key cho mỗi câu hỏi nếu chưa có
+                                _questionKeys[questionIndex] =
+                                    _questionKeys[questionIndex] ?? GlobalKey();
+
+                                return Container(
+                                  key: _questionKeys[
+                                      questionIndex], // Gán key cho container của câu hỏi
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'CÂU ${questionIndex + 1}:',
+                                        style: const TextStyle(
+                                          color: Color(0xFFD83B01),
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ),
+                                      const SizedBox(height: 16),
+                                      Text(_questions[questionIndex]['content'],
+                                          style:
+                                              TextStyle(fontSize: _fontSize)),
+                                      const SizedBox(height: 24),
+                                      ...List.generate(
+                                        _questions[questionIndex]['answers']
+                                            .length,
+                                        (answerIndex) => Padding(
+                                          padding:
+                                              const EdgeInsets.only(bottom: 16),
+                                          child: RadioButton(
+                                            checked: questionIndex ==
+                                                        _currentQuestionIndex &&
+                                                    _selectedAnswerIndex ==
+                                                        answerIndex ||
+                                                _userAnswers[questionIndex] ==
+                                                    answerIndex,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _currentQuestionIndex =
+                                                    questionIndex;
+                                                _selectedAnswerIndex =
+                                                    answerIndex;
+                                                _userAnswers[questionIndex] =
+                                                    answerIndex;
+                                              });
+                                            },
+                                            content: Text(
+                                              '${String.fromCharCode(65 + answerIndex)}. ${_questions[questionIndex]['answers'][answerIndex]['content']}',
+                                              style: TextStyle(
+                                                  fontSize: _fontSize - 2),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ],
-                              ),
+                                );
+                              },
                             ),
                           ),
                         ),
