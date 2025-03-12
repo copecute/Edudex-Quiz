@@ -167,11 +167,11 @@
                                 <i class="fas fa-sign-in-alt me-2"></i> Đăng nhập
                             </a>
                         </li>
-                        <li class="nav-item">
+                        {{-- <li class="nav-item">
                             <a class="nav-link" href="{{ route('register') }}">
                                 <i class="fas fa-user-plus me-2"></i> Đăng ký
                             </a>
-                        </li>
+                        </li> --}}
                     @else
                         <li class="nav-item dropdown user-dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button" data-bs-toggle="dropdown">
