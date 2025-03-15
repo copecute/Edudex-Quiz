@@ -7,7 +7,7 @@ start
 :Kiểm tra tài khoản;
 if (Thông tin hợp lệ?) then (Không)
     :Thông báo lỗi;
-    stop
+    :trở về trang đăng nhập;
 else (Có)
     :Chuyển đến trang chính;
 endif
@@ -39,6 +39,6 @@ if (Đổi mật khẩu?) then (Có)
     endif
 else (Không)
 endif
-
+|Người dùng|
 stop
 @enduml
