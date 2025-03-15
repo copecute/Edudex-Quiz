@@ -1,0 +1,41 @@
+@startuml
+|Quản trị hệ thống|
+start
+:Chọn chức năng Báo cáo & Thống kê;
+:Chọn kỳ thi;
+|Hệ thống|
+if (Kỳ thi hợp lệ?) then (Không)
+    :Thông báo lỗi;
+    stop
+else (Có)
+endif
+
+|Quản trị hệ thống|
+if (Xem báo cáo tổng hợp?) then (Có)
+    :Chọn loại báo cáo cần xem;
+    |Hệ thống|
+    :Truy vấn dữ liệu;
+    :Hiển thị báo cáo tổng hợp;
+else (Không)
+endif
+
+|Quản trị hệ thống|
+if (Thống kê chi tiết?) then (Có)
+    :Chọn tiêu chí thống kê (số thí sinh, điểm thi, tỷ lệ đậu, vi phạm, v.v.);
+    |Hệ thống|
+    :Tính toán số liệu thống kê;
+    :Hiển thị kết quả thống kê;
+else (Không)
+endif
+
+|Quản trị hệ thống|
+if (Xuất báo cáo?) then (Có)
+    :Chọn loại báo cáo cần xuất;
+    |Hệ thống|
+    :Xuất báo cáo ra file Excel/PDF hoặc in;
+    :Thông báo thành công;
+else (Không)
+endif
+
+stop
+@enduml

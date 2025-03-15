@@ -1,0 +1,40 @@
+@startuml
+actor "Quản trị hệ thống" as Admin
+boundary "Giao diện" as UI
+control "Hệ thống" as System
+database "Cơ sở dữ liệu" as DB
+
+Admin -> UI: Chọn chức năng Báo cáo & Thống kê
+Admin -> UI: Chọn kỳ thi
+UI -> System: Gửi yêu cầu kiểm tra kỳ thi
+System -> DB: Kiểm tra kỳ thi
+DB --> System: Kết quả kiểm tra
+alt Kỳ thi không hợp lệ
+    System -> UI: Thông báo lỗi
+else Kỳ thi hợp lệ
+end
+
+alt Xem báo cáo tổng hợp
+    Admin -> UI: Chọn loại báo cáo cần xem
+    UI -> System: Gửi yêu cầu truy vấn báo cáo tổng hợp
+    System -> DB: Truy vấn dữ liệu báo cáo
+    DB --> System: Kết quả truy vấn
+    System -> UI: Hiển thị báo cáo tổng hợp
+end
+
+alt Thống kê chi tiết
+    Admin -> UI: Chọn tiêu chí thống kê (số thí sinh, điểm thi, tỷ lệ...)
+    UI -> System: Gửi yêu cầu tính toán số liệu thống kê
+    System -> DB: Tính toán số liệu thống kê
+    DB --> System: Kết quả thống kê
+    System -> UI: Hiển thị kết quả thống kê
+end
+
+alt Xuất báo cáo
+    Admin -> UI: Chọn loại báo cáo cần xuất
+    UI -> System: Gửi yêu cầu xuất báo cáo
+    System -> DB: Xuất báo cáo ra file Excel/PDF hoặc in
+    DB --> System: Kết quả xuất báo cáo
+    System -> UI: Thông báo thành công
+end
+@enduml

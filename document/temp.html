@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mối quan hệ Actor và Use Case - Hệ Thống Edudex Quiz</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .section {
+            margin-bottom: 30px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 20px;
+        }
+        .component {
+            background-color: #f9f9f9;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .subsection {
+            margin-left: 20px;
+        }
+        .relationship {
+            font-style: italic;
+            color: #7f8c8d;
+        }
+        .actor {
+            font-weight: bold;
+            color: #2980b9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Mối quan hệ giữa các Actor và Use Case trong Hệ Thống Edudex Quiz</h1>
+        
+        <div class="section">
+            <h2>1. Các Actor chính</h2>
+            <ul>
+                <li class="actor">Quản trị hệ thống</li>
+                <li class="actor">Giáo viên</li>
+                <li class="actor">Cán bộ coi thi</li>
+                <li class="actor">Thí sinh</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>2. Các thành phần hệ thống</h2>
+            
+            <div class="component">
+                <h3>Server</h3>
+                <p>Thành phần trung tâm quản lý dữ liệu và điều phối hoạt động của hệ thống.</p>
+                <ul>
+                    <li><strong>Quản lý địa điểm thi:</strong> Quản lý các địa điểm tổ chức thi</li>
+                    <li><strong>Quản lý phòng thi:</strong> Quản lý thông tin phòng thi</li>
+                    <li><strong>Quản lý ngành:</strong> Quản lý thông tin các ngành đào tạo</li>
+                    <li><strong>Quản lý khoa:</strong> Quản lý thông tin các khoa</li>
+                    <li><strong>Quản lý môn học:</strong> Quản lý danh sách môn học</li>
+                    <li><strong>Quản lý câu hỏi:</strong> Quản lý ngân hàng câu hỏi</li>
+                    <li><strong>Quản lý đề thi:</strong> Quản lý đề thi từ ngân hàng câu hỏi</li>
+                    <li><strong>Quản lý tài khoản:</strong> Quản lý tài khoản người dùng</li>
+                    <li><strong>Xem lịch phân công:</strong> Xem thông tin phân công nhiệm vụ</li>
+                    <li><strong>Đăng nhập:</strong> Xác thực người dùng</li>
+                    <li><strong>Quản lý kỳ thi:</strong> Quản lý thông tin các kỳ thi
+                        <ul class="subsection">
+                            <li><strong>Quản lý môn thi:</strong> Quản lý môn thi trong kỳ thi</li>
+                            <li><strong>Quản lý ca thi:</strong> Quản lý thời gian các ca thi</li>
+                            <li><strong>Quản lý thí sinh:</strong> Quản lý danh sách thí sinh tham gia thi</li>
+                            <li><strong>Quản lý cán bộ coi thi:</strong> Quản lý và phân công cán bộ coi thi</li>
+                            <li><strong>Phân công:</strong> Phân công nhiệm vụ cho giáo viên và cán bộ coi thi</li>
+                            <li><strong>Phòng thi thuộc kỳ thi:</strong> Quản lý thông tin phòng thi trong kỳ thi</li>
+                        </ul>
+                    </li>
+                    <li><strong>Quản lý kết quả thi:</strong> Quản lý kết quả của thí sinh</li>
+                    <li><strong>Xem file kết quả thi:</strong> Xem báo cáo kết quả thi</li>
+                    <li><strong>Báo cáo & thống kê:</strong> Tạo báo cáo thống kê</li>
+                    <li><strong>Phân công:</strong> Phân công giáo viên và cán bộ coi thi</li>
+                </ul>
+            </div>
+            
+            <div class="component">
+                <h3>Client Teacher</h3>
+                <p>Giao diện dành cho giáo viên và cán bộ coi thi để tổ chức và quản lý các kỳ thi.</p>
+                <ul>
+                    <li><strong>Kết nối Server:</strong> Thiết lập kết nối với máy chủ trung tâm</li>
+                    <li><strong>Quản lý phòng thi:</strong> Quản lý phòng thi trong ca thi</li>
+                    <li><strong>Quản lý đề thi:</strong> Truy xuất và cấu hình đề thi</li>
+                    <li><strong>Xác thực tài khoản:</strong> Xác minh thông tin đăng nhập</li>
+                    <li><strong>Danh sách thí sinh:</strong> Quản lý danh sách thí sinh tham gia thi</li>
+                    <li><strong>Kết quả bài thi:</strong> Xem kết quả bài thi của thí sinh</li>
+                    <li><strong>Lịch sử làm bài:</strong> Xem lịch sử làm bài của thí sinh</li>
+                    <li><strong>Cài đặt:</strong> Thiết lập cấu hình hệ thống</li>
+                </ul>
+            </div>
+            
+            <div class="component">
+                <h3>Client Student</h3>
+                <p>Giao diện dành cho thí sinh tham gia làm bài thi.</p>
+                <ul>
+                    <li><strong>Kết nối Teacher Client:</strong> Thiết lập kết nối với Teacher Client</li>
+                    <li><strong>Thông tin tổng quan:</strong> Xem thông tin tổng quan về kỳ thi</li>
+                    <li><strong>Xác thực thí sinh:</strong> Xác minh danh tính thí sinh</li>
+                    <li><strong>Làm bài:</strong> Thực hiện bài thi</li>
+                    <li><strong>Lịch sử làm bài:</strong> Xem lịch sử các bài thi đã tham gia</li>
+                    <li><strong>Cài đặt:</strong> Thiết lập tùy chọn cá nhân</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>3. Mối quan hệ giữa Actor và Use Case</h2>
+            
+            <h3>Actor “Quản trị hệ thống” tác động đến các ca sử dụng</h3>
+            <ul>
+                <li>Tương tác chủ yếu với thành phần Server</li>
+                <li>Có quyền truy cập và quản lý tất cả chức năng quản lý hệ thống:
+                    <ul class="subsection">
+                        <li>Quản lý địa điểm thi</li>
+                        <li>Quản lý phòng thi</li>
+                        <li>Quản lý ngành</li>
+                        <li>Quản lý khoa</li>
+                        <li>Quản lý môn học</li>
+                        <li>Quản lý câu hỏi</li>
+                        <li>Quản lý đề thi</li>
+                        <li>Quản lý tài khoản</li>
+                        <li>Quản lý kỳ thi và các chức năng con</li>
+                        <li>Xem các báo cáo và thống kê</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h3>Actor “Giáo viên” tác động đến các ca sử dụng</h3>
+            <ul>
+                <li>Tương tác với Server và Client Teacher</li>
+                <li>Trên Server:
+                    <ul class="subsection">
+                        <li>Quản lý đề thi</li>
+                        <li>Quản lý câu hỏi</li>
+                        <li>Xem lịch phân công</li>
+                    </ul>
+                </li>
+                <li>Trên Client Teacher:
+                    <ul class="subsection">
+                        <li>Quản lý phòng thi</li>
+                        <li>Quản lý đề thi</li>
+                        <li>Xem danh sách thí sinh</li>
+                        <li>Theo dõi kết quả bài thi</li>
+                        <li>Xem lịch sử làm bài của thí sinh</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h3>Actor “Giáo viên” và “Cán bộ coi thi” tác động đến các ca sử dụng</h3>
+            <ul>
+                <li>Tương tác chủ yếu với Client Teacher</li>
+                <li>Chức năng chính:
+                    <ul class="subsection">
+                        <li>Xem danh sách thí sinh</li>
+                        <li>Theo dõi quá trình làm bài</li>
+                        <li>Xác thực tài khoản</li>
+                        <li>Xem lịch phân công</li>
+                    </ul>
+                </li>
+            </ul>
+            
+            <h3>Actor “Thí sinh” tác động đến các ca sử dụng</h3>
+            <ul>
+                <li>Tương tác chủ yếu với Client Student</li>
+                <li>Chức năng chính:
+                    <ul class="subsection">
+                        <li>Xác thực thí sinh</li>
+                        <li>Xem thông tin tổng quan</li>
+                        <li>Làm bài thi</li>
+                        <li>Xem lịch sử làm bài</li>
+                        <li>Điều chỉnh cài đặt cá nhân</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>4. Mối quan hệ giữa các Use Case</h2>
+            <ul>
+                <li class="relationship"><strong>Đăng nhập</strong> là tiền đề cho tất cả các chức năng khác, nơi các actor xác thực quyền truy cập vào hệ thống</li>
+                <li class="relationship"><strong>Quản lý kỳ thi</strong> mở rộng (extend) từ nhiều chức năng con như quản lý môn thi, ca thi, thí sinh và cán bộ coi thi</li>
+                <li class="relationship">Các chức năng <strong>Quản lý khoa, ngành, môn học</strong> có mối quan hệ bao gồm (include) với <strong>Đăng nhập</strong></li>
+                <li class="relationship"><strong>Kết nối Server</strong> từ Client Teacher và <strong>Kết nối Teacher Client</strong> từ Client Student là cầu nối dữ liệu trong hệ thống</li>
+                <li class="relationship"><strong>Làm bài</strong> của thí sinh có quan hệ include với <strong>Xác thực thí sinh</strong>, đảm bảo chỉ thí sinh hợp lệ mới được làm bài</li>
+                <li class="relationship"><strong>Kết quả bài thi</strong> là đầu ra của quá trình <strong>Làm bài</strong> và được quản lý bởi <strong>Quản lý kết quả thi</strong> trên Server</li>
+            </ul>
+        </div>
+        
+        <div class="section">
+            <h2>5. Mối quan hệ giữa các thành phần hệ thống</h2>
+            <ul>
+                <li><strong>Server:</strong>
+                    <ul class="subsection">
+                        <li>Là trung tâm điều phối và lưu trữ dữ liệu</li>
+                        <li>Kết nối với Client Teacher để truyền thông tin về kỳ thi, đề thi, phòng thi</li>
+                        <li>Lưu trữ kết quả thi và thông tin thí sinh từ Client Student thông qua Client Teacher</li>
+                    </ul>
+                </li>
+                <li><strong>Client Teacher:</strong>
+                    <ul class="subsection">
+                        <li>Kết nối với Server để nhận dữ liệu về kỳ thi, đề thi</li>
+                        <li>Kết nối với Client Student để quản lý quá trình làm bài của thí sinh</li>
+                        <li>Chuyển kết quả bài thi từ thí sinh lên Server để lưu trữ</li>
+                    </ul>
+                </li>
+                <li><strong>Client Student:</strong>
+                    <ul class="subsection">
+                        <li>Kết nối với Client Teacher để nhận đề thi và gửi bài làm</li>
+                        <li>Cung cấp giao diện cho thí sinh thực hiện bài thi</li>
+                        <li>Hiển thị kết quả và lịch sử làm bài cho thí sinh</li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
