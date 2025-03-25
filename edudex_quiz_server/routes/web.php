@@ -26,6 +26,7 @@ use App\Http\Controllers\ExamPeriodAssignmentController;
 use App\Http\Controllers\ExamPeriodStudentController;
 use App\Http\Controllers\ExamResultController;
 use App\Http\Controllers\EdudexFileController;
+use App\Http\Controllers\ExamReportController;
 
 // chuyển hướng từ trang chủ vào trang đăng nhập khi chưa đăng nhập
 Route::get('/', function () {
@@ -268,6 +269,16 @@ Route::middleware('auth')->group(function () {
     Route::get('/exam-periods/{examPeriod}/results/export', [ExamResultController::class, 'export'])
         ->name('exam-periods.results.export')
         ->middleware(['auth', 'admin']);
+
+    // thêm routes cho báo cáo kết quả thi
+    Route::prefix('exam-periods/{examPeriod}/reports')->name('exam-reports.')->group(function() {
+        Route::get('/', [ExamReportController::class, 'index'])->name('index');
+        Route::get('/by-subject', [ExamReportController::class, 'bySubject'])->name('by-subject');
+        Route::get('/by-room', [ExamReportController::class, 'byRoom'])->name('by-room');
+        Route::get('/student-ranking', [ExamReportController::class, 'studentRanking'])->name('ranking');
+        Route::get('/completion-rate', [ExamReportController::class, 'completionRate'])->name('completion');
+        Route::get('/export/{type}', [ExamReportController::class, 'export'])->name('export');
+    });
 });
 
 // quản lý kỳ thi

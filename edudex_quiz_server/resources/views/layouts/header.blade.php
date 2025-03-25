@@ -140,14 +140,6 @@
                                 </a>
                             </li>
                             <li>
-                                <a class="dropdown-item
-                                {{-- {{ request()->routeIs('exam-periods.*') ? 'active' : '' }} --}}
-                                 " 
-                                   href="{{ route('exam-periods.index') }}">
-                                    <i class="fas fa-file-alt me-2"></i> Trình hướng dẫn tổ chức kỳ thi
-                                </a>
-                            </li>
-                            <li>
                                 <a class="dropdown-item {{ request()->routeIs('edudex-files.*') ? 'active' : '' }}" 
                                    href="{{ route('edudex-files.index') }}">
                                     <i class="fas fa-calendar-alt me-2"></i> Đọc file .edudex
