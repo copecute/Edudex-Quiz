@@ -27,8 +27,8 @@ class ExamPeriodSeeder extends Seeder
         $examPeriod = ExamPeriod::create([
             'name' => 'Kỳ thi cuối kỳ 2 năm học 2024-2025',
             'description' => 'Kỳ thi cuối kỳ 2 dành cho sinh viên năm cuối',
-            'start_time' => Carbon::create(2025, 3, 1, 7, 0, 0),
-            'end_time' => Carbon::create(2025, 3, 30, 23, 59, 59),
+            'start_time' => Carbon::create(2025, 4, 1, 7, 0, 0),
+            'end_time' => Carbon::create(2025, 4, 30, 23, 59, 59),
             'is_active' => true
         ]);
 
@@ -52,16 +52,16 @@ class ExamPeriodSeeder extends Seeder
             ]
         ];
 
-        for ($day = 25; $day <= 29; $day++) {
+        for ($day = 11; $day <= 15; $day++) {
             foreach ($shiftTimes as $shift) {
                 ExamShift::create([
                     'exam_period_id' => $examPeriod->id,
                     'name' => $shift['name'] . ' ngày ' . $day,
-                    'start_time' => Carbon::create(2025, 3, $day, 
+                    'start_time' => Carbon::create(2025, 4, $day, 
                         substr($shift['time'][0], 0, 2), 
                         substr($shift['time'][0], 3, 2)
                     ),
-                    'end_time' => Carbon::create(2025, 3, $day,
+                    'end_time' => Carbon::create(2025, 4, $day,
                         substr($shift['time'][1], 0, 2),
                         substr($shift['time'][1], 3, 2)
                     ),
