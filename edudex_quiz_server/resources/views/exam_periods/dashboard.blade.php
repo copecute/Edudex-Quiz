@@ -385,21 +385,18 @@
                         </div>
                     </a>
                 </div>
-                <div class="col-md-3 mb-4">
-                    <div class="card h-100">
+                <div class="col-md-3">
+                    <a href="{{ route('exam-reports.index', $examPeriod) }}" class="card h-100 text-decoration-none">
                         <div class="card-body">
-                            <div class="d-flex align-items-center mb-3">
-                                <div class="feature-icon bg-primary text-white">
-                                    <i class="fas fa-chart-bar"></i>
-                                </div>
-                                <h5 class="mb-0 ms-3">Báo cáo kết quả thi</h5>
-                            </div>
-                            <p class="card-text text-muted">Xem thống kê, báo cáo kết quả thi và xuất báo cáo theo môn học, phòng thi.</p>
-                            <a href="{{ route('exam-reports.index', $examPeriod) }}" class="btn btn-outline-primary w-100">
-                                <i class="fas fa-chart-bar me-1"></i> Báo cáo kết quả
-                            </a>
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-bar me-2"></i>
+                                Báo cáo kết quả thi
+                            </h5>
+                            <p class="card-text text-muted">
+                                Xem thống kê, báo cáo kết quả thi và xuất báo cáo theo môn học, phòng thi.
+                            </p>
                         </div>
-                    </div>
+                    </a>
                 </div>
             </div>
         </div>
