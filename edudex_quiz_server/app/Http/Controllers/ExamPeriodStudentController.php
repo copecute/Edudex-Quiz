@@ -199,5 +199,4 @@ class ExamPeriodStudentController extends Controller
         );
     }
 
-    // ... các method khác tương tự, thay đổi tham số và logic xử lý
 } 
